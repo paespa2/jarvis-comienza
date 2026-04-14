@@ -533,22 +533,32 @@ export default function App() {
         const evaluation = await jarvisBrain.evaluator(plan, "Viabilidad, claridad y alineación con la Constitución de Jarvis.");
         response = `He trazado un plan estratégico para tu solicitud:\n\n${plan}\n\n---\n**Evaluación de Calidad:**\n${evaluation}`;
       } else {
-        // Run Safety Classifier (Auto Mode simulation)
-        const check = await jarvisBrain.safetyClassifier("Generar respuesta y actualizar memoria", userText);
-        setSafetyCheck(check);
+        // En modo local, saltamos el clasificador de seguridad simulado para permitir la ejecución real de herramientas
+        const isLocal = jarvisBrain.getEngine() === 'local';
+        
+        // Buscar en el grafo de conocimiento
+        const graphNodes = await memoryGraphService.searchNodes(userText);
+        let graphContext = "";
+        if (graphNodes.length > 0) {
+          graphContext = "\n\n[MEMORIA SEMÁNTICA RECUPERADA]:\n" + graphNodes.map(n => `- ${n.title}: ${n.content}`).join("\n");
+        }
 
-        if (!check.approved) {
-          response = `Protocolo de Seguridad activado. He bloqueado una acción potencialmente peligrosa o no autorizada explícitamente.\nMotivo: ${check.reason}`;
-        } else {
-          // Buscar en el grafo de conocimiento
-          const graphNodes = await memoryGraphService.searchNodes(userText);
-          let graphContext = "";
-          if (graphNodes.length > 0) {
-            graphContext = "\n\n[MEMORIA SEMÁNTICA RECUPERADA]:\n" + graphNodes.map(n => `- ${n.title}: ${n.content}`).join("\n");
-          }
-
-          const context = memories.slice(0, 5).map(m => m.content).join(". ") + graphContext;
+        const context = memories.slice(0, 5).map(m => m.content).join(". ") + graphContext;
+        
+        if (isLocal) {
+          // Si estamos en local, vamos directo a procesar el input sin pasar por el clasificador
+          setSafetyCheck({ approved: true, reason: "Local mode bypass" } as any);
           response = await jarvisBrain.processInput(userText, context);
+        } else {
+          // En cloud, usamos el clasificador
+          const check = await jarvisBrain.safetyClassifier("Generar respuesta y actualizar memoria", userText) as any;
+          setSafetyCheck(check as any);
+          
+          if (!check.approved) {
+            response = `Protocolo de Seguridad activado. He bloqueado una acción potencialmente peligrosa o no autorizada explícitamente.\nMotivo: ${check.reason}`;
+          } else {
+            response = await jarvisBrain.processInput(userText, context);
+          }
         }
       }
       

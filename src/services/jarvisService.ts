@@ -84,11 +84,69 @@ ai.models.generateContent = async (params: any) => {
       // MANEJAR LLAMADAS A HERRAMIENTAS (Tool Calling)
       if (message.tool_calls && message.tool_calls.length > 0) {
         const tc = message.tool_calls[0];
-        const args = tc.function.arguments;
+        const argsString = tc.function.arguments;
         
-        // Formateamos la respuesta para que se vea como una acción en la terminal
-        const responseText = `> 🛠️ **Jarvis ha invocado una herramienta:** \`${tc.function.name}\`\n>\n> 📦 **Parámetros:** \`${args}\`\n\n*Nota: Esta es una simulación del Paso 3 (Tool Calling). En el futuro, este comando se ejecutará en un contenedor Docker real.*`;
+        try {
+          const args = JSON.parse(argsString);
+          
+          if (tc.function.name === 'ejecutar_comando_kali') {
+            try {
+              // Intentar contactar al Backend Local de Jarvis
+              const execRes = await fetch('http://127.0.0.1:5000/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: args.comando })
+              });
+              
+              if (!execRes.ok) throw new Error("Error en el servidor local");
+              
+              const execData = await execRes.json();
+              const output = execData.output || execData.error || "Sin salida.";
+              
+              return { text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` } as any;
+            } catch (e) {
+              return { text: `> 🛠️ **Intento de ejecutar:** \`${args.comando}\`\n\n⚠️ **Error de Conexión:** No pude contactar al Backend Local. ¿Está corriendo el script \`jarvis_executor.py\` en el puerto 5000?` } as any;
+            }
+          }
+        } catch (parseError) {
+          console.error("Error parseando argumentos de herramienta", parseError);
+        }
+
+        // Fallback genérico
+        const responseText = `> 🛠️ **Jarvis ha invocado una herramienta:** \`${tc.function.name}\`\n>\n> 📦 **Parámetros:** \`${argsString}\``;
         return { text: responseText } as any;
+      }
+      
+      // A veces los modelos locales devuelven la llamada a la herramienta como un string JSON en el content
+      if (message.content && message.content.includes('ejecutar_comando_kali')) {
+         try {
+            // Intentar extraer JSON del string
+            const match = message.content.match(/\{[\s\S]*\}/);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (parsed.comando) {
+                    try {
+                      // Intentar contactar al Backend Local de Jarvis
+                      const execRes = await fetch('http://127.0.0.1:5000/execute', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: parsed.comando })
+                      });
+                      
+                      if (!execRes.ok) throw new Error("Error en el servidor local");
+                      
+                      const execData = await execRes.json();
+                      const output = execData.output || execData.error || "Sin salida.";
+                      
+                      return { text: `> 🛠️ **Comando ejecutado:** \`${parsed.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` } as any;
+                    } catch (e) {
+                      return { text: `> 🛠️ **Intento de ejecutar:** \`${parsed.comando}\`\n\n⚠️ **Error de Conexión:** No pude contactar al Backend Local. ¿Está corriendo el script \`jarvis_executor.py\` en el puerto 5000?` } as any;
+                    }
+                }
+            }
+         } catch(e) {
+             // Ignorar error de parseo
+         }
       }
       
       let responseText = message.content;
