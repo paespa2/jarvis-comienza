@@ -15,15 +15,16 @@
     },
     "Memory": {
       "title": "Jarvis Memory",
-      "description": "Aprendizajes y datos recolectados del día a día.",
+      "description": "Aprendizajes, historial de chat y datos recolectados del día a día.",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "content": { "type": "string" },
-        "category": { "type": "string", "enum": ["habit", "preference", "task", "observation"] },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "type": { "type": "string", "enum": ["chat", "thought", "action", "evolution", "system"] },
+        "role": { "type": "string", "enum": ["user", "jarvis"] },
+        "timestamp": { "type": "number" }
       },
-      "required": ["uid", "content", "timestamp"]
+      "required": ["uid", "content", "type", "timestamp"]
     },
     "Task": {
       "title": "Task",
@@ -39,12 +40,30 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "title", "status"]
+    },
+    "KnowledgeNode": {
+      "title": "Knowledge Node",
+      "description": "Nodos de la memoria semántica de grafos de Jarvis (estilo Obsidian).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "title": { "type": "string", "description": "El concepto principal o entidad (ej: Proyecto Alpha, Juan)" },
+        "content": { "type": "string", "description": "La información detallada sobre este nodo" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "links": { "type": "array", "items": { "type": "string" }, "description": "Títulos de otros nodos relacionados" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["uid", "title", "content", "updatedAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Perfiles de usuario."
+    },
+    "/users/{userId}/knowledge_nodes/{nodeId}": {
+      "schema": "KnowledgeNode",
+      "description": "Nodos del grafo de conocimiento de Jarvis."
     },
     "/users/{userId}/memories/{memoryId}": {
       "schema": "Memory",

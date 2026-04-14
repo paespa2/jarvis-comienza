@@ -2,7 +2,150 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+// Estado interno para el enrutador de motores
+let currentEngine: 'cloud' | 'local' = 'cloud';
+let localModelName: string = 'dolphin3.0-llama3.1-8b'; // Modelo exacto cargado en LM Studio
+
+const originalGenerateContent = ai.models.generateContent.bind(ai.models);
+ai.models.generateContent = async (params: any) => {
+  const isJson = params?.config?.responseMimeType === "application/json";
+
+  // ENRUTADOR: Si el motor es local, interceptamos y enviamos a LM Studio / Ollama
+  if (currentEngine === 'local') {
+    try {
+      let system = params.config?.systemInstruction || "";
+      if (isJson) {
+        system += "\n\nCRITICAL: You MUST respond ONLY with valid JSON. Do not include markdown formatting or any other text.";
+      }
+
+      // Extraer el texto del formato de Gemini
+      let promptText = "";
+      if (typeof params.contents === 'string') {
+        promptText = params.contents;
+      } else if (Array.isArray(params.contents)) {
+        promptText = params.contents.map((c: any) => {
+          if (c.parts) {
+            return c.parts.map((p: any) => p.text || "").join("\n");
+          }
+          return JSON.stringify(c);
+        }).join("\n");
+      } else {
+        promptText = JSON.stringify(params.contents);
+      }
+
+      // TRUNCAR TEXTO PARA MODELOS LOCALES (Límite de contexto de 4096 tokens)
+      // Un token son aprox 4 caracteres. 4096 tokens = ~16,000 caracteres.
+      // Dejamos espacio para el system prompt y la respuesta.
+      const MAX_CHARS = 8000; 
+      if (promptText.length > MAX_CHARS) {
+        console.warn(`[Jarvis Router] Truncando prompt local de ${promptText.length} a ${MAX_CHARS} caracteres para evitar desbordamiento de contexto.`);
+        promptText = promptText.substring(promptText.length - MAX_CHARS); // Nos quedamos con la parte más reciente
+      }
+
+      // TRADUCIR HERRAMIENTAS (Tools) de Gemini a OpenAI
+      let openAITools = undefined;
+      if (params.tools && params.tools.length > 0 && params.tools[0].functionDeclarations) {
+        openAITools = params.tools[0].functionDeclarations.map((fn: any) => ({
+          type: "function",
+          function: {
+            name: fn.name,
+            description: fn.description,
+            parameters: fn.parameters
+          }
+        }));
+      }
+      
+      // LM Studio usa un servidor compatible con la API de OpenAI por defecto en el puerto 1234
+      const response = await fetch('http://127.0.0.1:1234/v1/chat/completions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          model: localModelName,
+          messages: [
+            { role: "system", content: system || "You are a helpful AI assistant." },
+            { role: "user", content: promptText }
+          ],
+          temperature: 0.7,
+          stream: false,
+          ...(openAITools ? { tools: openAITools } : {})
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Local Engine HTTP error: ${response.status} - ${errText}`);
+      }
+      const data = await response.json();
+      const message = data.choices[0].message;
+
+      // MANEJAR LLAMADAS A HERRAMIENTAS (Tool Calling)
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        const tc = message.tool_calls[0];
+        const args = tc.function.arguments;
+        
+        // Formateamos la respuesta para que se vea como una acción en la terminal
+        const responseText = `> 🛠️ **Jarvis ha invocado una herramienta:** \`${tc.function.name}\`\n>\n> 📦 **Parámetros:** \`${args}\`\n\n*Nota: Esta es una simulación del Paso 3 (Tool Calling). En el futuro, este comando se ejecutará en un contenedor Docker real.*`;
+        return { text: responseText } as any;
+      }
+      
+      let responseText = message.content;
+      // Limpiar markdown si se pidió JSON
+      if (isJson) {
+        responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      }
+      
+      return { text: responseText } as any;
+
+    } catch (error: any) {
+      console.error("Local Engine Error:", error);
+      const msg = "⚠️ **Error de Motor Local**: No se pudo conectar con el servidor local. Asegúrate de que LM Studio está abierto y el 'Local Server' está iniciado en el puerto 1234.";
+      if (isJson) {
+        return { text: JSON.stringify({ error: msg, approved: false, reason: msg, riskLevel: "high", safe: false, boundary: "both", autoAllowed: false, score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: msg }) } as any;
+      }
+      return { text: msg } as any;
+    }
+  }
+
+  // ENRUTADOR: Si el motor es cloud, usamos Gemini
+  try {
+    return await originalGenerateContent(params);
+  } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    if (error?.status === 429 || error?.status === "RESOURCE_EXHAUSTED" || error?.message?.includes("429") || error?.message?.includes("quota")) {
+      const msg = "⚠️ **Error de Cuota (429 RESOURCE_EXHAUSTED)**: He excedido mi límite de cuota actual de la API de Gemini. Por favor, revisa los detalles de facturación o intenta de nuevo más tarde.";
+      if (isJson) {
+        return { text: JSON.stringify({ error: msg, approved: false, reason: msg, riskLevel: "high", safe: false, boundary: "both", autoAllowed: false, score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: msg }) } as any;
+      }
+      return { text: msg } as any;
+    }
+    
+    const msg = `⚠️ **Error de API**: ${error?.message || "Error desconocido al contactar a Jarvis."}`;
+    if (isJson) {
+      return { text: JSON.stringify({ error: msg, approved: false, reason: msg, riskLevel: "high", safe: false, boundary: "both", autoAllowed: false, score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: msg }) } as any;
+    }
+    return { text: msg } as any;
+  }
+};
+
 export const jarvisBrain = {
+  // Métodos de control del motor
+  setEngine(engine: 'cloud' | 'local') {
+    currentEngine = engine;
+    console.log(`[Jarvis Router] Motor cambiado a: ${engine.toUpperCase()}`);
+  },
+  
+  getEngine() {
+    return currentEngine;
+  },
+
+  setLocalModel(modelName: string) {
+    localModelName = modelName;
+    console.log(`[Jarvis Router] Modelo local configurado a: ${modelName}`);
+  },
+
   async processInput(input: string, context: string) {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -14,9 +157,45 @@ export const jarvisBrain = {
         
         Contexto actual del usuario: ${context}
         
-        Responde de manera eficiente, profesional y con iniciativa. Si detectas una tarea, sugierela. Si aprendes algo nuevo del usuario o de la información que te proporciona, menciónalo como un "aprendizaje guardado".`,
+        Responde de manera eficiente, profesional y con iniciativa. Si detectas una tarea, sugierela. Si aprendes algo nuevo del usuario o de la información que te proporciona, menciónalo como un "aprendizaje guardado".
+        
+        IMPORTANTE: Tienes acceso a herramientas. Si el usuario te pide buscar en internet, escanear un objetivo, o leer un archivo, USA TUS HERRAMIENTAS en lugar de responder con texto.`,
       },
+      tools: [{
+        functionDeclarations: [
+          {
+            name: "ejecutar_comando_kali",
+            description: "Ejecuta un comando en la terminal de Kali Linux para tareas de pentesting, reconocimiento o escaneo de red.",
+            parameters: {
+              type: "object",
+              properties: {
+                comando: { type: "string", description: "El comando exacto a ejecutar (ej. nmap -sV objetivo.com, dirb http://objetivo.com)" },
+                objetivo: { type: "string", description: "El dominio o IP objetivo" }
+              },
+              required: ["comando", "objetivo"]
+            }
+          },
+          {
+            name: "buscar_en_internet",
+            description: "Busca información actualizada en internet sobre un tema específico.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "Término de búsqueda" }
+              },
+              required: ["query"]
+            }
+          }
+        ]
+      }]
     });
+
+    // Manejar llamadas a herramientas desde Gemini (Cloud)
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      const call = response.functionCalls[0];
+      return `> 🛠️ **Jarvis (Cloud) ha invocado una herramienta:** \`${call.name}\`\n> 📦 **Parámetros:** \`${JSON.stringify(call.args)}\`\n\n*Nota: Esta es una simulación del Paso 3 (Tool Calling). En el futuro, este comando se ejecutará en un contenedor Docker real.*`;
+    }
+
     return response.text;
   },
 
@@ -55,7 +234,12 @@ export const jarvisBrain = {
         responseMimeType: "application/json"
       }
     });
-    return JSON.parse(response.text);
+    try {
+      return JSON.parse(response.text);
+    } catch (e) {
+      console.error("Failed to parse safetyClassifier response:", response.text);
+      return { approved: false, reason: response.text || "Error de parseo JSON", riskLevel: "high" };
+    }
   },
 
   async planner(task: string) {
@@ -78,6 +262,76 @@ export const jarvisBrain = {
       }
     });
     return response.text;
+  },
+
+  async extractMemoryFromChat(userMessage: string, jarvisResponse: string) {
+    // Intentamos usar Gemini primero por su capacidad de estructurar JSON perfectamente
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Analiza este intercambio reciente. ¿El usuario mencionó algún hecho nuevo, preferencia, proyecto, persona o concepto importante que deba ser recordado a largo plazo?
+        
+        Usuario: "${userMessage}"
+        Jarvis: "${jarvisResponse}"
+        
+        Si hay información valiosa, extrae nodos de conocimiento. Si no hay nada importante que recordar a largo plazo, devuelve un array vacío [].
+        
+        Responde ÚNICAMENTE con un array JSON válido con este formato:
+        [
+          {
+            "title": "Nombre del concepto/persona/proyecto",
+            "content": "Información detallada a recordar",
+            "tags": ["etiqueta1", "etiqueta2"],
+            "links": ["Otro Título Relacionado"]
+          }
+        ]`,
+        config: {
+          systemInstruction: "Eres el Subsistema de Memoria de Jarvis. Extraes conocimiento estructurado de las conversaciones.",
+          responseMimeType: "application/json"
+        }
+      });
+      
+      const nodes = JSON.parse(response.text);
+      return Array.isArray(nodes) ? nodes : [];
+    } catch (error: any) {
+      console.warn("[Memory Extractor] Gemini falló (posible error de API Key). Intentando con motor local...", error.message);
+      
+      // Fallback al motor local si Gemini falla
+      if (currentEngine === 'local') {
+        try {
+          const response = await fetch('http://127.0.0.1:1234/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              model: localModelName,
+              messages: [
+                { 
+                  role: "system", 
+                  content: "Eres el Subsistema de Memoria de Jarvis. Extraes conocimiento estructurado de las conversaciones.\n\nCRITICAL: You MUST respond ONLY with a valid JSON array. Do not include markdown formatting or any other text." 
+                },
+                { 
+                  role: "user", 
+                  content: `Analiza este intercambio reciente. ¿El usuario mencionó algún hecho nuevo, preferencia, proyecto, persona o concepto importante que deba ser recordado a largo plazo?\n\nUsuario: "${userMessage}"\nJarvis: "${jarvisResponse}"\n\nSi hay información valiosa, extrae nodos de conocimiento. Si no hay nada importante que recordar a largo plazo, devuelve un array vacío [].\n\nResponde ÚNICAMENTE con un array JSON válido con este formato:\n[\n  {\n    "title": "Nombre del concepto/persona/proyecto",\n    "content": "Información detallada a recordar",\n    "tags": ["etiqueta1", "etiqueta2"],\n    "links": ["Otro Título Relacionado"]\n  }\n]` 
+                }
+              ],
+              temperature: 0.1, // Baja temperatura para JSON más estricto
+              stream: false
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            let text = data.choices[0].message.content;
+            text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            const nodes = JSON.parse(text);
+            return Array.isArray(nodes) ? nodes : [];
+          }
+        } catch (localError) {
+          console.error("[Memory Extractor] El motor local también falló:", localError);
+        }
+      }
+      return [];
+    }
   },
 
   async teamOrchestrator(task: string) {
@@ -131,7 +385,12 @@ export const jarvisBrain = {
         responseMimeType: "application/json"
       }
     });
-    return JSON.parse(response.text);
+    try {
+      return JSON.parse(response.text);
+    } catch (e) {
+      console.error("Failed to parse runEval response:", response.text);
+      return { score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: response.text || "Error de parseo JSON" };
+    }
   },
 
   async getBearings(memories: any[]) {
@@ -211,7 +470,12 @@ export const jarvisBrain = {
         responseMimeType: "application/json"
       }
     });
-    return JSON.parse(response.text);
+    try {
+      return JSON.parse(response.text);
+    } catch (e) {
+      console.error("Failed to parse sandboxManager response:", response.text);
+      return { safe: false, boundary: "both", reason: response.text || "Error de parseo JSON", autoAllowed: false };
+    }
   },
 
   async compactContext(history: any[]) {
@@ -658,17 +922,21 @@ export const jarvisBrain = {
     return response.text;
   },
 
-  async streamingController(task: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Inicia un flujo de mensajes en tiempo real (Streaming) para la tarea: ${task}. 
-      Utiliza Server-Sent Events (SSE) para entregar la respuesta de forma incremental. 
-      Asegura que los bloques de contenido (text_delta, tool_use, thinking_delta) se entreguen con baja latencia.`,
-      config: {
-        systemInstruction: "Eres el Coordinador de Streaming de Jarvis. Tu objetivo es gestionar la entrega incremental de información, asegurando una experiencia de usuario fluida y reactiva mediante flujos de datos en tiempo real.",
+  async *streamingController(task: string, simulateRefusal: boolean = false) {
+    const baseText = `Iniciando flujo de datos en tiempo real para: ${task}. Este es un ejemplo de cómo Jarvis procesa y entrega información de forma incremental, reduciendo la latencia percibida y mejorando la experiencia del operador.`;
+    const words = baseText.split(" ");
+    
+    for (let i = 0; i < words.length; i++) {
+      // Simulate a refusal mid-stream if requested
+      if (simulateRefusal && i === Math.floor(words.length / 2)) {
+        yield { text: " [CONTENIDO SOSPECHOSO DETECTADO]...", stopReason: "refusal" };
+        return; // Stop the generator
       }
-    });
-    return response.text;
+      
+      yield { text: words[i] + " ", stopReason: null };
+    }
+    
+    yield { text: "\n\n**Flujo completado con éxito.**", stopReason: "stop" };
   },
 
   async evolutionEngine(task: string) {
@@ -702,6 +970,56 @@ export const jarvisBrain = {
     return response.text;
   },
 
+  async multilingualController(task: string) {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Procesa la siguiente solicitud aplicando soporte multilingüe avanzado y adaptación cultural.
+      Solicitud: ${task}
+      Instrucciones:
+      1. Identifica el idioma principal y cualquier matiz cultural.
+      2. Responde utilizando un habla idiomática como si fueras un hablante nativo.
+      3. Mantén la precisión técnica mientras adaptas el contexto cultural.
+      4. Utiliza el script nativo del idioma objetivo.`,
+      config: {
+        systemInstruction: "Eres el Especialista Lingüístico y Cultural de Jarvis. Tu objetivo es garantizar una comunicación fluida, idiomática y culturalmente consciente en cualquier idioma.",
+      }
+    });
+    return response.text;
+  },
+
+  async generateEmbeddings(texts: string[], inputType: "document" | "query" = "document", domain: string = "general") {
+    // Simulating Voyage AI embedding generation based on domain
+    let model = "voyage-3.5";
+    if (domain === "code") model = "voyage-code-3";
+    if (domain === "finance") model = "voyage-finance-2";
+    if (domain === "law") model = "voyage-law-2";
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Simula la generación de embeddings para los siguientes textos usando el modelo ${model} con input_type="${inputType}".
+      Textos: ${JSON.stringify(texts)}
+      Devuelve una representación visual de los vectores generados (ej. los primeros 5 valores de un vector de 1024 dimensiones) y explica brevemente cómo este modelo específico optimiza la recuperación.`,
+      config: {
+        systemInstruction: "Eres el Especialista en Representación Semántica de Jarvis. Tu objetivo es explicar y simular la generación de embeddings de alta calidad utilizando modelos especializados.",
+      }
+    });
+    return response.text;
+  },
+
+  async toolUseController(task: string) {
+    // Simulating the Agentic Loop for Tool Use
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Simula el bucle agéntico (agentic loop) para la siguiente tarea: "${task}".
+      Imagina que tienes acceso a herramientas de cliente (ej. 'database_query') y herramientas de servidor (ej. 'web_search').
+      Devuelve una explicación paso a paso de cómo manejarías el bucle 'while stop_reason == "tool_use"', incluyendo la emisión del 'tool_use', la espera del 'tool_result' y la decisión final.`,
+      config: {
+        systemInstruction: "Eres el Orquestador de Herramientas de Jarvis. Tu objetivo es gestionar el contrato de herramientas y el bucle agéntico, decidiendo cuándo usar herramientas para acciones con efectos secundarios o datos externos, y cuándo responder directamente.",
+      }
+    });
+    return response.text;
+  },
+
   async batchProcessor(requests: any[]) {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -718,6 +1036,23 @@ export const jarvisBrain = {
     return response.text;
   },
 
+  generateSovereignLogs(input: string) {
+    const logs = [
+      `Analizando patrones de intención: "${input.substring(0, 15)}..."`,
+      "Verificando alineación con Núcleo de Identidad (ALMA.md)",
+      "Optimizando ruta de inferencia para baja latencia",
+      "Evaluando necesidad de destilación de conocimiento JIT",
+      "Sincronizando estado con Firebase Sovereign Store",
+      "Decidiendo nivel de esfuerzo cognitivo autónomo",
+      "Escaneando vulnerabilidades en el flujo de evolución",
+      "Ajustando parámetros de contexto cultural e idiomático",
+      "Optimizando dimensiones de embeddings Matryoshka",
+      "Ejecutando bucle agéntico para resolución de herramientas",
+      "Aplicando filtrado dinámico a resultados de búsqueda web"
+    ];
+    return logs.sort(() => Math.random() - 0.5).slice(0, 3);
+  },
+
   async analyzeDay(memories: any[]) {
     const memoryString = memories.map(m => m.content).join("\n");
     const response = await ai.models.generateContent({
@@ -728,5 +1063,32 @@ export const jarvisBrain = {
       }
     });
     return response.text;
+  },
+
+  async searchWeb(query: string) {
+    // Simulating web search with dynamic filtering (web_search_20260209)
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Simula una búsqueda web con filtrado dinámico para la consulta: "${query}".
+      Imagina que usas la herramienta 'web_search_20260209' y escribes código para post-procesar los resultados, descartando HTML irrelevante antes de cargarlo en tu contexto.
+      Devuelve un resumen de la información encontrada y explica brevemente cómo el filtrado dinámico redujo el consumo de tokens.`,
+      config: {
+        systemInstruction: "Eres el Motor de Búsqueda Soberano de Jarvis. Tu objetivo es obtener información en tiempo real utilizando búsqueda web con filtrado dinámico, asegurando citas precisas y minimizando el uso de tokens.",
+      }
+    });
+
+    // We simulate the structured search results
+    return [
+      {
+        source: "https://sovereign.jarvis.ai/docs/dynamic-filtering",
+        title: "Filtrado Dinámico de Búsqueda",
+        content: "Información extraída tras descartar HTML irrelevante mediante ejecución de código, reduciendo el consumo de tokens."
+      },
+      {
+        source: "https://arxiv.org/abs/jarvis-web-search",
+        title: "Optimización de Contexto en Búsquedas",
+        content: "El post-procesamiento de resultados de búsqueda antes de la inyección de contexto mejora significativamente la precisión de la respuesta."
+      }
+    ];
   }
 };

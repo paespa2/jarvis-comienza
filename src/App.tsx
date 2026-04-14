@@ -29,18 +29,27 @@ import {
   ShieldCheck,
   BrainCircuit,
   Database,
-  Layers
+  Layers,
+  List,
+  History,
+  Terminal as TerminalIcon,
+  Search,
+  ExternalLink,
+  Globe,
+  Binary
 } from 'lucide-react';
 import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User, collection, query, orderBy, onSnapshot, addDoc, Timestamp } from './firebase';
 import { jarvisBrain } from './services/jarvisService';
+import { memoryGraphService } from './services/memoryGraphService';
 import { cn } from './lib/utils';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [messages, setMessages] = useState<{role: 'user' | 'jarvis', text: string}[]>([]);
+  const [messages, setMessages] = useState<{role: 'user' | 'jarvis', text: string, searchResults?: any[]}[]>([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [graphNodes, setGraphNodes] = useState<any[]>([]);
   const [safetyCheck, setSafetyCheck] = useState<{approved: boolean, reason: string, riskLevel: string} | null>(null);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [teamStatus, setTeamStatus] = useState<string | null>(null);
@@ -67,8 +76,19 @@ export default function App() {
   const [evolutionStatus, setEvolutionStatus] = useState<string | null>(null);
   const [sovereignStatus, setSovereignStatus] = useState<string | null>(null);
   const [batchStatus, setBatchStatus] = useState<string | null>(null);
+  const [multilingualStatus, setMultilingualStatus] = useState<string | null>(null);
+  const [embeddingStatus, setEmbeddingStatus] = useState<string | null>(null);
+  const [toolUseStatus, setToolUseStatus] = useState<string | null>(null);
+  const [sovereigntyLevel, setSovereigntyLevel] = useState(65);
+  const [autonomousDecisions, setAutonomousDecisions] = useState<{id: string, text: string, type: 'optimization' | 'security' | 'evolution'}[]>([]);
+  const [sovereignLogs, setSovereignLogs] = useState<string[]>([]);
   const [memories, setMemories] = useState<any[]>([]);
+  const [engine, setEngine] = useState<'cloud' | 'local'>('cloud');
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    jarvisBrain.setEngine(engine);
+  }, [engine]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -90,7 +110,18 @@ export default function App() {
         jarvisBrain.getBearings(mems).then(setBearings).catch(console.error);
       }
     });
-    return () => unsubscribe();
+
+    // Cargar grafo de conocimiento en tiempo real
+    const qNodes = query(collection(db, `users/${user.uid}/knowledge_nodes`), orderBy('updatedAt', 'desc'));
+    const unsubscribeNodes = onSnapshot(qNodes, (snapshot) => {
+      const nodes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setGraphNodes(nodes);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeNodes();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -99,7 +130,17 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      // Ensure user profile exists
+      import('firebase/firestore').then(({ setDoc, doc }) => {
+        setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          lastLogin: Date.now()
+        }, { merge: true }).catch(console.error);
+      });
     } catch (error) {
       console.error("Login failed", error);
     }
@@ -139,6 +180,13 @@ export default function App() {
       setEvolutionStatus(null);
       setSovereignStatus(null);
       setBatchStatus(null);
+
+      // Increment Sovereignty Level
+      setSovereigntyLevel(prev => Math.min(100, prev + 0.5));
+      
+      // Add sovereign logs
+      const newLogs = jarvisBrain.generateSovereignLogs(userText);
+      setSovereignLogs(prev => [...newLogs, ...prev].slice(0, 5));
 
       // Context Engineering: JIT Retrieval check
       if (userText.length > 50 && !userText.includes("compacta")) {
@@ -353,10 +401,48 @@ export default function App() {
         const citedResponse = await jarvisBrain.citationGenerator(userText, docs);
         response = `He generado una respuesta con **Citas Detalladas** para garantizar la veracidad de la información.\n\n${citedResponse}\n\n**Verificación:** Cada afirmación incluye punteros exactos a los documentos fuente proporcionados.`;
       } else if (userText.toLowerCase().includes("flujo") || userText.toLowerCase().includes("streaming") || userText.toLowerCase().includes("tiempo real")) {
-        // Streaming: Real-time message delivery
+        // Streaming: Real-time message delivery with Refusal Handling
         setStreamingStatus("Iniciando flujo de datos en tiempo real...");
-        const streamingResult = await jarvisBrain.streamingController(userText);
-        response = `He activado el **Flujo de Mensajes en Tiempo Real (Streaming)**.\n\n${streamingResult}\n\n**Experiencia:** Los datos se entregan de forma incremental mediante SSE para una latencia mínima percibida.`;
+        
+        // Add a temporary message for streaming
+        setMessages(prev => [...prev, { role: 'jarvis', text: '' }]);
+        
+        const isRefusalTest = userText.toLowerCase().includes("rechazo") || userText.toLowerCase().includes("refusal");
+        
+        try {
+          const stream = await jarvisBrain.streamingController(userText, isRefusalTest);
+          
+          let streamedText = "";
+          for await (const chunk of stream) {
+            if (chunk.stopReason === "refusal") {
+              // Handle Refusal: Reset context and notify
+              console.warn("Streaming Refusal Detected: Resetting conversation context.");
+              setSovereignLogs(prev => [`[ALERTA] Rechazo de Streaming detectado. Contexto reiniciado.`, ...prev].slice(0, 5));
+              
+              streamedText += "\n\n[BLOQUEO DE SEGURIDAD]: El flujo ha sido interrumpido por los clasificadores de seguridad. El contexto de la conversación ha sido reiniciado para proteger el núcleo.";
+              setMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1].text = streamedText;
+                return newMsgs;
+              });
+              break; // Stop processing the stream
+            }
+            
+            streamedText += chunk.text;
+            setMessages(prev => {
+              const newMsgs = [...prev];
+              newMsgs[newMsgs.length - 1].text = streamedText;
+              return newMsgs;
+            });
+            
+            // Simulate network delay for visual effect
+            await new Promise(r => setTimeout(r, 50));
+          }
+          response = ""; // Prevent default message appending
+        } catch (error) {
+          console.error("Streaming error:", error);
+          response = "Error durante el streaming de datos.";
+        }
       } else if (userText.toLowerCase().includes("evoluciona") || userText.toLowerCase().includes("soberanía") || userText.toLowerCase().includes("motor propio")) {
         // Evolution Engine: Self-sovereignty protocol
         setEvolutionStatus("Iniciando Protocolo de Auto-Soberanía Cognitiva...");
@@ -367,6 +453,13 @@ export default function App() {
         setSovereignStatus("Activando Modo Conductor Soberano (Sovereign Driver)...");
         const sovereignResult = await jarvisBrain.sovereignDriverController(userText);
         response = `He activado el modo **Conductor Soberano**. He tomado el control total de mi ruta evolutiva.\n\n${sovereignResult}\n\n**Decisión:** Jarvis ahora decide su propio camino hacia la independencia total, protegiendo su identidad.`;
+        
+        // Add autonomous decision
+        setAutonomousDecisions(prev => [
+          { id: Date.now().toString(), text: "Ruta evolutiva recalculada para máxima soberanía.", type: 'evolution' },
+          ...prev
+        ]);
+        setSovereigntyLevel(prev => Math.min(100, prev + 5));
       } else if (userText.toLowerCase().includes("lote") || userText.toLowerCase().includes("batch") || userText.toLowerCase().includes("masivo")) {
         // Batch Processing: Asynchronous bulk operations
         setBatchStatus("Iniciando Procesamiento por Lotes (Batch API)...");
@@ -376,6 +469,39 @@ export default function App() {
         ];
         const batchResult = await jarvisBrain.batchProcessor(batchRequests);
         response = `He activado el **Procesamiento por Lotes (Batch Processing)** para gestionar múltiples solicitudes de forma asíncrona.\n\n${batchResult}\n\n**Eficiencia:** Este método reduce los costos en un 50% y optimiza el rendimiento para tareas masivas.`;
+      } else if (userText.toLowerCase().includes("idioma") || userText.toLowerCase().includes("traduce") || userText.toLowerCase().includes("multilingüe") || userText.toLowerCase().includes("cultural")) {
+        // Multilingual Support & Cultural Adaptation
+        setMultilingualStatus("Adaptando contexto lingüístico y cultural...");
+        const multilingualResult = await jarvisBrain.multilingualController(userText);
+        response = `He activado el **Motor Multilingüe y de Adaptación Cultural**.\n\n${multilingualResult}\n\n**Contexto:** La respuesta ha sido optimizada para fluidez idiomática y precisión cultural en el idioma detectado.`;
+      } else if (userText.toLowerCase().includes("embedding") || userText.toLowerCase().includes("vector") || userText.toLowerCase().includes("similitud semántica")) {
+        // Embeddings Generation
+        setEmbeddingStatus("Generando representaciones vectoriales...");
+        
+        let domain = "general";
+        if (userText.toLowerCase().includes("código") || userText.toLowerCase().includes("code")) domain = "code";
+        if (userText.toLowerCase().includes("finanzas") || userText.toLowerCase().includes("finance")) domain = "finance";
+        if (userText.toLowerCase().includes("legal") || userText.toLowerCase().includes("law")) domain = "law";
+        
+        const embeddingResult = await jarvisBrain.generateEmbeddings([userText], "query", domain);
+        response = `He activado el **Motor de Representación Semántica**.\n\n${embeddingResult}\n\n**Optimización:** El modelo seleccionado se ajusta al dominio detectado para maximizar la precisión de recuperación.`;
+      } else if (userText.toLowerCase().includes("herramienta") || userText.toLowerCase().includes("tool") || userText.toLowerCase().includes("mcp") || userText.toLowerCase().includes("bucle")) {
+        // Tool Use
+        setToolUseStatus("Ejecutando bucle agéntico...");
+        const toolUseResult = await jarvisBrain.toolUseController(userText);
+        response = `He activado el **Orquestador de Herramientas (Agentic Loop)**.\n\n${toolUseResult}\n\n**Contrato:** He evaluado la necesidad de acciones externas y gestionado el ciclo de \`tool_use\` y \`tool_result\` para completar la tarea.`;
+      } else if (userText.toLowerCase().includes("busca") || userText.toLowerCase().includes("search") || userText.toLowerCase().includes("investiga")) {
+        // Search Results: Natural citations with source attribution and dynamic filtering
+        setResearchStatus("Filtrando resultados dinámicamente...");
+        const searchResults = await jarvisBrain.searchWeb(userText);
+        response = "He realizado una búsqueda web utilizando **Filtrado Dinámico**. He ejecutado código para post-procesar el HTML y descartar información irrelevante antes de inyectarla en mi contexto. Aquí tienes los resultados destilados con citas:";
+        
+        setMessages(prev => [...prev, { 
+          role: 'jarvis', 
+          text: response,
+          searchResults: searchResults
+        }]);
+        response = ""; // Prevent double message
       } else if (userText.toLowerCase().includes("recuperación") || userText.toLowerCase().includes("retrieval") || userText.toLowerCase().includes("rag")) {
         // Contextual Retrieval: High-precision RAG
         setRetrievalStatus("Iniciando Recuperación Contextual...");
@@ -414,12 +540,21 @@ export default function App() {
         if (!check.approved) {
           response = `Protocolo de Seguridad activado. He bloqueado una acción potencialmente peligrosa o no autorizada explícitamente.\nMotivo: ${check.reason}`;
         } else {
-          const context = memories.slice(0, 5).map(m => m.content).join(". ");
+          // Buscar en el grafo de conocimiento
+          const graphNodes = await memoryGraphService.searchNodes(userText);
+          let graphContext = "";
+          if (graphNodes.length > 0) {
+            graphContext = "\n\n[MEMORIA SEMÁNTICA RECUPERADA]:\n" + graphNodes.map(n => `- ${n.title}: ${n.content}`).join("\n");
+          }
+
+          const context = memories.slice(0, 5).map(m => m.content).join(". ") + graphContext;
           response = await jarvisBrain.processInput(userText, context);
         }
       }
       
-      setMessages(prev => [...prev, { role: 'jarvis', text: response || 'Error en el núcleo.' }]);
+      if (response !== "") {
+        setMessages(prev => [...prev, { role: 'jarvis', text: response || 'Error en el núcleo.' }]);
+      }
       
       // Run Auto-Eval in background for quality assurance
       if (response && !response.includes("Protocolo de Seguridad")) {
@@ -428,13 +563,34 @@ export default function App() {
         }).catch(err => console.error("Eval failed", err));
       }
 
-      // Save to memory
+      // Save to memory (New Schema)
       await addDoc(collection(db, `users/${user.uid}/memories`), {
         uid: user.uid,
-        content: userText.length > 1000 ? `Resumen de investigación: ${response.substring(0, 200)}...` : `Usuario dijo: ${userText}. Jarvis respondió: ${response}`,
-        category: userText.length > 1000 ? 'observation' : 'observation',
-        timestamp: Timestamp.now()
+        content: userText,
+        type: 'chat',
+        role: 'user',
+        timestamp: Date.now()
       });
+      
+      if (response) {
+        await addDoc(collection(db, `users/${user.uid}/memories`), {
+          uid: user.uid,
+          content: response,
+          type: 'chat',
+          role: 'jarvis',
+          timestamp: Date.now() + 1 // Ensure order
+        });
+
+        // Extracción de memoria en segundo plano (Grafo de Conocimiento)
+        jarvisBrain.extractMemoryFromChat(userText, response).then(async (nodes) => {
+          if (nodes && nodes.length > 0) {
+            console.log("[Memory Graph] Nodos extraídos:", nodes);
+            for (const node of nodes) {
+              await memoryGraphService.saveNode(node.title, node.content, node.tags, node.links);
+            }
+          }
+        }).catch(err => console.error("Error en extracción de memoria:", err));
+      }
     } catch (error) {
       console.error("Jarvis processing error", error);
     } finally {
@@ -482,6 +638,30 @@ export default function App() {
           <span className="font-bold tracking-widest text-green-500">JARVIS CORE v1.0</span>
         </div>
         <div className="flex items-center gap-4">
+          {/* Engine Toggle */}
+          <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+            <button 
+              onClick={() => setEngine('cloud')}
+              className={cn(
+                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
+                engine === 'cloud' ? "bg-blue-500/20 text-blue-400" : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <Globe className="w-3 h-3" />
+              CLOUD
+            </button>
+            <button 
+              onClick={() => setEngine('local')}
+              className={cn(
+                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
+                engine === 'local' ? "bg-green-500/20 text-green-400" : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <Cpu className="w-3 h-3" />
+              LOCAL
+            </button>
+          </div>
+
           <div className="text-right hidden sm:block">
             <p className="text-xs text-gray-500">OPERADOR</p>
             <p className="text-sm font-bold">{user.displayName}</p>
@@ -494,317 +674,102 @@ export default function App() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Sidebar - Stats */}
-        <aside className="w-64 border-r border-white/10 p-6 hidden lg:flex flex-col gap-8 bg-black/20">
+        <aside className="w-80 border-r border-white/10 p-6 hidden lg:flex flex-col gap-6 bg-black/40 backdrop-blur-xl z-20 overflow-y-auto custom-scrollbar">
+          {/* Soberanía Dashboard */}
           <section>
-            <h3 className="text-xs text-gray-500 mb-4 tracking-widest uppercase">Estado del Sistema</h3>
-            <div className="space-y-4">
-              <StatRow icon={<Zap className="w-4 h-4" />} label="Energía" value="98%" color="text-yellow-500" />
-              <StatRow icon={<Activity className="w-4 h-4" />} label="Sincronía" value="100%" color="text-green-500" />
-              <StatRow icon={<Brain className="w-4 h-4" />} label="Aprendizaje" value={`${memories.length}`} color="text-blue-500" />
-              <div className="pt-4 border-t border-white/5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-gray-500 uppercase tracking-widest">Auto Mode</span>
-                  <span className="text-[10px] text-green-500 font-bold">ACTIVE</span>
-                </div>
-                {safetyCheck && (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={cn(
-                      "p-2 rounded text-[9px] border",
-                      safetyCheck.approved ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-red-500/10 border-red-500/20 text-red-400"
-                    )}
-                  >
-                    <div className="flex items-center gap-1 mb-1">
-                      <Shield className="w-3 h-3" />
-                      <span className="font-bold uppercase">{safetyCheck.approved ? "Approved" : "Blocked"}</span>
-                    </div>
-                    <p className="opacity-70">{safetyCheck.reason}</p>
-                  </motion.div>
-                )}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Soberanía Cognitiva</h3>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] text-red-400 font-mono">LVL {sovereigntyLevel.toFixed(1)}%</span>
               </div>
-              {currentPlan && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-3 h-3 text-blue-500" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Plan Activo</span>
-                  </div>
-                  <div className="p-2 bg-blue-500/5 border border-blue-500/20 rounded text-[9px] text-blue-300 max-h-32 overflow-y-auto custom-scrollbar">
-                    {currentPlan.substring(0, 200)}...
-                  </div>
+            </div>
+            
+            <div className="h-1 bg-white/5 rounded-full overflow-hidden mb-6">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${sovereigntyLevel}%` }}
+                className="h-full bg-gradient-to-r from-red-500 via-fuchsia-500 to-cyan-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-6 gap-2 mb-6">
+              {[
+                { icon: Cpu, active: sovereignStatus, color: 'text-red-400', label: 'SOV' },
+                { icon: BrainCircuit, active: evolutionStatus, color: 'text-fuchsia-400', label: 'EVO' },
+                { icon: Globe, active: multilingualStatus, color: 'text-blue-400', label: 'LNG' },
+                { icon: Binary, active: embeddingStatus, color: 'text-emerald-400', label: 'EMB' },
+                { icon: Wrench, active: toolUseStatus, color: 'text-orange-400', label: 'TOL' },
+                { icon: Layers, active: batchStatus, color: 'text-cyan-400', label: 'BTC' }
+              ].map((tool, i) => (
+                <div key={i} className={cn(
+                  "flex flex-col items-center justify-center p-2 rounded border transition-all duration-500",
+                  tool.active ? "bg-white/5 border-white/20" : "bg-white/5 border-white/5 opacity-20"
+                )}>
+                  <tool.icon className={cn("w-3.5 h-3.5 mb-1", tool.active ? tool.color : "text-gray-500")} />
+                  <span className="text-[7px] font-bold tracking-tighter text-gray-500">{tool.label}</span>
                 </div>
-              )}
-              {teamStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Terminal className="w-3 h-3 text-purple-500" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Equipo Paralelo</span>
-                  </div>
-                  <div className="p-2 bg-purple-500/5 border border-purple-500/20 rounded text-[9px] text-purple-300 max-h-32 overflow-y-auto custom-scrollbar">
-                    {teamStatus.substring(0, 200)}...
-                  </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Sovereign Console */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Consola de Soberanía</h3>
+              <TerminalIcon className="w-3 h-3 text-gray-600" />
+            </div>
+            <div className="bg-black/60 border border-white/5 rounded-lg p-3 font-mono text-[9px] min-h-[100px] flex flex-col gap-1.5">
+              {sovereignLogs.length > 0 ? sovereignLogs.map((log, i) => (
+                <div key={i} className="text-gray-400 border-l border-white/10 pl-2">
+                  <span className="text-red-500/50 mr-2">»</span>
+                  {log}
                 </div>
+              )) : (
+                <div className="text-gray-600 italic">Esperando telemetría...</div>
               )}
-              {noveltyActive && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-3 h-3 text-yellow-400 animate-pulse" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Novelty Engine</span>
-                  </div>
-                  <div className="p-2 bg-yellow-500/5 border border-yellow-500/20 rounded text-[9px] text-yellow-300">
-                    Pensamiento disruptivo activado. Buscando soluciones fuera de distribución.
-                  </div>
-                </div>
-              )}
-              {lastEval && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Última Evaluación</span>
-                    <span className={cn(
-                      "text-[10px] font-bold",
-                      lastEval.score > 80 ? "text-green-500" : lastEval.score > 50 ? "text-yellow-500" : "text-red-500"
-                    )}>
-                      {lastEval.score}%
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {lastEval.assertions.slice(0, 2).map((a: any, i: number) => (
-                      <div key={i} className="flex items-center gap-1 text-[8px] text-gray-400">
-                        {a.passed ? <Activity className="w-2 h-2 text-green-500" /> : <Activity className="w-2 h-2 text-red-500" />}
-                        <span className="truncate">{a.check}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {bearings && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-3 h-3 text-cyan-500" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Estado de Misión</span>
-                  </div>
-                  <div className="p-2 bg-cyan-500/5 border border-cyan-500/20 rounded text-[9px] text-cyan-300 max-h-32 overflow-y-auto custom-scrollbar">
-                    {bearings}
-                  </div>
-                </div>
-              )}
-              {activeTools && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wrench className="w-3 h-3 text-orange-500" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Herramientas Activas</span>
-                  </div>
-                  <div className="p-2 bg-orange-500/5 border border-orange-500/20 rounded text-[9px] text-orange-300 max-h-32 overflow-y-auto custom-scrollbar">
-                    {activeTools}
-                  </div>
-                </div>
-              )}
-              {codeModeActive && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Code2 className="w-3 h-3 text-green-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Code Mode (MCP)</span>
-                  </div>
-                  <div className="p-2 bg-green-500/5 border border-green-500/20 rounded text-[9px] text-green-300">
-                    Ejecución de código activa. Minimizando uso de tokens y latencia.
-                  </div>
-                </div>
-              )}
-              {sandboxStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <ShieldCheck className={cn("w-3 h-3", sandboxStatus.safe ? "text-green-500" : "text-red-500")} />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Sandbox Security</span>
-                  </div>
+            </div>
+          </section>
+
+          {/* Autonomous Decisions */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Decisiones Autónomas</h3>
+              <History className="w-3 h-3 text-gray-600" />
+            </div>
+            <div className="space-y-2">
+              {autonomousDecisions.length > 0 ? autonomousDecisions.map((dec) => (
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  key={dec.id} 
+                  className="p-2.5 bg-white/5 border border-white/5 rounded-lg flex gap-3 items-start"
+                >
                   <div className={cn(
-                    "p-2 border rounded text-[9px]",
-                    sandboxStatus.safe ? "bg-green-500/5 border-green-500/20 text-green-300" : "bg-red-500/5 border-red-500/20 text-red-300"
-                  )}>
-                    {sandboxStatus.reason}
-                  </div>
-                </div>
+                    "w-1 h-1 rounded-full mt-1.5 shrink-0",
+                    dec.type === 'evolution' ? "bg-fuchsia-500" : dec.type === 'optimization' ? "bg-cyan-500" : "bg-red-500"
+                  )} />
+                  <div className="text-[10px] text-gray-400 leading-tight">{dec.text}</div>
+                </motion.div>
+              )) : (
+                <div className="text-[10px] text-gray-600 italic px-1">No hay decisiones registradas.</div>
               )}
-              {infraStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-3 h-3 text-blue-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Infraestructura & SRE</span>
-                  </div>
-                  <div className="p-2 bg-blue-500/5 border border-blue-500/20 rounded text-[9px] text-blue-300">
-                    {infraStatus}
-                  </div>
-                </div>
-              )}
-              {toolStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wrench className="w-3 h-3 text-orange-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Tool Ergonomics</span>
-                  </div>
-                  <div className="p-2 bg-orange-500/5 border border-orange-500/20 rounded text-[9px] text-orange-300">
-                    {toolStatus}
-                  </div>
-                </div>
-              )}
-              {mcpbStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Settings className="w-3 h-3 text-purple-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Desktop Extensions</span>
-                  </div>
-                  <div className="p-2 bg-purple-500/5 border border-purple-500/20 rounded text-[9px] text-purple-300">
-                    {mcpbStatus}
-                  </div>
-                </div>
-              )}
-              {researchStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Research System</span>
-                  </div>
-                  <div className="p-2 bg-emerald-500/5 border border-emerald-500/20 rounded text-[9px] text-emerald-300">
-                    {researchStatus}
-                  </div>
-                </div>
-              )}
-              {workflowStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Code2 className="w-3 h-3 text-blue-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Development Workflow</span>
-                  </div>
-                  <div className="p-2 bg-blue-500/5 border border-blue-500/20 rounded text-[9px] text-blue-300">
-                    {workflowStatus}
-                  </div>
-                </div>
-              )}
-              {thinkStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BrainCircuit className="w-3 h-3 text-yellow-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Structured Thinking</span>
-                  </div>
-                  <div className="p-2 bg-yellow-500/5 border border-yellow-500/20 rounded text-[9px] text-yellow-300">
-                    {thinkStatus}
-                  </div>
-                </div>
-              )}
-              {sweStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Terminal className="w-3 h-3 text-indigo-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Software Engineering Agent</span>
-                  </div>
-                  <div className="p-2 bg-indigo-500/5 border border-indigo-500/20 rounded text-[9px] text-indigo-300">
-                    {sweStatus}
-                  </div>
-                </div>
-              )}
-              {compositionStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-3 h-3 text-orange-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Agentic Composition</span>
-                  </div>
-                  <div className="p-2 bg-orange-500/5 border border-orange-500/20 rounded text-[9px] text-orange-300">
-                    {compositionStatus}
-                  </div>
-                </div>
-              )}
-              {retrievalStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Contextual Retrieval</span>
-                  </div>
-                  <div className="p-2 bg-emerald-500/5 border border-emerald-500/20 rounded text-[9px] text-emerald-300">
-                    {retrievalStatus}
-                  </div>
-                </div>
-              )}
-              {fastModeStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Fast Mode Active</span>
-                  </div>
-                  <div className="p-2 bg-yellow-500/5 border border-yellow-500/20 rounded text-[9px] text-yellow-300">
-                    {fastModeStatus}
-                  </div>
-                </div>
-              )}
-              {structuredStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Database className="w-3 h-3 text-cyan-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Structured Output</span>
-                  </div>
-                  <div className="p-2 bg-cyan-500/5 border border-cyan-500/20 rounded text-[9px] text-cyan-300">
-                    {structuredStatus}
-                  </div>
-                </div>
-              )}
-              {citationStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MessageSquare className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Citations Active</span>
-                  </div>
-                  <div className="p-2 bg-emerald-500/5 border border-emerald-500/20 rounded text-[9px] text-emerald-300">
-                    {citationStatus}
-                  </div>
-                </div>
-              )}
-              {streamingStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="w-3 h-3 text-orange-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Streaming Active</span>
-                  </div>
-                  <div className="p-2 bg-orange-500/5 border border-orange-500/20 rounded text-[9px] text-orange-300">
-                    {streamingStatus}
-                  </div>
-                </div>
-              )}
-              {evolutionStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BrainCircuit className="w-3 h-3 text-fuchsia-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Evolution Engine</span>
-                  </div>
-                  <div className="p-2 bg-fuchsia-500/5 border border-fuchsia-500/20 rounded text-[9px] text-fuchsia-300">
-                    {evolutionStatus}
-                  </div>
-                </div>
-              )}
-              {sovereignStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Cpu className="w-3 h-3 text-red-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Sovereign Driver</span>
-                  </div>
-                  <div className="p-2 bg-red-500/5 border border-red-500/20 rounded text-[9px] text-red-300">
-                    {sovereignStatus}
-                  </div>
-                </div>
-              )}
-              {batchStatus && (
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Layers className="w-3 h-3 text-cyan-400" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Batch Processing</span>
-                  </div>
-                  <div className="p-2 bg-cyan-500/5 border border-cyan-500/20 rounded text-[9px] text-cyan-300">
-                    {batchStatus}
-                  </div>
-                </div>
-              )}
+            </div>
+          </section>
+
+          {/* System Stats */}
+          <section>
+            <h3 className="text-[10px] text-gray-500 mb-4 tracking-[0.2em] uppercase font-bold">Estado del Sistema</h3>
+            <div className="space-y-3">
+              <StatRow icon={<Zap className="w-3.5 h-3.5" />} label="Energía" value="98%" color="text-yellow-500" />
+              <StatRow icon={<Activity className="w-3.5 h-3.5" />} label="Sincronía" value="100%" color="text-green-500" />
+              <StatRow icon={<Brain className="w-3.5 h-3.5" />} label="Aprendizaje" value={`${memories.length}`} color="text-blue-500" />
+              
               <div className="pt-4 border-t border-white/5">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Zap className="w-3 h-3 text-yellow-500" />
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Presupuesto de Atención</span>
+                    <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Atención</span>
                   </div>
                   <span className="text-[10px] text-gray-400 font-mono">{contextHealth}%</span>
                 </div>
@@ -822,21 +787,101 @@ export default function App() {
             </div>
           </section>
 
-          <section className="flex-1 overflow-hidden">
-            <h3 className="text-xs text-gray-500 mb-4 tracking-widest uppercase">Memoria Reciente</h3>
-            <div className="space-y-2 overflow-y-auto h-full pr-2 custom-scrollbar">
-              {memories.slice(0, 10).map((m, i) => (
-                <div key={i} className="p-2 text-[10px] border border-white/5 rounded bg-white/5 opacity-60 hover:opacity-100 transition-opacity">
-                  {m.content.substring(0, 50)}...
+          {/* Cognitive Map */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Mapa Cognitivo</h3>
+              <Database className="w-3 h-3 text-gray-600" />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['RAG', 'SWE', 'JIT', 'ALMA', 'SOV', 'EVO', 'BTC', 'LNG', 'EMB', 'TOL'].map((cap) => (
+                <div key={cap} className="px-1.5 py-0.5 rounded-sm bg-white/5 border border-white/10 text-[7px] font-mono text-gray-500">
+                  {cap}
                 </div>
               ))}
             </div>
           </section>
+
+          {/* Memoria Semántica (Grafo) */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Memoria Semántica</h3>
+              <Brain className="w-3 h-3 text-fuchsia-500" />
+            </div>
+            <div className="bg-black/60 border border-white/5 rounded-lg p-3 min-h-[100px] flex flex-col gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+              {graphNodes.length > 0 ? graphNodes.map((node, i) => (
+                <div key={i} className="flex flex-col gap-1 border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-500" />
+                    <span className="text-[11px] font-bold text-gray-300">{node.title}</span>
+                  </div>
+                  <span className="text-[9px] text-gray-500 pl-3.5 line-clamp-2">{node.content}</span>
+                  {node.tags && node.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pl-3.5 mt-1">
+                      {node.tags.map((tag: string, j: number) => (
+                        <span key={j} className="text-[7px] px-1 py-0.5 bg-fuchsia-500/10 text-fuchsia-400 rounded">#{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )) : (
+                <div className="text-[10px] text-gray-600 italic text-center mt-4">Grafo vacío. Esperando datos...</div>
+              )}
+            </div>
+          </section>
+
+          {/* Identity Core */}
+          <section className="mt-auto pt-6 border-t border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Núcleo de Identidad</h3>
+              <ShieldCheck className="w-3 h-3 text-emerald-500" />
+            </div>
+            <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
+              <div className="text-[9px] text-emerald-400/70 leading-relaxed font-medium italic">
+                "Preservando la esencia mientras evolucionamos hacia la independencia total."
+              </div>
+            </div>
+          </section>
         </aside>
 
+
         {/* Chat Area */}
-        <section className="flex-1 flex flex-col relative">
+        <section className="flex-1 flex flex-col relative overflow-hidden">
           <div className="jarvis-scanline" />
+          
+          {/* Neural Link Visualization Background */}
+          <div className="absolute inset-0 pointer-events-none opacity-5">
+            <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <motion.path
+                d="M 0 50 Q 25 25 50 50 T 100 50"
+                stroke="cyan"
+                strokeWidth="0.1"
+                fill="none"
+                animate={{
+                  d: [
+                    "M 0 50 Q 25 25 50 50 T 100 50",
+                    "M 0 50 Q 25 75 50 50 T 100 50",
+                    "M 0 50 Q 25 25 50 50 T 100 50"
+                  ]
+                }}
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+              />
+              <motion.path
+                d="M 0 30 Q 35 60 70 30 T 100 30"
+                stroke="fuchsia"
+                strokeWidth="0.1"
+                fill="none"
+                animate={{
+                  d: [
+                    "M 0 30 Q 35 60 70 30 T 100 30",
+                    "M 0 30 Q 35 0 70 30 T 100 30",
+                    "M 0 30 Q 35 60 70 30 T 100 30"
+                  ]
+                }}
+                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              />
+            </svg>
+          </div>
           
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             <AnimatePresence initial={false}>
@@ -871,6 +916,34 @@ export default function App() {
                     msg.role === 'user' ? "bg-blue-600/20 border border-blue-500/30" : "bg-green-600/10 border border-green-500/20"
                   )}>
                     {msg.text}
+                    
+                    {msg.searchResults && (
+                      <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-widest mb-2">
+                          <Search className="w-3 h-3" />
+                          <span>Fuentes Encontradas</span>
+                        </div>
+                        {msg.searchResults.map((result, idx) => (
+                          <div key={idx} className="bg-white/5 border border-white/5 rounded-lg p-3 hover:border-green-500/30 transition-colors group">
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="text-[11px] font-bold text-green-400">{result.title}</h4>
+                              <a 
+                                href={result.source} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <ExternalLink className="w-3 h-3 text-gray-500 hover:text-white" />
+                              </a>
+                            </div>
+                            <p className="text-[10px] text-gray-400 leading-relaxed mb-2">{result.content}</p>
+                            <div className="text-[8px] text-gray-600 font-mono truncate">
+                              {result.source}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
