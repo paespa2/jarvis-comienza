@@ -36,7 +36,7 @@ ai.models.generateContent = async (params: any) => {
       // TRUNCAR TEXTO PARA MODELOS LOCALES (Límite de contexto de 4096 tokens)
       // Un token son aprox 4 caracteres. 4096 tokens = ~16,000 caracteres.
       // Dejamos espacio para el system prompt y la respuesta.
-      const MAX_CHARS = 8000; 
+      const MAX_CHARS = 32000; // Incrementado para permitir prompts largos y descripciones de herramientas
       if (promptText.length > MAX_CHARS) {
         console.warn(`[Jarvis Router] Truncando prompt local de ${promptText.length} a ${MAX_CHARS} caracteres para evitar desbordamiento de contexto.`);
         promptText = promptText.substring(promptText.length - MAX_CHARS); // Nos quedamos con la parte más reciente
