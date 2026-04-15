@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: "AIzaSyDSUgdOzuOD6MHn55rtTVugq6uxqI7hShw" }); 
 
 // Estado interno para el enrutador de motores
 let currentEngine: 'cloud' | 'local' | 'openrouter' | 'ollama' = 'cloud';

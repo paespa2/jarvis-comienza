@@ -251,7 +251,7 @@ export default function App() {
         setMcpbStatus("Orquestando extensión MCPB...");
         if (userText.toLowerCase().includes("empaqueta") || userText.toLowerCase().includes("pack")) {
           const packaging = await jarvisBrain.mcpbPackager(userText);
-          response = `He validado y **empaquetado la extensión MCPB** (.mcpb).\n\n${packaging}\n\n**Estado:** Bundle listo para instalación con un solo clic en Claude Desktop.`;
+          response = `He validado y **empaquetado la extensión MCPB** (.mcpb).\n\n${packaging}\n\n**Estado:** Bundle listo para instalación con un solo clic.`;
         } else {
           const extension = await jarvisBrain.mcpbOrchestrator(userText);
           response = `He generado la arquitectura para tu **Extensión de Escritorio (MCPB)**.\n\n${extension}\n\nHe incluido el \`manifest.json\` con soporte para configuración de usuario y secretos seguros.`;
@@ -388,7 +388,7 @@ export default function App() {
         // Citations: Verified information sources
         setCitationStatus("Generando respuesta con citas verificables...");
         const docs = [
-          { title: "Manual de Jarvis", content: "El núcleo de Jarvis opera bajo la Constitución de IA de Anthropic." },
+          { title: "Manual de Jarvis", content: "El núcleo de Jarvis opera bajo la Constitución de Jarvis IA: Lealtad, Proactividad, Evolución." },
           { title: "Protocolos de Seguridad", content: "El sistema utiliza sandboxing para todas las ejecuciones de herramientas." }
         ];
         

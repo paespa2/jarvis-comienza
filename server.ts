@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { createEngineRoutes } from "./src/engine/integration.js";
 
 dotenv.config();
 
@@ -14,20 +15,59 @@ const execAsync = promisify(exec);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  
+  // Configuración de Jarvis IA desde variables de entorno
+  const PORT = parseInt(process.env.JARVIS_PORT || "3000");
+  const GEMINI_KEY = process.env.JARVIS_GEMINI_API_KEY || "";
+  const OPENROUTER_KEY = process.env.JARVIS_OPENROUTER_API_KEY || "";
+  const ENGINE = process.env.JARVIS_ENGINE || "auto";
+  const MODEL = process.env.JARVIS_MODEL || "gemini-3-flash-preview";
+  const LOCAL_MODEL = process.env.JARVIS_LOCAL_MODEL || "llama3.2";
+  const LOCAL_API_URL = process.env.JARVIS_LOCAL_API_URL || "http://127.0.0.1:11434";
+  const AUTO_EXECUTE = process.env.JARVIS_AUTO_EXECUTE !== "false";
 
   app.use(cors());
   app.use(express.json());
 
-  // Configurar Gemini
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // Inicializar cerebro de Jarvis IA
+  let ai: GoogleGenAI | null = null;
+  
+  if (GEMINI_KEY) {
+    ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    console.log(`[Jarvis IA] ✅ Cerebro principal: ${MODEL} (Gemini)`);
+  } else {
+    console.log(`[Jarvis IA] ⚠️  Sin API key de Gemini - usando modo local`);
+  }
 
-  // Workspace directory para Jarvis
-  const WORKSPACE_DIR = path.join(process.cwd(), "jarvis_workspace");
+  // Directorio de trabajo de Jarvis IA
+  const WORKSPACE_DIR = path.join(process.cwd(), process.env.JARVIS_WORKSPACE_DIR || "jarvis_workspace");
   await fs.mkdir(WORKSPACE_DIR, { recursive: true });
 
+  console.log(`[Jarvis IA] 🧠 Motor: ${ENGINE} | Autonomía: ${AUTO_EXECUTE ? 'ACTIVADA' : 'DESACTIVADA'}`);
+  console.log(`[Jarvis IA] 📁 Workspace: ${WORKSPACE_DIR}`);
+
   // ==========================================
-  // API ROUTES (BACKEND LOGIC)
+  // INICIALIZAR MOTOR DE JARVIS IA
+  // ==========================================
+  let engineRoutes: any = null;
+  
+  if (GEMINI_KEY && AUTO_EXECUTE) {
+    try {
+      engineRoutes = createEngineRoutes(app, {
+        workspaceDir: WORKSPACE_DIR,
+        apiKey: GEMINI_KEY,
+      });
+      console.log("[Jarvis IA] ✅ Motor autónomo inicializado");
+    } catch (error) {
+      console.error("[Jarvis IA] ⚠️  Motor autónomo falló:", error);
+      console.log("[Jarvis IA] Usando motor heredado");
+    }
+  } else {
+    console.log("[Jarvis IA] Motor autónomo desactivado - usando motor heredado");
+  }
+
+  // ==========================================
+  // LEGACY API ROUTES (BACKWARD COMPATIBILITY)
   // ==========================================
 
   // 1. Ejecutar comandos en la terminal local
@@ -72,8 +112,13 @@ async function startServer() {
     }
   });
 
-  // 4. Procesar Input con Gemini (El Cerebro) o Local (LM Studio)
-  app.post("/api/chat", async (req, res) => {
+  // 4. ENHANCED CHAT ENDPOINT (uses QueryEngine if available)
+  // Note: This route is now handled by the enhanced engine
+  // The legacy implementation below is kept for backward compatibility
+  // but will be overridden by the enhanced routes
+
+  // Legacy chat endpoint (fallback only)
+  const legacyChatHandler = async (req: any, res: any) => {
     const { input, context, engine, role } = req.body;
 
     try {
@@ -298,6 +343,52 @@ async function startServer() {
       console.error("[Jarvis Brain] Error:", error);
       res.status(500).json({ error: error.message });
     }
+  };
+
+  // Registrar motor legacy si es necesario
+  if (!engineRoutes) {
+    app.post("/api/chat", legacyChatHandler);
+    console.log("[Jarvis IA] ⚠️  Usando endpoint heredado");
+  } else {
+    console.log("[Jarvis IA] ✅ Rutas del motor autónomo registradas");
+  }
+
+  // ==========================================
+  // ADDITIONAL ENHANCED ENDPOINTS
+  // ==========================================
+  
+  // Direct command execution (bypasses AI - for manual control)
+  app.post("/api/command", async (req, res) => {
+    const { command } = req.body;
+    if (!command) {
+      return res.status(400).json({ error: "No command provided" });
+    }
+
+    try {
+      const { stdout, stderr } = await execAsync(command, { cwd: WORKSPACE_DIR });
+      res.json({ 
+        success: true, 
+        output: stdout || stderr || "Command executed successfully",
+        command 
+      });
+    } catch (error: any) {
+      res.json({ 
+        success: false, 
+        error: error.message,
+        output: error.stdout || "",
+        command 
+      });
+    }
+  });
+
+  // Engine status endpoint
+  app.get("/api/status", (req, res) => {
+    res.json({
+      status: "online",
+      engine: engineRoutes ? "QueryEngine v2.0 (Motor Autónomo Jarvis IA)" : "Legacy Engine",
+      workspace: WORKSPACE_DIR,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // ==========================================
@@ -318,8 +409,14 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Jarvis System] Servidor Full-Stack corriendo en http://localhost:${PORT}`);
-    console.log(`[Jarvis System] Workspace de Hacking: ${WORKSPACE_DIR}`);
+    console.log(`\n========================================`);
+    console.log(`  🤖 Jarvis IA - Motor Autónomo v2.0`);
+    console.log(`========================================`);
+    console.log(`  🌐 Servidor: http://localhost:${PORT}`);
+    console.log(`  📁 Workspace: ${WORKSPACE_DIR}`);
+    console.log(`  🧠 Motor: ${ENGINE}`);
+    console.log(`  ⚡ Autonomía: ${AUTO_EXECUTE ? 'ACTIVADA' : 'DESACTIVADA'}`);
+    console.log(`========================================\n`);
   });
 }
 
