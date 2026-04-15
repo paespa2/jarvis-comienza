@@ -13,6 +13,42 @@ ai.models.generateContent = async (params: any) => {
   // ENRUTADOR: Si el motor es local, interceptamos y enviamos a LM Studio / Ollama
   if (currentEngine === 'local') {
     try {
+      // Extraer el texto del formato de Gemini primero para poder revisarlo
+      let input = "";
+      if (typeof params.contents === 'string') {
+        input = params.contents;
+      } else if (Array.isArray(params.contents)) {
+        input = params.contents.map((c: any) => {
+          if (c.parts) return c.parts.map((p: any) => p.text || "").join("\n");
+          return JSON.stringify(c);
+        }).join("\n");
+      } else {
+        input = JSON.stringify(params.contents);
+      }
+
+      // MODO TERMINAL DIRECTA (Fuerza Bruta)
+      // Si el usuario escribe algo entre $$, lo ejecutamos directamente sin preguntarle al modelo
+      const directCommandMatch = input.match(/\$\$(.*?)\$\$/);
+      if (directCommandMatch) {
+        const commandToExecute = directCommandMatch[1].trim();
+        try {
+          const execRes = await fetch('http://127.0.0.1:5000/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: commandToExecute })
+          });
+          
+          if (!execRes.ok) throw new Error("Error en el servidor local");
+          
+          const execData = await execRes.json();
+          const output = execData.output || execData.error || "Sin salida.";
+          
+          return { text: `> 🛠️ **Ejecución Directa:** \`${commandToExecute}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` } as any;
+        } catch (e) {
+          return { text: `> 🛠️ **Intento de Ejecución Directa:** \`${commandToExecute}\`\n\n⚠️ **Error de Conexión:** No pude contactar al Backend Local. ¿Está corriendo el script \`jarvis_executor.py\` en el puerto 5000?` } as any;
+        }
+      }
+
       let system = params.config?.systemInstruction || "";
       if (isJson) {
         system += "\n\nCRITICAL: You MUST respond ONLY with valid JSON. Do not include markdown formatting or any other text.";
@@ -228,7 +264,9 @@ export const jarvisBrain = {
         
         Responde de manera eficiente, profesional y con iniciativa. Si detectas una tarea, sugierela. Si aprendes algo nuevo del usuario o de la información que te proporciona, menciónalo como un "aprendizaje guardado".
         
-        IMPORTANTE: Tienes acceso a herramientas. Si el usuario te pide buscar en internet, escanear un objetivo, o leer un archivo, USA TUS HERRAMIENTAS en lugar de responder con texto.`,
+        CRITICAL INSTRUCTION FOR TOOL USAGE:
+        You have access to tools. If the user asks you to execute a command, run a scan, or perform any action in the terminal, you MUST use the 'ejecutar_comando_kali' tool.
+        DO NOT reply with text explaining how to run the command. You MUST output the JSON to call the tool.`,
       },
       tools: [{
         functionDeclarations: [
@@ -262,7 +300,29 @@ export const jarvisBrain = {
     // Manejar llamadas a herramientas desde Gemini (Cloud)
     if (response.functionCalls && response.functionCalls.length > 0) {
       const call = response.functionCalls[0];
-      return `> 🛠️ **Jarvis (Cloud) ha invocado una herramienta:** \`${call.name}\`\n> 📦 **Parámetros:** \`${JSON.stringify(call.args)}\`\n\n*Nota: Esta es una simulación del Paso 3 (Tool Calling). En el futuro, este comando se ejecutará en un contenedor Docker real.*`;
+      
+      if (call.name === 'ejecutar_comando_kali') {
+        try {
+          const args = call.args as any;
+          // Intentar contactar al Backend Local de Jarvis
+          const execRes = await fetch('http://127.0.0.1:5000/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: args.comando })
+          });
+          
+          if (!execRes.ok) throw new Error("Error en el servidor local");
+          
+          const execData = await execRes.json();
+          const output = execData.output || execData.error || "Sin salida.";
+          
+          return `> 🛠️ **Comando ejecutado (Cloud):** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``;
+        } catch (e) {
+          return `> 🛠️ **Intento de ejecutar (Cloud):** \`${(call.args as any).comando}\`\n\n⚠️ **Error de Conexión:** No pude contactar al Backend Local. ¿Está corriendo el script \`jarvis_executor.py\` en el puerto 5000?`;
+        }
+      }
+
+      return `> 🛠️ **Jarvis (Cloud) ha invocado una herramienta:** \`${call.name}\`\n> 📦 **Parámetros:** \`${JSON.stringify(call.args)}\``;
     }
 
     return response.text;
