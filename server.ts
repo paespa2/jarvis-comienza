@@ -150,6 +150,31 @@ async function startServer() {
                 }
               },
               {
+                name: "reproducir_error",
+                description: "Crea y ejecuta un script de prueba para reproducir un error o validar una vulnerabilidad.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    script_content: { type: Type.STRING, description: "Contenido del script de reproducción" },
+                    filename: { type: Type.STRING, description: "Nombre del archivo (ej. repro.js, test.py)" }
+                  },
+                  required: ["script_content", "filename"]
+                }
+              },
+              {
+                name: "editar_archivo_quirurgico",
+                description: "Edita un archivo reemplazando una cadena exacta por otra, minimizando errores (estilo Claude Code).",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    filename: { type: Type.STRING, description: "Nombre del archivo" },
+                    old_content: { type: Type.STRING, description: "Contenido exacto a reemplazar" },
+                    new_content: { type: Type.STRING, description: "Nuevo contenido" }
+                  },
+                  required: ["filename", "old_content", "new_content"]
+                }
+              },
+              {
                 name: "leer_archivo",
                 description: "Lee el contenido de un archivo en el workspace.",
                 parameters: {
@@ -198,6 +223,38 @@ async function startServer() {
           }
         }
         
+        if (call.name === 'reproducir_error') {
+          const args = call.args as any;
+          try {
+            const filePath = path.join(WORKSPACE_DIR, args.filename);
+            await fs.writeFile(filePath, args.script_content, "utf-8");
+            const { stdout, stderr } = await execAsync(`node ${args.filename}`, { cwd: WORKSPACE_DIR });
+            const output = stdout || stderr || "Script ejecutado sin salida.";
+            return res.json({ 
+              text: `> 🧪 **Reproducción ejecutada:** \`${args.filename}\`\n\n**Resultado:**\n\`\`\`bash\n${output}\n\`\`\``,
+              metadata: { tool: 'reproducir_error', output, success: !stderr }
+            });
+          } catch (e: any) {
+            return res.json({ text: `> 🧪 **Fallo en reproducción:** ${e.message}` });
+          }
+        }
+
+        if (call.name === 'editar_archivo_quirurgico') {
+          const args = call.args as any;
+          try {
+            const filePath = path.join(WORKSPACE_DIR, args.filename);
+            const content = await fs.readFile(filePath, "utf-8");
+            if (!content.includes(args.old_content)) {
+              throw new Error("No se encontró el contenido exacto a reemplazar.");
+            }
+            const newContent = content.replace(args.old_content, args.new_content);
+            await fs.writeFile(filePath, newContent, "utf-8");
+            return res.json({ text: `> 🛠️ **Edición quirúrgica exitosa:** \`${args.filename}\`` });
+          } catch (e: any) {
+            return res.json({ text: `> 🛠️ **Error en edición:** ${e.message}` });
+          }
+        }
+
         if (call.name === 'leer_archivo') {
           const args = call.args as any;
           try {
