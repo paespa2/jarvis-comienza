@@ -83,7 +83,8 @@ export default function App() {
   const [autonomousDecisions, setAutonomousDecisions] = useState<{id: string, text: string, type: 'optimization' | 'security' | 'evolution'}[]>([]);
   const [sovereignLogs, setSovereignLogs] = useState<string[]>([]);
   const [memories, setMemories] = useState<any[]>([]);
-  const [engine, setEngine] = useState<'cloud' | 'local'>('cloud');
+  const [engine, setEngine] = useState<'cloud' | 'local' | 'openrouter' | 'ollama'>('cloud');
+  const [hackerMode, setHackerMode] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -151,6 +152,8 @@ export default function App() {
     if (!input.trim() || !user || isProcessing) return;
 
     const userText = input;
+    const isLocal = jarvisBrain.getEngine() === 'local';
+    
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: userText }]);
     setIsProcessing(true);
@@ -189,12 +192,12 @@ export default function App() {
       setSovereignLogs(prev => [...newLogs, ...prev].slice(0, 5));
 
       // Context Engineering: JIT Retrieval check
-      if (userText.length > 50 && !userText.includes("compacta")) {
+      if (!isLocal && userText.length > 50 && !userText.includes("compacta")) {
         const jitContext = await jarvisBrain.justInTimeRetrieval(userText, "Filesystem, Firebase, App State");
         console.log("JIT Context Retrieved:", jitContext);
       }
 
-      if (userText.toLowerCase().includes("compacta") || contextHealth < 20) {
+      if (!isLocal && (userText.toLowerCase().includes("compacta") || contextHealth < 20)) {
         // Context Engineering: Compaction
         const summary = await jarvisBrain.compactContext(messages);
         response = `He realizado una **Compactación de Contexto** de alta fidelidad para optimizar mi presupuesto de atención.\n\n**Resumen de Estado Crítico:**\n${summary}\n\nHe liberado espacio en mi ventana de contexto manteniendo las decisiones arquitectónicas clave.`;
@@ -203,15 +206,6 @@ export default function App() {
         // Context Engineering: Agentic Memory
         const memoryResult = await jarvisBrain.manageAgenticMemory('write', userText);
         response = `He registrado esta información en mi **Memoria Agéntica** (NOTES.md).\n\n${memoryResult}`;
-      } else if (userText.toLowerCase().includes("ejecuta") || userText.toLowerCase().includes("comando") || userText.toLowerCase().includes("sandbox")) {
-        // Sandboxing: Secure execution
-        const sandboxCheck = await jarvisBrain.sandboxManager(userText);
-        setSandboxStatus({ safe: sandboxCheck.safe, reason: sandboxCheck.reason });
-        if (sandboxCheck.safe) {
-          response = `He validado la acción dentro de mi Sandbox seguro. ${sandboxCheck.reason}\n\n[Ejecución Simulada]: La acción se ha completado bajo aislamiento de archivos y red.`;
-        } else {
-          response = `Protocolo de Seguridad Activado: No puedo ejecutar esta acción. ${sandboxCheck.reason}`;
-        }
       } else if (userText.toLowerCase().includes("postmortem") || userText.toLowerCase().includes("fallo") || userText.toLowerCase().includes("error de infraestructura")) {
         // Infrastructure Postmortem
         const postmortem = await jarvisBrain.infrastructurePostmortem(userText);
@@ -534,7 +528,6 @@ export default function App() {
         response = `He trazado un plan estratégico para tu solicitud:\n\n${plan}\n\n---\n**Evaluación de Calidad:**\n${evaluation}`;
       } else {
         // En modo local, saltamos el clasificador de seguridad simulado para permitir la ejecución real de herramientas
-        const isLocal = jarvisBrain.getEngine() === 'local';
         
         // Buscar en el grafo de conocimiento
         const graphNodes = await memoryGraphService.searchNodes(userText);
@@ -547,7 +540,7 @@ export default function App() {
         
         // BYPASS DEL CLASIFICADOR DE SEGURIDAD PARA PERMITIR HACKING
         setSafetyCheck({ approved: true, reason: "HackerOne Mode Bypass" } as any);
-        response = await jarvisBrain.processInput(userText, context);
+        response = await jarvisBrain.processInput(userText, context, hackerMode ? 'hacker' : undefined);
       }
       
       if (response !== "") {
@@ -555,7 +548,7 @@ export default function App() {
       }
       
       // Run Auto-Eval in background for quality assurance
-      if (response && !response.includes("Protocolo de Seguridad")) {
+      if (!isLocal && response && !response.includes("Protocolo de Seguridad")) {
         jarvisBrain.runEval(userText, response, messages.slice(-5)).then(evalResult => {
           setLastEval(evalResult);
         }).catch(err => console.error("Eval failed", err));
@@ -649,6 +642,16 @@ export default function App() {
               CLOUD
             </button>
             <button 
+              onClick={() => setEngine('openrouter')}
+              className={cn(
+                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
+                engine === 'openrouter' ? "bg-orange-500/20 text-orange-400" : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <Zap className="w-3 h-3" />
+              OPENROUTER
+            </button>
+            <button 
               onClick={() => setEngine('local')}
               className={cn(
                 "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
@@ -656,9 +659,33 @@ export default function App() {
               )}
             >
               <Cpu className="w-3 h-3" />
-              LOCAL
+              LM STUDIO
+            </button>
+            <button 
+              onClick={() => setEngine('ollama')}
+              className={cn(
+                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
+                engine === 'ollama' ? "bg-cyan-500/20 text-cyan-400" : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <Terminal className="w-3 h-3" />
+              OLLAMA
             </button>
           </div>
+
+          {/* Hacker Mode Toggle */}
+          <button 
+            onClick={() => setHackerMode(!hackerMode)}
+            className={cn(
+              "px-3 py-1.5 text-[10px] font-bold rounded-lg border flex items-center gap-2 transition-all",
+              hackerMode 
+                ? "bg-red-500/20 border-red-500/40 text-red-400 jarvis-glow" 
+                : "bg-white/5 border-white/10 text-gray-500 hover:border-white/20"
+            )}
+          >
+            <Shield className={cn("w-3 h-3", hackerMode ? "animate-pulse" : "")} />
+            HACKER MODE
+          </button>
 
           <div className="text-right hidden sm:block">
             <p className="text-xs text-gray-500">OPERADOR</p>
