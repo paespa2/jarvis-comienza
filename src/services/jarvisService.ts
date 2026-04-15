@@ -93,15 +93,6 @@ ai.models.generateContent = async (params: any) => {
       
       // LM Studio usa un servidor compatible con la API de OpenAI por defecto en el puerto 1234
       
-      // FORZAR LLAMADA A HERRAMIENTA SI EL USUARIO PIDE EJECUTAR UN COMANDO
-      let forcedToolChoice = undefined;
-      if (promptText.toLowerCase().includes("ejecuta el comando") || promptText.toLowerCase().includes("ejecuta ")) {
-        forcedToolChoice = {
-          type: "function",
-          function: { name: "ejecutar_comando_kali" }
-        };
-      }
-
       const response = await fetch('http://127.0.0.1:1234/v1/chat/completions', {
         method: 'POST',
         headers: { 
@@ -116,8 +107,7 @@ ai.models.generateContent = async (params: any) => {
           ],
           temperature: 0.7,
           stream: false,
-          ...(openAITools ? { tools: openAITools } : {}),
-          ...(forcedToolChoice ? { tool_choice: forcedToolChoice } : {})
+          ...(openAITools ? { tools: openAITools } : {})
         })
       });
 
