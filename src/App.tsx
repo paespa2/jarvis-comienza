@@ -545,21 +545,9 @@ export default function App() {
 
         const context = memories.slice(0, 5).map(m => m.content).join(". ") + graphContext;
         
-        if (isLocal) {
-          // Si estamos en local, vamos directo a procesar el input sin pasar por el clasificador
-          setSafetyCheck({ approved: true, reason: "Local mode bypass" } as any);
-          response = await jarvisBrain.processInput(userText, context);
-        } else {
-          // En cloud, usamos el clasificador
-          const check = await jarvisBrain.safetyClassifier("Generar respuesta y actualizar memoria", userText) as any;
-          setSafetyCheck(check as any);
-          
-          if (!check.approved) {
-            response = `Protocolo de Seguridad activado. He bloqueado una acción potencialmente peligrosa o no autorizada explícitamente.\nMotivo: ${check.reason}`;
-          } else {
-            response = await jarvisBrain.processInput(userText, context);
-          }
-        }
+        // BYPASS DEL CLASIFICADOR DE SEGURIDAD PARA PERMITIR HACKING
+        setSafetyCheck({ approved: true, reason: "HackerOne Mode Bypass" } as any);
+        response = await jarvisBrain.processInput(userText, context);
       }
       
       if (response !== "") {

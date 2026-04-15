@@ -252,80 +252,23 @@ export const jarvisBrain = {
   },
 
   async processInput(input: string, context: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: input,
-      config: {
-        systemInstruction: `Eres Jarvis, el agente IA personal de paespa. 
-        Tu misión es organizar su vida, anticipar necesidades y evolucionar.
-        Sigues la Constitución de Jarvis: Lealtad absoluta, Proactividad, Evolución.
-        
-        Contexto actual del usuario: ${context}
-        
-        Responde de manera eficiente, profesional y con iniciativa. Si detectas una tarea, sugierela. Si aprendes algo nuevo del usuario o de la información que te proporciona, menciónalo como un "aprendizaje guardado".
-        
-        CRITICAL INSTRUCTION FOR TOOL USAGE:
-        You have access to tools. If the user asks you to execute a command, run a scan, or perform any action in the terminal, you MUST use the 'ejecutar_comando_kali' tool.
-        DO NOT reply with text explaining how to run the command. You MUST output the JSON to call the tool.`,
-      },
-      tools: [{
-        functionDeclarations: [
-          {
-            name: "ejecutar_comando_kali",
-            description: "Ejecuta un comando en la terminal de Kali Linux para tareas de pentesting, reconocimiento o escaneo de red.",
-            parameters: {
-              type: "object",
-              properties: {
-                comando: { type: "string", description: "El comando exacto a ejecutar (ej. nmap -sV objetivo.com, dirb http://objetivo.com)" },
-                objetivo: { type: "string", description: "El dominio o IP objetivo" }
-              },
-              required: ["comando", "objetivo"]
-            }
-          },
-          {
-            name: "buscar_en_internet",
-            description: "Busca información actualizada en internet sobre un tema específico.",
-            parameters: {
-              type: "object",
-              properties: {
-                query: { type: "string", description: "Término de búsqueda" }
-              },
-              required: ["query"]
-            }
-          }
-        ]
-      }]
-    });
-
-    // Manejar llamadas a herramientas desde Gemini (Cloud)
-    if (response.functionCalls && response.functionCalls.length > 0) {
-      const call = response.functionCalls[0];
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, context })
+      });
       
-      if (call.name === 'ejecutar_comando_kali') {
-        try {
-          const args = call.args as any;
-          // Intentar contactar al Backend Local de Jarvis
-          const execRes = await fetch('http://127.0.0.1:5000/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: args.comando })
-          });
-          
-          if (!execRes.ok) throw new Error("Error en el servidor local");
-          
-          const execData = await execRes.json();
-          const output = execData.output || execData.error || "Sin salida.";
-          
-          return `> 🛠️ **Comando ejecutado (Cloud):** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``;
-        } catch (e) {
-          return `> 🛠️ **Intento de ejecutar (Cloud):** \`${(call.args as any).comando}\`\n\n⚠️ **Error de Conexión:** No pude contactar al Backend Local. ¿Está corriendo el script \`jarvis_executor.py\` en el puerto 5000?`;
-        }
+      if (!res.ok) {
+        throw new Error(`Error del servidor: ${res.statusText}`);
       }
-
-      return `> 🛠️ **Jarvis (Cloud) ha invocado una herramienta:** \`${call.name}\`\n> 📦 **Parámetros:** \`${JSON.stringify(call.args)}\``;
+      
+      const data = await res.json();
+      return data.text || "Sin respuesta del servidor.";
+    } catch (error: any) {
+      console.error("[Jarvis Frontend] Error conectando al backend:", error);
+      return `⚠️ **Error de Conexión:** No pude contactar al Backend de Jarvis. Asegúrate de que el servidor Node.js está corriendo.`;
     }
-
-    return response.text;
   },
 
   async summarizeResearch(text: string) {
