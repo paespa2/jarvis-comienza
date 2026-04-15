@@ -41,6 +41,7 @@ import {
 import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User, collection, query, orderBy, onSnapshot, addDoc, Timestamp } from './firebase';
 import { jarvisBrain } from './services/jarvisService';
 import { memoryGraphService } from './services/memoryGraphService';
+import { learningEngine, KnowledgeNode } from './services/learningService';
 import { cn } from './lib/utils';
 
 export default function App() {
@@ -83,13 +84,18 @@ export default function App() {
   const [autonomousDecisions, setAutonomousDecisions] = useState<{id: string, text: string, type: 'optimization' | 'security' | 'evolution'}[]>([]);
   const [sovereignLogs, setSovereignLogs] = useState<string[]>([]);
   const [memories, setMemories] = useState<any[]>([]);
-  const [engine, setEngine] = useState<'cloud' | 'local' | 'openrouter' | 'ollama'>('cloud');
   const [hackerMode, setHackerMode] = useState(false);
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeNode[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    jarvisBrain.setEngine(engine);
-  }, [engine]);
+    loadKnowledge();
+  }, []);
+
+  const loadKnowledge = async () => {
+    const kb = await learningEngine.getKnowledgeBase();
+    setKnowledgeBase(kb);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -152,7 +158,6 @@ export default function App() {
     if (!input.trim() || !user || isProcessing) return;
 
     const userText = input;
-    const isLocal = jarvisBrain.getEngine() === 'local';
     
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: userText }]);
@@ -160,6 +165,7 @@ export default function App() {
 
     try {
       let response = '';
+      let metadata: any = null;
       setSafetyCheck(null);
       setCurrentPlan(null);
       setTeamStatus(null);
@@ -192,12 +198,12 @@ export default function App() {
       setSovereignLogs(prev => [...newLogs, ...prev].slice(0, 5));
 
       // Context Engineering: JIT Retrieval check
-      if (!isLocal && userText.length > 50 && !userText.includes("compacta")) {
+      if (userText.length > 50 && !userText.includes("compacta")) {
         const jitContext = await jarvisBrain.justInTimeRetrieval(userText, "Filesystem, Firebase, App State");
         console.log("JIT Context Retrieved:", jitContext);
       }
 
-      if (!isLocal && (userText.toLowerCase().includes("compacta") || contextHealth < 20)) {
+      if (userText.toLowerCase().includes("compacta") || contextHealth < 20) {
         // Context Engineering: Compaction
         const summary = await jarvisBrain.compactContext(messages);
         response = `He realizado una **Compactación de Contexto** de alta fidelidad para optimizar mi presupuesto de atención.\n\n**Resumen de Estado Crítico:**\n${summary}\n\nHe liberado espacio en mi ventana de contexto manteniendo las decisiones arquitectónicas clave.`;
@@ -251,7 +257,7 @@ export default function App() {
         setMcpbStatus("Orquestando extensión MCPB...");
         if (userText.toLowerCase().includes("empaqueta") || userText.toLowerCase().includes("pack")) {
           const packaging = await jarvisBrain.mcpbPackager(userText);
-          response = `He validado y **empaquetado la extensión MCPB** (.mcpb).\n\n${packaging}\n\n**Estado:** Bundle listo para instalación con un solo clic.`;
+          response = `He validado y **empaquetado la extensión MCPB** (.mcpb).\n\n${packaging}\n\n**Estado:** Bundle listo para instalación con un solo clic en Claude Desktop.`;
         } else {
           const extension = await jarvisBrain.mcpbOrchestrator(userText);
           response = `He generado la arquitectura para tu **Extensión de Escritorio (MCPB)**.\n\n${extension}\n\nHe incluido el \`manifest.json\` con soporte para configuración de usuario y secretos seguros.`;
@@ -388,7 +394,7 @@ export default function App() {
         // Citations: Verified information sources
         setCitationStatus("Generando respuesta con citas verificables...");
         const docs = [
-          { title: "Manual de Jarvis", content: "El núcleo de Jarvis opera bajo la Constitución de Jarvis IA: Lealtad, Proactividad, Evolución." },
+          { title: "Manual de Jarvis", content: "El núcleo de Jarvis opera bajo la Constitución de IA de Anthropic." },
           { title: "Protocolos de Seguridad", content: "El sistema utiliza sandboxing para todas las ejecuciones de herramientas." }
         ];
         
@@ -540,15 +546,40 @@ export default function App() {
         
         // BYPASS DEL CLASIFICADOR DE SEGURIDAD PARA PERMITIR HACKING
         setSafetyCheck({ approved: true, reason: "HackerOne Mode Bypass" } as any);
-        response = await jarvisBrain.processInput(userText, context, hackerMode ? 'hacker' : undefined);
+        const rawRes = await jarvisBrain.processInput(userText, context, hackerMode ? 'hacker' : undefined);
+        
+        if (typeof rawRes === 'object' && rawRes !== null) {
+          response = rawRes.text;
+          metadata = rawRes.metadata;
+        } else {
+          response = rawRes;
+        }
       }
       
       if (response !== "") {
         setMessages(prev => [...prev, { role: 'jarvis', text: response || 'Error en el núcleo.' }]);
+        
+        // APRENDIZAJE AUTÓNOMO: Jarvis aprende de la interacción
+        setTimeout(async () => {
+          // Si hubo ejecución de herramienta, aprender del resultado específicamente
+          if (metadata && metadata.tool === 'ejecutar_comando_kali') {
+            const toolInsight = await learningEngine.learnFromExecution(metadata.command, metadata.output, metadata.success);
+            if (toolInsight) {
+              setKnowledgeBase(prev => [...prev, toolInsight]);
+              setSovereignLogs(prev => [`OPTIMIZACIÓN MOTOR: ${toolInsight.pattern}`, ...prev.slice(0, 5)]);
+            }
+          }
+
+          const insight = await learningEngine.learnFromInteraction(userText, response);
+          if (insight) {
+            setKnowledgeBase(prev => [...prev, insight]);
+            setSovereignLogs(prev => [`NUEVO INSIGHT: ${insight.pattern}`, ...prev.slice(0, 5)]);
+          }
+        }, 1000);
       }
       
       // Run Auto-Eval in background for quality assurance
-      if (!isLocal && response && !response.includes("Protocolo de Seguridad")) {
+      if (response && !response.includes("Protocolo de Seguridad")) {
         jarvisBrain.runEval(userText, response, messages.slice(-5)).then(evalResult => {
           setLastEval(evalResult);
         }).catch(err => console.error("Eval failed", err));
@@ -629,48 +660,10 @@ export default function App() {
           <span className="font-bold tracking-widest text-green-500">JARVIS CORE v1.0</span>
         </div>
         <div className="flex items-center gap-4">
-          {/* Engine Toggle */}
-          <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
-            <button 
-              onClick={() => setEngine('cloud')}
-              className={cn(
-                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
-                engine === 'cloud' ? "bg-blue-500/20 text-blue-400" : "text-gray-500 hover:text-gray-300"
-              )}
-            >
-              <Globe className="w-3 h-3" />
-              CLOUD
-            </button>
-            <button 
-              onClick={() => setEngine('openrouter')}
-              className={cn(
-                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
-                engine === 'openrouter' ? "bg-orange-500/20 text-orange-400" : "text-gray-500 hover:text-gray-300"
-              )}
-            >
-              <Zap className="w-3 h-3" />
-              OPENROUTER
-            </button>
-            <button 
-              onClick={() => setEngine('local')}
-              className={cn(
-                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
-                engine === 'local' ? "bg-green-500/20 text-green-400" : "text-gray-500 hover:text-gray-300"
-              )}
-            >
-              <Cpu className="w-3 h-3" />
-              LM STUDIO
-            </button>
-            <button 
-              onClick={() => setEngine('ollama')}
-              className={cn(
-                "px-3 py-1 text-xs font-bold rounded-md flex items-center gap-2 transition-all",
-                engine === 'ollama' ? "bg-cyan-500/20 text-cyan-400" : "text-gray-500 hover:text-gray-300"
-              )}
-            >
-              <Terminal className="w-3 h-3" />
-              OLLAMA
-            </button>
+          {/* System Status Indicator */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-[10px] text-blue-400 font-bold tracking-wider">GEMINI CLOUD ACTIVE</span>
           </div>
 
           {/* Hacker Mode Toggle */}
@@ -716,6 +709,30 @@ export default function App() {
                 animate={{ width: `${sovereigntyLevel}%` }}
                 className="h-full bg-gradient-to-r from-red-500 via-fuchsia-500 to-cyan-500"
               />
+            </div>
+
+            {/* Knowledge Base Preview */}
+            <div className="mb-6">
+              <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold mb-3">Núcleo Cognitivo</h3>
+              <div className="space-y-2">
+                {knowledgeBase.slice(-3).reverse().map((node, i) => (
+                  <motion.div 
+                    key={node.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="p-2 bg-white/5 border border-white/10 rounded text-[9px] leading-tight"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-cyan-400 font-bold uppercase">{node.category}</span>
+                      <span className="text-gray-600">{(node.confidence * 100).toFixed(0)}% CONF</span>
+                    </div>
+                    <p className="text-gray-300 italic">"{node.insight}"</p>
+                  </motion.div>
+                ))}
+                {knowledgeBase.length === 0 && (
+                  <p className="text-[9px] text-gray-600 italic">Esperando primera síntesis...</p>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-6 gap-2 mb-6">

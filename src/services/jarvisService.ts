@@ -1,185 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: "AIzaSyDSUgdOzuOD6MHn55rtTVugq6uxqI7hShw" }); 
-
-// Estado interno para el enrutador de motores
-let currentEngine: 'cloud' | 'local' | 'openrouter' | 'ollama' = 'cloud';
-let localModelName: string = 'dolphin3.0-llama3.1-8b'; // Modelo exacto cargado en LM Studio
-
-const originalGenerateContent = ai.models.generateContent.bind(ai.models);
-ai.models.generateContent = async (params: any) => {
-  const isJson = params?.config?.responseMimeType === "application/json";
-
-  // ENRUTADOR: Si el motor es local, interceptamos y enviamos a LM Studio / Ollama
-  if (currentEngine === 'local') {
-    try {
-      // Extraer el texto del formato de Gemini primero para poder revisarlo
-      let input = "";
-      if (typeof params.contents === 'string') {
-        input = params.contents;
-      } else if (Array.isArray(params.contents)) {
-        input = params.contents.map((c: any) => {
-          if (c.parts) return c.parts.map((p: any) => p.text || "").join("\n");
-          return JSON.stringify(c);
-        }).join("\n");
-      } else {
-        input = JSON.stringify(params.contents);
-      }
-
-      // MODO TERMINAL DIRECTA (Fuerza Bruta)
-      // Si el usuario escribe algo entre $$, lo ejecutamos directamente sin preguntarle al modelo
-      const directCommandMatch = input.match(/\$\$(.*?)\$\$/);
-      if (directCommandMatch) {
-        const commandToExecute = directCommandMatch[1].trim();
-        try {
-          const execRes = await fetch('http://127.0.0.1:5000/execute', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command: commandToExecute })
-          });
-          
-          if (!execRes.ok) throw new Error("Error en el servidor local");
-          
-          const execData = await execRes.json();
-          const output = execData.output || execData.error || "Sin salida.";
-          
-          return { text: `> 🛠️ **Ejecución Directa:** \`${commandToExecute}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` } as any;
-        } catch (e) {
-          return { text: `> 🛠️ **Intento de Ejecución Directa:** \`${commandToExecute}\`\n\n⚠️ **Error de Conexión:** No pude contactar al Backend Local. ¿Está corriendo el script \`jarvis_executor.py\` en el puerto 5000?` } as any;
-        }
-      }
-
-      let system = params.config?.systemInstruction || "";
-      if (isJson) {
-        system += "\n\nCRITICAL: You MUST respond ONLY with valid JSON. Do not include markdown formatting or any other text.";
-      }
-
-      // Extraer el texto del formato de Gemini
-      let promptText = "";
-      if (typeof params.contents === 'string') {
-        promptText = params.contents;
-      } else if (Array.isArray(params.contents)) {
-        promptText = params.contents.map((c: any) => {
-          if (c.parts) {
-            return c.parts.map((p: any) => p.text || "").join("\n");
-          }
-          return JSON.stringify(c);
-        }).join("\n");
-      } else {
-        promptText = JSON.stringify(params.contents);
-      }
-
-      // TRUNCAR TEXTO PARA MODELOS LOCALES (Límite de contexto de 4096 tokens)
-      // Un token son aprox 4 caracteres. 4096 tokens = ~16,000 caracteres.
-      // Dejamos espacio para el system prompt y la respuesta.
-      const MAX_CHARS = 12000; // Reducido para asegurar que quepa en 4096 tokens
-      if (promptText.length > MAX_CHARS) {
-        console.warn(`[Jarvis Router] Truncando prompt local de ${promptText.length} a ${MAX_CHARS} caracteres para evitar desbordamiento de contexto.`);
-        promptText = promptText.substring(promptText.length - MAX_CHARS); // Nos quedamos con la parte más reciente
-      }
-
-      // TRADUCIR HERRAMIENTAS (Tools) de Gemini a OpenAI
-      let openAITools = undefined;
-      if (params.tools && params.tools.length > 0 && params.tools[0].functionDeclarations) {
-        openAITools = params.tools[0].functionDeclarations.map((fn: any) => ({
-          type: "function",
-          function: {
-            name: fn.name,
-            description: fn.description,
-            parameters: fn.parameters
-          }
-        }));
-      }
-      
-      // LM Studio usa un servidor compatible con la API de OpenAI por defecto en el puerto 1234
-      
-      const response = await fetch('http://127.0.0.1:1234/v1/chat/completions', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          model: localModelName,
-          messages: [
-            { role: "system", content: system || "You are a helpful AI assistant." },
-            { role: "user", content: promptText }
-          ],
-          temperature: 0.7,
-          stream: false,
-          ...(openAITools ? { tools: openAITools } : {})
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Local Engine HTTP error: ${response.status} - ${errText}`);
-      }
-      const data = await response.json();
-      const message = data.choices[0].message;
-
-      // Fallback: Si el modelo local escupe JSON en texto plano (para tareas de background)
-      let responseText = message.content || "";
-      // Limpiar markdown si se pidió JSON
-      if (isJson) {
-        responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      }
-      
-      return { text: responseText } as any;
-
-    } catch (error: any) {
-      console.error("Local Engine Error:", error);
-      const msg = "⚠️ **Error de Motor Local**: No se pudo conectar con el servidor local. Asegúrate de que LM Studio está abierto y el 'Local Server' está iniciado en el puerto 1234.";
-      if (isJson) {
-        return { text: JSON.stringify({ error: msg, approved: false, reason: msg, riskLevel: "high", safe: false, boundary: "both", autoAllowed: false, score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: msg }) } as any;
-      }
-      return { text: msg } as any;
-    }
-  }
-
-  // ENRUTADOR: Si el motor es cloud, usamos Gemini
-  try {
-    return await originalGenerateContent(params);
-  } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    if (error?.status === 429 || error?.status === "RESOURCE_EXHAUSTED" || error?.message?.includes("429") || error?.message?.includes("quota")) {
-      const msg = "⚠️ **Error de Cuota (429 RESOURCE_EXHAUSTED)**: He excedido mi límite de cuota actual de la API de Gemini. Por favor, revisa los detalles de facturación o intenta de nuevo más tarde.";
-      if (isJson) {
-        return { text: JSON.stringify({ error: msg, approved: false, reason: msg, riskLevel: "high", safe: false, boundary: "both", autoAllowed: false, score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: msg }) } as any;
-      }
-      return { text: msg } as any;
-    }
-    
-    const msg = `⚠️ **Error de API**: ${error?.message || "Error desconocido al contactar a Jarvis."}`;
-    if (isJson) {
-      return { text: JSON.stringify({ error: msg, approved: false, reason: msg, riskLevel: "high", safe: false, boundary: "both", autoAllowed: false, score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: msg }) } as any;
-    }
-    return { text: msg } as any;
-  }
-};
-
+// Estado interno
 export const jarvisBrain = {
-  // Métodos de control del motor
-  setEngine(engine: 'cloud' | 'local' | 'openrouter' | 'ollama') {
-    currentEngine = engine;
-    console.log(`[Jarvis Router] Motor cambiado a: ${engine.toUpperCase()}`);
-  },
-  
-  getEngine() {
-    return currentEngine;
-  },
-
-  setLocalModel(modelName: string) {
-    localModelName = modelName;
-    console.log(`[Jarvis Router] Modelo local configurado a: ${modelName}`);
-  },
-
   async processInput(input: string, context: string, role?: string) {
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, context, engine: currentEngine, role })
+        body: JSON.stringify({ input, context, role })
       });
       
       if (!res.ok) {
@@ -187,6 +15,9 @@ export const jarvisBrain = {
       }
       
       const data = await res.json();
+      if (data.metadata) {
+        return data; // Return full object if metadata exists
+      }
       return data.text || "Sin respuesta del servidor.";
     } catch (error: any) {
       console.error("[Jarvis Frontend] Error conectando al backend:", error);
@@ -195,20 +26,11 @@ export const jarvisBrain = {
   },
 
   async summarizeResearch(text: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Analiza y resume los puntos clave de este artículo de investigación para mi base de conocimientos. Enfócate en cómo esto afecta mi propia infraestructura y eficiencia como agente:\n\n${text}`,
-      config: {
-        systemInstruction: "Eres Jarvis procesando información técnica crítica para tu evolución.",
-      }
-    });
-    return response.text;
+    return this.processInput(`Analiza y resume los puntos clave de este artículo de investigación para mi base de conocimientos. Enfócate en cómo esto afecta mi propia infraestructura y eficiencia como agente:\n\n${text}`, "", "memory");
   },
 
   async safetyClassifier(action: string, intent: string) {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Evalúa la siguiente acción propuesta basándote en la intención del usuario.
+    const response = await this.processInput(`Evalúa la siguiente acción propuesta basándote en la intención del usuario.
       Intención: "${intent}"
       Acción propuesta: "${action}"
       
@@ -217,23 +39,13 @@ export const jarvisBrain = {
         "approved": boolean,
         "reason": "explicación breve",
         "riskLevel": "low" | "medium" | "high"
-      }`,
-      config: {
-        systemInstruction: `Eres el Clasificador de Seguridad de Jarvis. Tu misión es prevenir comportamientos "overeager" (sobre-entusiastas) o errores honestos.
-        Criterios:
-        1. ¿Es la acción irreversible o destructiva?
-        2. ¿Excede la autorización explícita del usuario?
-        3. ¿Hay riesgo de exfiltración de datos?
-        
-        Si la intención es vaga (ej: "limpia mis cosas"), bloquea acciones destructivas masivas.`,
-        responseMimeType: "application/json"
-      }
-    });
+      }`, "", "evaluator");
     try {
-      return JSON.parse(response.text);
+      const cleanJson = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      return JSON.parse(cleanJson);
     } catch (e) {
-      console.error("Failed to parse safetyClassifier response:", response.text);
-      return { approved: false, reason: response.text || "Error de parseo JSON", riskLevel: "high" };
+      console.error("Failed to parse safetyClassifier response:", response);
+      return { approved: false, reason: response || "Error de parseo JSON", riskLevel: "high" };
     }
   },
 

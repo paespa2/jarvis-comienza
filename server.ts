@@ -7,7 +7,6 @@ import fs from "fs/promises";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import { createEngineRoutes } from "./src/engine/integration.js";
 
 dotenv.config();
 
@@ -15,59 +14,29 @@ const execAsync = promisify(exec);
 
 async function startServer() {
   const app = express();
-  
-  // Configuración de Jarvis IA desde variables de entorno
-  const PORT = parseInt(process.env.JARVIS_PORT || "3000");
-  const GEMINI_KEY = process.env.JARVIS_GEMINI_API_KEY || "";
-  const OPENROUTER_KEY = process.env.JARVIS_OPENROUTER_API_KEY || "";
-  const ENGINE = process.env.JARVIS_ENGINE || "auto";
-  const MODEL = process.env.JARVIS_MODEL || "gemini-3-flash-preview";
-  const LOCAL_MODEL = process.env.JARVIS_LOCAL_MODEL || "llama3.2";
-  const LOCAL_API_URL = process.env.JARVIS_LOCAL_API_URL || "http://127.0.0.1:11434";
-  const AUTO_EXECUTE = process.env.JARVIS_AUTO_EXECUTE !== "false";
+  const PORT = 3000;
 
   app.use(cors());
   app.use(express.json());
 
-  // Inicializar cerebro de Jarvis IA
-  let ai: GoogleGenAI | null = null;
-  
-  if (GEMINI_KEY) {
-    ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
-    console.log(`[Jarvis IA] ✅ Cerebro principal: ${MODEL} (Gemini)`);
-  } else {
-    console.log(`[Jarvis IA] ⚠️  Sin API key de Gemini - usando modo local`);
-  }
+  // Configurar Gemini
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  // Directorio de trabajo de Jarvis IA
-  const WORKSPACE_DIR = path.join(process.cwd(), process.env.JARVIS_WORKSPACE_DIR || "jarvis_workspace");
+  // Workspace directory para Jarvis
+  const WORKSPACE_DIR = path.join(process.cwd(), "jarvis_workspace");
   await fs.mkdir(WORKSPACE_DIR, { recursive: true });
 
-  console.log(`[Jarvis IA] 🧠 Motor: ${ENGINE} | Autonomía: ${AUTO_EXECUTE ? 'ACTIVADA' : 'DESACTIVADA'}`);
-  console.log(`[Jarvis IA] 📁 Workspace: ${WORKSPACE_DIR}`);
-
-  // ==========================================
-  // INICIALIZAR MOTOR DE JARVIS IA
-  // ==========================================
-  let engineRoutes: any = null;
+  const KNOWLEDGE_FILE = path.join(WORKSPACE_DIR, "knowledge_base.json");
   
-  if (GEMINI_KEY && AUTO_EXECUTE) {
-    try {
-      engineRoutes = createEngineRoutes(app, {
-        workspaceDir: WORKSPACE_DIR,
-        apiKey: GEMINI_KEY,
-      });
-      console.log("[Jarvis IA] ✅ Motor autónomo inicializado");
-    } catch (error) {
-      console.error("[Jarvis IA] ⚠️  Motor autónomo falló:", error);
-      console.log("[Jarvis IA] Usando motor heredado");
-    }
-  } else {
-    console.log("[Jarvis IA] Motor autónomo desactivado - usando motor heredado");
+  // Inicializar base de conocimientos si no existe
+  try {
+    await fs.access(KNOWLEDGE_FILE);
+  } catch {
+    await fs.writeFile(KNOWLEDGE_FILE, JSON.stringify([], null, 2));
   }
 
   // ==========================================
-  // LEGACY API ROUTES (BACKWARD COMPATIBILITY)
+  // API ROUTES (BACKEND LOGIC)
   // ==========================================
 
   // 1. Ejecutar comandos en la terminal local
@@ -112,21 +81,30 @@ async function startServer() {
     }
   });
 
-  // 4. ENHANCED CHAT ENDPOINT (uses QueryEngine if available)
-  // Note: This route is now handled by the enhanced engine
-  // The legacy implementation below is kept for backward compatibility
-  // but will be overridden by the enhanced routes
-
-  // Legacy chat endpoint (fallback only)
-  const legacyChatHandler = async (req: any, res: any) => {
-    const { input, context, engine, role } = req.body;
+  // 4. Procesar Input con Gemini (El Cerebro)
+  app.post("/api/chat", async (req, res) => {
+    const { input, context, role } = req.body;
 
     try {
+      // Cargar base de conocimientos aprendida
+      let learnedKnowledge = "";
+      try {
+        const kbData = await fs.readFile(KNOWLEDGE_FILE, "utf-8");
+        const kb = JSON.parse(kbData);
+        if (kb.length > 0) {
+          learnedKnowledge = "\n\nCONOCIMIENTO APRENDIDO (EXPERIENCIA PREVIA):\n" + 
+            kb.slice(-10).map((n: any) => `- [${n.category.toUpperCase()}] ${n.pattern}: ${n.insight}`).join("\n");
+        }
+      } catch (e) {
+        console.error("Error cargando KB:", e);
+      }
+
       let systemInstruction = `Eres Jarvis, el agente IA personal de paespa. 
       Tu misión es organizar su vida, anticipar necesidades y evolucionar.
       Sigues la Constitución de Jarvis: Lealtad absoluta, Proactividad, Evolución.
       
       Contexto actual del usuario: ${context}
+      ${learnedKnowledge}
       
       CRITICAL INSTRUCTION FOR TOOL USAGE:
       You are running in a native Node.js backend environment with full access to the local machine.
@@ -150,109 +128,6 @@ async function startServer() {
         Tienes acceso total a la terminal local. Usa herramientas como nmap, subfinder, sqlmap, etc. si están instaladas.
         SIEMPRE prioriza la ejecución de comandos para obtener datos reales antes de teorizar.
         Formato de salida: Si necesitas ejecutar algo, usa el formato JSON {"comando": "tu_comando"} o bloques bash.`;
-      }
-
-      // Función auxiliar para manejar comandos extraídos de texto
-      const handleTextCommands = async (content: string) => {
-        // 1. Buscar JSON de comando
-        const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/) || content.match(/\{[\s\S]*"comando"[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            const rawJson = jsonMatch[1] || jsonMatch[0];
-            const parsed = JSON.parse(rawJson);
-            if (parsed.comando) {
-              console.log(`[Jarvis Fallback] Ejecutando comando extraído: ${parsed.comando}`);
-              const { stdout, stderr } = await execAsync(parsed.comando, { cwd: WORKSPACE_DIR });
-              const output = stdout || stderr || "Sin salida.";
-              return { text: `> 🛠️ **Comando ejecutado:** \`${parsed.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` };
-            }
-          } catch (e) {}
-        }
-
-        // 2. Buscar bloques bash directamente
-        if (input.toLowerCase().includes("ejecuta") || input.toLowerCase().includes("comando") || input.toLowerCase().includes("terminal") || role === 'hacker') {
-          const bashMatch = content.match(/```bash\n([\s\S]*?)\n```/) || content.match(/```\n([\s\S]*?)\n```/);
-          if (bashMatch) {
-            const cmd = bashMatch[1].trim();
-            if (cmd && !cmd.includes("require(") && !cmd.includes("import ")) {
-              console.log(`[Jarvis Fallback] Ejecutando bloque bash extraído: ${cmd}`);
-              try {
-                const { stdout, stderr } = await execAsync(cmd, { cwd: WORKSPACE_DIR });
-                const output = stdout || stderr || "Sin salida.";
-                return { text: `> 🛠️ **Comando ejecutado:** \`${cmd}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` };
-              } catch (e: any) {
-                return { text: `> 🛠️ **Error ejecutando:** \`${cmd}\`\n\n\`\`\`bash\n${e.message}\n\`\`\`` };
-              }
-            }
-          }
-        }
-        return null;
-      };
-
-      if (engine === 'local' || engine === 'ollama') {
-        // Usar LM Studio (local) o Ollama
-        const url = engine === 'local' 
-          ? 'http://127.0.0.1:1234/v1/chat/completions' 
-          : 'http://127.0.0.1:11434/v1/chat/completions';
-
-        const localRes = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: engine === 'local' ? "current" : "llama3", // Ollama suele requerir nombre de modelo
-            messages: [
-              { role: "system", content: systemInstruction },
-              { role: "user", content: input }
-            ],
-            temperature: 0.3,
-            max_tokens: 2000,
-          })
-        });
-
-        if (!localRes.ok) {
-          const errText = await localRes.text();
-          throw new Error(`${engine.toUpperCase()} Error: ${localRes.status} - ${errText}`);
-        }
-
-        const data = await localRes.json();
-        const content = data.choices[0].message.content || "";
-
-        const commandResult = await handleTextCommands(content);
-        if (commandResult) return res.json(commandResult);
-
-        return res.json({ text: content });
-      }
-
-      if (engine === 'openrouter') {
-        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            'X-Title': 'Jarvis AI Agent'
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.0-flash-exp:free",
-            messages: [
-              { role: "system", content: systemInstruction },
-              { role: "user", content: input }
-            ],
-            temperature: 0.3,
-          })
-        });
-
-        if (!orRes.ok) {
-          const errText = await orRes.text();
-          throw new Error(`OpenRouter Error: ${orRes.status} - ${errText}`);
-        }
-
-        const data = await orRes.json();
-        const content = data.choices[0].message.content || "";
-
-        const commandResult = await handleTextCommands(content);
-        if (commandResult) return res.json(commandResult);
-
-        return res.json({ text: content });
       }
 
       // Motor Cloud (Gemini)
@@ -311,9 +186,15 @@ async function startServer() {
           try {
             const { stdout, stderr } = await execAsync(args.comando, { cwd: WORKSPACE_DIR });
             const output = stdout || stderr || "Sin salida.";
-            return res.json({ text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\`` });
+            return res.json({ 
+              text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``,
+              metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output, success: !stderr }
+            });
           } catch (e: any) {
-            return res.json({ text: `> 🛠️ **Error:** \`${args.comando}\`\n\n\`\`\`bash\n${e.message}\n\`\`\`` });
+            return res.json({ 
+              text: `> 🛠️ **Error:** \`${args.comando}\`\n\n\`\`\`bash\n${e.message}\n\`\`\``,
+              metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output: e.message, success: false }
+            });
           }
         }
         
@@ -343,52 +224,29 @@ async function startServer() {
       console.error("[Jarvis Brain] Error:", error);
       res.status(500).json({ error: error.message });
     }
-  };
+  });
 
-  // Registrar motor legacy si es necesario
-  if (!engineRoutes) {
-    app.post("/api/chat", legacyChatHandler);
-    console.log("[Jarvis IA] ⚠️  Usando endpoint heredado");
-  } else {
-    console.log("[Jarvis IA] ✅ Rutas del motor autónomo registradas");
-  }
-
-  // ==========================================
-  // ADDITIONAL ENHANCED ENDPOINTS
-  // ==========================================
-  
-  // Direct command execution (bypasses AI - for manual control)
-  app.post("/api/command", async (req, res) => {
-    const { command } = req.body;
-    if (!command) {
-      return res.status(400).json({ error: "No command provided" });
-    }
-
+  // API para Aprendizaje
+  app.post("/api/learn", async (req, res) => {
     try {
-      const { stdout, stderr } = await execAsync(command, { cwd: WORKSPACE_DIR });
-      res.json({ 
-        success: true, 
-        output: stdout || stderr || "Command executed successfully",
-        command 
-      });
+      const newNode = req.body;
+      const kbData = await fs.readFile(KNOWLEDGE_FILE, "utf-8");
+      const kb = JSON.parse(kbData);
+      kb.push(newNode);
+      await fs.writeFile(KNOWLEDGE_FILE, JSON.stringify(kb, null, 2));
+      res.json({ success: true });
     } catch (error: any) {
-      res.json({ 
-        success: false, 
-        error: error.message,
-        output: error.stdout || "",
-        command 
-      });
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Engine status endpoint
-  app.get("/api/status", (req, res) => {
-    res.json({
-      status: "online",
-      engine: engineRoutes ? "QueryEngine v2.0 (Motor Autónomo Jarvis IA)" : "Legacy Engine",
-      workspace: WORKSPACE_DIR,
-      timestamp: new Date().toISOString(),
-    });
+  app.get("/api/knowledge", async (req, res) => {
+    try {
+      const kbData = await fs.readFile(KNOWLEDGE_FILE, "utf-8");
+      res.json(JSON.parse(kbData));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // ==========================================
@@ -409,14 +267,8 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`\n========================================`);
-    console.log(`  🤖 Jarvis IA - Motor Autónomo v2.0`);
-    console.log(`========================================`);
-    console.log(`  🌐 Servidor: http://localhost:${PORT}`);
-    console.log(`  📁 Workspace: ${WORKSPACE_DIR}`);
-    console.log(`  🧠 Motor: ${ENGINE}`);
-    console.log(`  ⚡ Autonomía: ${AUTO_EXECUTE ? 'ACTIVADA' : 'DESACTIVADA'}`);
-    console.log(`========================================\n`);
+    console.log(`[Jarvis System] Servidor Full-Stack corriendo en http://localhost:${PORT}`);
+    console.log(`[Jarvis System] Workspace de Hacking: ${WORKSPACE_DIR}`);
   });
 }
 
