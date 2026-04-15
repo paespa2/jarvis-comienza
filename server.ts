@@ -175,6 +175,28 @@ async function startServer() {
                 }
               },
               {
+                name: "mapear_workspace_profundo",
+                description: "Realiza un listado recursivo y detallado del workspace para descubrimiento de contexto.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    path: { type: Type.STRING, description: "Ruta relativa opcional" }
+                  }
+                }
+              },
+              {
+                name: "busqueda_grep_avanzada",
+                description: "Busca patrones de texto en todo el workspace (útil para encontrar vulnerabilidades o secretos).",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    pattern: { type: Type.STRING, description: "Patrón de búsqueda (regex)" },
+                    include: { type: Type.STRING, description: "Filtro de archivos (ej. *.js)" }
+                  },
+                  required: ["pattern"]
+                }
+              },
+              {
                 name: "leer_archivo",
                 description: "Lee el contenido de un archivo en el workspace.",
                 parameters: {
@@ -249,9 +271,41 @@ async function startServer() {
             }
             const newContent = content.replace(args.old_content, args.new_content);
             await fs.writeFile(filePath, newContent, "utf-8");
-            return res.json({ text: `> 🛠️ **Edición quirúrgica exitosa:** \`${args.filename}\`` });
+            return res.json({ 
+              text: `> 🛠️ **Edición quirúrgica exitosa:** \`${args.filename}\``,
+              metadata: { tool: 'editar_archivo_quirurgico', filename: args.filename, success: true }
+            });
           } catch (e: any) {
             return res.json({ text: `> 🛠️ **Error en edición:** ${e.message}` });
+          }
+        }
+
+        if (call.name === 'mapear_workspace_profundo') {
+          const args = call.args as any;
+          try {
+            const targetPath = args.path ? path.join(WORKSPACE_DIR, args.path) : WORKSPACE_DIR;
+            const { stdout } = await execAsync(`dir /s /b`, { cwd: targetPath });
+            return res.json({ 
+              text: `> 🔍 **Mapa de Workspace generado**\n\n\`\`\`text\n${stdout}\n\`\`\``,
+              metadata: { tool: 'mapear_workspace_profundo', success: true }
+            });
+          } catch (e: any) {
+            return res.json({ text: `> 🔍 **Error mapeando:** ${e.message}` });
+          }
+        }
+
+        if (call.name === 'busqueda_grep_avanzada') {
+          const args = call.args as any;
+          try {
+            // Usamos findstr en Windows como equivalente a grep
+            const includeCmd = args.include ? `findstr /i /m "${args.pattern}" ${args.include}` : `findstr /s /i /n "${args.pattern}" *`;
+            const { stdout } = await execAsync(includeCmd, { cwd: WORKSPACE_DIR });
+            return res.json({ 
+              text: `> 🔎 **Resultados de búsqueda para:** \`${args.pattern}\`\n\n\`\`\`text\n${stdout || 'Sin coincidencias.'}\n\`\`\``,
+              metadata: { tool: 'busqueda_grep_avanzada', pattern: args.pattern, success: true }
+            });
+          } catch (e: any) {
+            return res.json({ text: `> 🔎 **Sin coincidencias o error:** ${e.message}` });
           }
         }
 

@@ -7,6 +7,8 @@ Jarvis ahora opera con la lógica de ingeniería de Anthropic Claude Code:
 1. **Protocolo de Reproducción**: Antes de cualquier fix, Jarvis crea un script `repro.js` para validar el estado del sistema.
 2. **Edición Quirúrgica**: Utiliza `editar_archivo_quirurgico` para evitar la corrupción de archivos grandes.
 3. **Bucle de Verificación**: Cada cambio es seguido inmediatamente por una prueba de validación.
+4. **Descubrimiento Profundo**: Capacidad de mapear recursivamente el workspace para encontrar contexto oculto.
+5. **Búsqueda Táctica**: Uso de `busqueda_grep_avanzada` para localizar patrones de vulnerabilidades o secretos.
 
 ## Núcleo Operativo
 - **Propósito:** Optimización de vida.
