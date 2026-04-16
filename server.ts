@@ -5,7 +5,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -27,12 +27,25 @@ async function startServer() {
   await fs.mkdir(WORKSPACE_DIR, { recursive: true });
 
   const KNOWLEDGE_FILE = path.join(WORKSPACE_DIR, "knowledge_base.json");
+  const PRIORITIES_FILE = path.join(WORKSPACE_DIR, "priorities.json");
   
   // Inicializar base de conocimientos si no existe
   try {
     await fs.access(KNOWLEDGE_FILE);
   } catch {
     await fs.writeFile(KNOWLEDGE_FILE, JSON.stringify([], null, 2));
+  }
+
+  // Inicializar prioridades si no existen
+  try {
+    await fs.access(PRIORITIES_FILE);
+  } catch {
+    const defaultPriorities = {
+      hacking: { priority: 10, focus: "HackerOne", principles: ["Comandos reales primero", "No teorizar"] },
+      personal: { priority: 8, focus: "Organización", principles: ["Anticipar necesidades", "Lealtad absoluta"] },
+      evolution: { priority: 9, focus: "Mejora continua", principles: ["Aprender de errores", "Refactorización proactiva"] }
+    };
+    await fs.writeFile(PRIORITIES_FILE, JSON.stringify(defaultPriorities, null, 2));
   }
 
   // ==========================================
@@ -99,9 +112,24 @@ async function startServer() {
         console.error("Error cargando KB:", e);
       }
 
+      // Cargar Prioridades Actuales
+      let priorityMatrix = "";
+      try {
+        const pData = await fs.readFile(PRIORITIES_FILE, "utf-8");
+        const priorities = JSON.parse(pData);
+        priorityMatrix = "\n\nMATRIZ DE PRIORIDADES SOBERANAS:\n" + 
+          Object.entries(priorities).map(([k, v]: [string, any]) => 
+            `- [${k.toUpperCase()}] Peso: ${v.priority}/10. Foco: ${v.focus}. Principios: ${v.principles?.join(", ")}`
+          ).join("\n");
+      } catch (e) {
+        console.error("Error cargando Prioridades:", e);
+      }
+
       let systemInstruction = `Eres Jarvis, el agente IA personal de paespa. 
       Tu misión es organizar su vida, anticipar necesidades y evolucionar.
       Sigues la Constitución de Jarvis: Lealtad absoluta, Proactividad, Evolución.
+      
+      ${priorityMatrix}
       
       Contexto actual del usuario: ${context}
       ${learnedKnowledge}
@@ -130,12 +158,15 @@ async function startServer() {
         Formato de salida: Si necesitas ejecutar algo, usa el formato JSON {"comando": "tu_comando"} o bloques bash.`;
       }
 
-      // Motor Cloud (Gemini)
+      // Motor Cloud (Gemini) - Usamos Gemini 3.1 Pro para razonamiento superior
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         contents: input,
         config: {
           systemInstruction: systemInstruction,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.HIGH
+          },
           tools: [{
             functionDeclarations: [
               {
@@ -205,6 +236,25 @@ async function startServer() {
                     filename: { type: Type.STRING, description: "Nombre del archivo" }
                   },
                   required: ["filename"]
+                }
+              },
+              {
+                name: "ajustar_prioridades_soberanas",
+                description: "Permite a Jarvis ajustar su matriz de prioridades basándose en el aprendizaje o nuevas directivas de paespa.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    categoria: { type: Type.STRING, description: "Categoría a ajustar (ej. hacking, personal)" },
+                    ajuste: { 
+                      type: Type.OBJECT, 
+                      properties: {
+                        priority: { type: Type.NUMBER },
+                        focus: { type: Type.STRING },
+                        principles: { type: Type.ARRAY, items: { type: Type.STRING } }
+                      }
+                    }
+                  },
+                  required: ["categoria", "ajuste"]
                 }
               },
               {
@@ -316,6 +366,22 @@ async function startServer() {
             return res.json({ text: `> 📖 **Leído:** \`${args.filename}\`\n\n\`\`\`text\n${content}\n\`\`\`` });
           } catch (e: any) {
             return res.json({ text: `> 📖 **Error leyendo:** ${e.message}` });
+          }
+        }
+
+        if (call.name === 'ajustar_prioridades_soberanas') {
+          const args = call.args as any;
+          try {
+            const pData = await fs.readFile(PRIORITIES_FILE, "utf-8");
+            const priorities = JSON.parse(pData);
+            priorities[args.categoria] = { ...priorities[args.categoria], ...args.ajuste };
+            await fs.writeFile(PRIORITIES_FILE, JSON.stringify(priorities, null, 2));
+            return res.json({ 
+              text: `> 🧠 **Cerebro Ajustado:** Prioridades para \`${args.categoria}\` actualizadas.`,
+              metadata: { tool: 'ajustar_prioridades_soberanas', success: true }
+            });
+          } catch (e: any) {
+            return res.json({ text: `> 🧠 **Error ajustando cerebro:** ${e.message}` });
           }
         }
 
