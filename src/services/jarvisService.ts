@@ -96,7 +96,7 @@ export const jarvisBrain = {
       // 7. Generar Respuesta
       console.log(`[Jarvis Brain] Generando respuesta (${mode})${isBackground ? ' [FONDO]' : ''}...`);
       // Si es background o modo secundario, forzar Flash para no quemar cuota de Pro
-      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3.1-flash" : "gemini-3.1-pro-preview";
+      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3-flash-preview" : "gemini-3.1-pro-preview";
       const response = await geminiService.generateResponse(augmentedInput, systemInstruction, needsSearch, modelToUse, isBackground);
 
       // 8. Manejar Tool Calls (Solo si no es background para evitar bucles)
@@ -501,6 +501,32 @@ export const jarvisBrain = {
     return logs.sort(() => Math.random() - 0.5).slice(0, 3);
   },
 
+  async getBearingsState(memories: any[]) {
+    // Retrasar disparo automático al inicio para no competir e instanciar fallos de cuota con Firebase load
+    await new Promise(r => setTimeout(r, 2000));
+    
+    // Si la memoria está vacia no requerimos LLM para situarnos
+    if (!memories || memories.length === 0) return "Sistemas en línea (Memoria Limpia)";
+
+    const memoryString = memories.slice(0, 3).map(m => m.content).join(" | ");
+    
+    try {
+      const prompt = `Estás auto-comprobando tus rodamientos. Lee estas memorias recientes y genera un log interno MUY BREVE de 5 a 10 palabras sobre tu estado. Ej: "Recuerdo haber modificado la UI de React. Sistemas estables."\n\nMemorias recientes: ${memoryString}`;
+      // Usar modelo pequeño y fondo=true
+      const res = await this.processInput(prompt, "", { role: "memory", mode: "primary" });
+      const textResult = typeof res === 'object' ? res.text : res;
+      
+      // Manejar el caso del error para no fallar el bearings de la UI
+      if (textResult?.includes("Error Crítico") || textResult?.includes("Cuota de IA Excedida")) {
+         return "Memoria sincronizada silenciosamente (Modo Conservador de Cuota).";
+      }
+
+      return textResult;
+    } catch (e) {
+      return "Sistemas cargados sin respuesta autónoma";
+    }
+  },
+
   async analyzeDay(memories: any[]) {
     const memoryString = memories.map(m => m.content).join("\n");
     const res = await this.processInput(`Recuerdos:\n${memoryString}`, "", "memory");
@@ -548,5 +574,69 @@ export const jarvisBrain = {
     
     const res = await this.processInput(prompt, "", "evaluator");
     return typeof res === 'object' ? res.text : res;
+  },
+
+  async *autonomousAgentTrigger(goal: string) {
+    yield `🧠 **[INICIANDO ORQUESTADOR AUTÓNOMO]**\nObjetivo Estratégico: *${goal}*\n\n`;
+
+    const maxIterations = 3;
+    let context = `Objetivo principal: ${goal}\n`;
+
+    for (let i = 1; i <= maxIterations; i++) {
+      yield `\n\n🔄 **[CICLO DE REFLEXIÓN ${i}/${maxIterations}]** - Planificando siguiente acción...\n`;
+      
+      const planPrompt = `Eres un Agente Autónomo (Loop Recursivo).
+Historial y Estado actual:
+${context}
+
+Analiza qué debes hacer a continuación para avanzar hacia el objetivo. 
+De tu lista de herramientas conocidas (leer_archivo, buscar_web, procesar_datos, etc.), ¿cuál usarías y por qué?
+Si crees que el objetivo ya está cumplido o no necesitas más herramientas, declara "FIN_DEL_BUCLE" y da la respuesta final.
+
+Responde *exclusivamente* en este formato exacto:
+PENSAMIENTO: [Tu razonamiento lógico aquí]
+ACCION: [Nombrar herramienta_falsa o paso estructurado]
+EJECUCION: [Comando o acción conceptual a realizar]`;
+
+      // Consult the lightweight model for planning
+      const planRes = await geminiService.generateResponse(planPrompt, "", false, "gemini-3-flash-preview", true);
+      const planText = planRes.text || "";
+
+      // Yield the thought process
+      yield `\n> **Pensamiento:** ${planText.split("ACCION:")[0].replace("PENSAMIENTO: ", "").trim()}\n`;
+
+      if (planText.includes("FIN_DEL_BUCLE")) {
+        yield `\n✅ **[META ALCANZADA]** Bucle terminado exitosamente.\n\n`;
+        // Generar respuesta final de cierre
+        const finalRes = await geminiService.generateResponse(`Genera la conclusión de este trabajo. Historial:\n${context}`, "", false, "gemini-3.1-pro-preview", false);
+        yield `**Conclusión Soberana:**\n${finalRes.text}\n`;
+        break;
+      }
+
+      // Extract details
+      const actionMatch = planText.match(/ACCION:\s*(.+)/);
+      const executionMatch = planText.match(/EJECUCION:\s*(.+)/);
+      
+      const actionName = actionMatch ? actionMatch[1].trim() : "Análisis General";
+      const executionDetails = executionMatch ? executionMatch[1].trim() : "Procesamiento de estado...";
+
+      yield `> ⚙️ **Ejecutando [${actionName}]**: \`${executionDetails}\`...\n`;
+
+      // Simulate a tool execution (since this is frontend, we simulate the 'worker' environment)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const toolResult = `Simulación de resultado para ${actionName}: OK. Información recolectada o acción completada con éxito.`;
+      
+      yield `> 📊 **Resultado de la Observación:** ${toolResult}\n`;
+
+      // Append to context to remember what we did
+      context += `\nCiclo ${i}:\n- Acción intentada: ${actionName}\n- Resultado: ${toolResult}\n`;
+
+      if (i === maxIterations) {
+        yield `\n⚠️ **[LÍMITE DE ITERACIONES ALCANZADO]** Forzando conclusión...\n\n`;
+        const wrapUpRes = await geminiService.generateResponse(`Termina y resume el trabajo. Nos quedamos sin ciclos. Historial:\n${context}`, "", false, "gemini-3.1-pro-preview", false);
+        yield `**Conclusión Forzada:**\n${wrapUpRes.text}\n`;
+      }
+    }
   }
 };

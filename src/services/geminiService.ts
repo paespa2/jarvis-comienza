@@ -112,7 +112,7 @@ export const JARVIS_TOOLS = [
 ];
 
 export const geminiService = {
-  async withRetry<T>(fn: () => Promise<T>, maxRetries = 4, initialDelay = 2000): Promise<T> {
+  async withRetry<T>(fn: () => Promise<T>, maxRetries = 5, initialDelay = 4000): Promise<T> {
     let lastError: any;
     for (let i = 0; i < maxRetries; i++) {
       try {
@@ -121,14 +121,23 @@ export const geminiService = {
         lastError = error;
         const errorMessage = error.message || JSON.stringify(error);
         if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          const delay = initialDelay * Math.pow(2, i); // 2s, 4s, 8s, 16s...
-          console.warn(`[Gemini Service] Quota excedida (429). Reintentando en ${delay}ms... (Intento ${i + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          // Exponencial ampliado: 4s, 8s, 16s, 32s, 64s
+          const delay = initialDelay * Math.pow(2, i);
+          
+          // Agregamos un jitter (ruido aleatorio) para evitar el problema de thundering herd 
+          // cuando multiples llamados de fondo caen al mismo tiempo
+          const jitter = Math.random() * 1000;
+          const finalDelay = delay + jitter;
+          
+          console.warn(`[Gemini Service] 🔋 Quota Rate Limit (429). Retrasando ejecución por ${Math.round(finalDelay/1000)}s... (Intento ${i + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, finalDelay));
           continue;
         }
+        // Si no es un 429 (ej. un 500, o sintaxis), no hacemos retries ciegos, lanzamos.
         throw error;
       }
     }
+    console.error("[Gemini Service] Fallos exhaustos tras múltiples retries de cuota.");
     throw lastError;
   },
 
@@ -164,7 +173,7 @@ export const geminiService = {
     try {
       return await this.withRetry(async () => {
         const response = await ai.models.generateContent({
-          model: "gemini-3.1-flash",
+          model: "gemini-3-flash-preview",
           contents: [{ role: "user", parts: [{ text: `Identifica la intención de esta solicitud en JSON.
         
 Solicitud: "${input}"
@@ -202,7 +211,7 @@ Responde SOLO con JSON válido (sin markdown):
     try {
       return await this.withRetry(async () => {
         const response = await ai.models.generateContent({
-          model: "gemini-3.1-flash",
+          model: "gemini-3-flash-preview",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
             responseMimeType: "application/json",

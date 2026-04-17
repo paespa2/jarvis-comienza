@@ -26,7 +26,8 @@ export const secondBrainService = {
     return new Promise<CognitiveBlock[]>((resolve) => {
       extractionQueue = extractionQueue.then(async () => {
         console.log(`[Second Brain] Sintetizando conocimiento de: ${source}`);
-        await new Promise(r => setTimeout(r, 1000)); // Rate limiting buffer
+        // Extended base rate limit buffer for extraction processes to avoid overlapping
+        await new Promise(r => setTimeout(r, 4500)); 
         
         // Usar Flash para la síntesis: Económico y con mayor cuota (ML-lite)
         const prompt = `Actúa como el Motor de Síntesis Cognitiva de Jarvis. 

@@ -174,9 +174,13 @@ export default function App() {
       const mems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMemories(mems);
       
-      // Auto-get bearings when memories load
-      if (mems.length > 0 && !bearings) {
-        jarvisBrain.getBearings(mems).then(setBearings).catch(console.error);
+      // Auto-get bearings when memories load ONLY ONCE and prevent infinite loops
+      if (mems.length > 0) {
+        setBearings(prev => {
+           if (prev) return prev; // Already fetched
+           jarvisBrain.getBearingsState(mems).then(res => setBearings(res)).catch(console.error);
+           return "Buscando contexto base..."; // Temporary lock state
+        });
       }
     });
 
@@ -665,9 +669,29 @@ export default function App() {
         response = `He activado el **Motor de Representación Semántica**.\n\n${embeddingResult}\n\n**Optimización:** El modelo seleccionado se ajusta al dominio detectado para maximizar la precisión de recuperación.`;
       } else if (userText.toLowerCase().includes("herramienta") || userText.toLowerCase().includes("tool") || userText.toLowerCase().includes("mcp") || userText.toLowerCase().includes("bucle")) {
         // Tool Use
-        setToolUseStatus("Ejecutando bucle agéntico...");
-        const toolUseResult = await jarvisBrain.toolUseController(userText);
-        response = `He activado el **Orquestador de Herramientas (Agentic Loop)**.\n\n${toolUseResult}\n\n**Contrato:** He evaluado la necesidad de acciones externas y gestionado el ciclo de \`tool_use\` y \`tool_result\` para completar la tarea.`;
+        setToolUseStatus("Ejecutando bucle agéntico avanzado...");
+        
+        // Add a temporary message for streaming the autonomous thoughts
+        setMessages(prev => [...prev, { role: 'jarvis', text: '*(Iniciando Bucle Autónomo...)*' }]);
+        
+        try {
+          let streamedText = "";
+          // Hooking into a new autonomous orchestrator that returns an async generator
+          const stream = await jarvisBrain.autonomousAgentTrigger(userText);
+          
+          for await (const chunk of stream) {
+            streamedText += chunk;
+            setMessages(prev => {
+              const newMsgs = [...prev];
+              newMsgs[newMsgs.length - 1].text = streamedText;
+              return newMsgs;
+            });
+            await new Promise(r => setTimeout(r, 80)); // Visual delay
+          }
+          response = ""; // Prevent default appending
+        } catch (error: any) {
+          response = `Error en el núcleo autónomo: ${error.message}`;
+        }
       } else if (userText.toLowerCase().includes("busca") || userText.toLowerCase().includes("search") || userText.toLowerCase().includes("investiga")) {
         // Search Results: Natural citations with source attribution and dynamic filtering
         setResearchStatus("Filtrando resultados dinámicamente...");
