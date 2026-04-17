@@ -132,6 +132,11 @@ service cloud.firestore {
       }
     }
 
+    match /jarvis/lineage/{generationId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated(); // For now, allow authenticated writes for the agent
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

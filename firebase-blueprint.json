@@ -54,6 +54,39 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["uid", "title", "content", "updatedAt"]
+    },
+    "Genome": {
+      "title": "Agent Genome",
+      "description": "Represents the genetic state of the Jarvis AI agent.",
+      "type": "object",
+      "properties": {
+        "agentId": { "type": "string" },
+        "mutationVector": {
+          "type": "object",
+          "properties": {
+            "aggressiveness": { "type": "number" },
+            "caution": { "type": "number" },
+            "predictivity": { "type": "number" }
+          }
+        },
+        "mutation": { "type": "string" },
+        "fitnessScore": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "parentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "ARCHIVED", "MUTATED"] }
+      }
+    },
+    "Decision": {
+      "title": "Jarvis Decision",
+      "description": "A record of a loyalty-based decision made by Jarvis.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "proposedAction": { "type": "string" },
+        "loyaltyEvaluation": { "type": "object" },
+        "result": { "type": "string", "enum": ["executed", "rejected", "mutated"] },
+        "outcome": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -72,6 +105,10 @@
     "/users/{userId}/tasks/{taskId}": {
       "schema": "Task",
       "description": "Tareas gestionadas por Jarvis."
+    },
+    "/jarvis/lineage/{generationId}": {
+      "schema": "Genome",
+      "description": "The evolutionary genealogy of Jarvis."
     }
   }
 }

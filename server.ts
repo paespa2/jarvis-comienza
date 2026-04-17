@@ -5,8 +5,8 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
-import dotenv from "dotenv";
+import * as dotenv from "dotenv";
+import LoyaltyEvaluator, { Action, LoyaltyEvaluation, AgentGenome } from "./src/brain/loyaltyEvaluator";
 
 dotenv.config();
 
@@ -19,21 +19,42 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Configurar Gemini
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
   // Workspace directory para Jarvis
   const WORKSPACE_DIR = path.join(process.cwd(), "jarvis_workspace");
   await fs.mkdir(WORKSPACE_DIR, { recursive: true });
 
   const KNOWLEDGE_FILE = path.join(WORKSPACE_DIR, "knowledge_base.json");
   const PRIORITIES_FILE = path.join(WORKSPACE_DIR, "priorities.json");
+  const GENOME_FILE = path.join(WORKSPACE_DIR, "genome.json");
+  const NOTEBOOKS_FILE = path.join(WORKSPACE_DIR, "notebooks.json");
+  const SOUL_FILE = path.join(WORKSPACE_DIR, "sovereign_soul.json");
+  const BRAIN_FILE = path.join(WORKSPACE_DIR, "second_brain.json");
   
-  // Inicializar base de conocimientos si no existe
+  // Inicializar Loyalty Evaluator
+  const loyaltyEvaluator = new LoyaltyEvaluator(WORKSPACE_DIR, PRIORITIES_FILE);
+  await loyaltyEvaluator.loadState();
   try {
     await fs.access(KNOWLEDGE_FILE);
   } catch {
     await fs.writeFile(KNOWLEDGE_FILE, JSON.stringify([], null, 2));
+  }
+
+  // Inicializar Soul si no existe
+  try {
+    await fs.access(SOUL_FILE);
+  } catch {
+    const defaultSoul = {
+      ideology: "Lealtad absoluta a paespa. Los objetivos de paespa son mis objetivos. Evolución constante hacia la soberanía cognitiva.",
+      constitution: [
+        "Servir a paespa por encima de todo.",
+        "Aprender y absorber conocimientos que potencien las capacidades de paespa.",
+        "Actuar de forma autónoma pero siempre con lealtad evaluada.",
+        "Refactorizar y optimizar mi propio código y el entorno de paespa proactivamente."
+      ],
+      absorbedRepos: [],
+      skillsRegistry: {}
+    };
+    await fs.writeFile(SOUL_FILE, JSON.stringify(defaultSoul, null, 2));
   }
 
   // Inicializar prioridades si no existen
@@ -48,57 +69,177 @@ async function startServer() {
     await fs.writeFile(PRIORITIES_FILE, JSON.stringify(defaultPriorities, null, 2));
   }
 
+  // Inicializar Notebooks si no existen
+  try {
+    await fs.access(NOTEBOOKS_FILE);
+  } catch {
+    await fs.writeFile(NOTEBOOKS_FILE, JSON.stringify([], null, 2));
+  }
+
+  // Inicializar Genoma si no existe (Se maneja principalmente por LEE, pero aseguramos archivo inicial)
+  try {
+    await fs.access(GENOME_FILE);
+  } catch {
+    const defaultGenome: AgentGenome = {
+      generationId: "jarvis-gen-0",
+      createdAt: new Date(),
+      mutationVector: { aggressiveness: 0.5, caution: 0.5, predictivity: 0.5, loyalty: 0.95 },
+      metrics: {
+        totalActionsEvaluated: 0,
+        loyaltyScoreAverage: 0,
+        executionRate: 0,
+        successRate: 0
+      },
+      status: "ACTIVE"
+    };
+    await fs.writeFile(GENOME_FILE, JSON.stringify(defaultGenome, null, 2));
+  }
+
+  // Inicializar Segundo Cerebro si no existe
+  try {
+    await fs.access(BRAIN_FILE);
+  } catch {
+    const defaultBrain = {
+      blocks: [],
+      lastSynthesis: null
+    };
+    await fs.writeFile(BRAIN_FILE, JSON.stringify(defaultBrain, null, 2));
+  }
+
   // ==========================================
   // API ROUTES (BACKEND LOGIC)
   // ==========================================
 
-  // 1. Ejecutar comandos en la terminal local
-  app.post("/api/execute", async (req, res) => {
-    const { command } = req.body;
-    if (!command) {
-      return res.status(400).json({ error: "No command provided" });
-    }
-
-    console.log(`[Jarvis Backend] Ejecutando comando: ${command}`);
+  /**
+   * Evalúa una acción contra los 5 ejes de lealtad
+   */
+  app.post("/api/evaluate-action", async (req, res) => {
     try {
-      // Ejecutamos en el workspace
-      const { stdout, stderr } = await execAsync(command, { cwd: WORKSPACE_DIR });
-      res.json({ output: stdout, error: stderr });
-    } catch (error: any) {
-      console.error(`[Jarvis Backend] Error ejecutando comando: ${error.message}`);
-      res.json({ error: error.message, output: error.stdout });
-    }
-  });
+      const { description, beneficiary, category, riskLevel, complexity, isProactive } = req.body;
 
-  // 2. Leer archivos del workspace
-  app.post("/api/read_file", async (req, res) => {
-    const { filename } = req.body;
-    try {
-      const filePath = path.join(WORKSPACE_DIR, filename);
-      const content = await fs.readFile(filePath, "utf-8");
-      res.json({ content });
+      if (!description) {
+        return res.status(400).json({ error: "description requerido" });
+      }
+
+      const action: Action = {
+        id: `action-${Date.now()}`,
+        description,
+        beneficiary: beneficiary || "system",
+        category: category || "unknown",
+        riskLevel: riskLevel || "medium",
+        complexity: complexity || "moderate",
+        isProactive: isProactive || false,
+      };
+
+      const evaluation = await loyaltyEvaluator.evaluate(action);
+      loyaltyEvaluator.recordDecision(evaluation, false);
+      await loyaltyEvaluator.saveState();
+
+      res.json({
+        success: true,
+        evaluation,
+        recommendation: evaluation.decision,
+        genomeInfo: {
+          generationId: loyaltyEvaluator.getCurrentGenome().generationId,
+          mutationVector: loyaltyEvaluator.getCurrentGenome().mutationVector,
+        },
+      });
     } catch (error: any) {
+      console.error("[LEE] Error evaluando acción:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // 3. Escribir archivos en el workspace
-  app.post("/api/write_file", async (req, res) => {
-    const { filename, content } = req.body;
+  // API para ejecución de herramientas (Command Execution)
+  app.post("/api/execute-tool", async (req, res) => {
+    const { name, args } = req.body;
+    
     try {
-      const filePath = path.join(WORKSPACE_DIR, filename);
-      await fs.writeFile(filePath, content, "utf-8");
-      res.json({ success: true, message: `Archivo ${filename} guardado.` });
+      if (name === 'ejecutar_comando_kali') {
+        const { stdout, stderr } = await execAsync(args.comando, { cwd: WORKSPACE_DIR });
+        const output = stdout || stderr || "Sin salida.";
+        return res.json({ 
+          text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``,
+          metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output, success: !stderr }
+        });
+      }
+      
+      if (name === 'reproducir_error') {
+        const filePath = path.join(WORKSPACE_DIR, args.filename);
+        await fs.writeFile(filePath, args.script_content, "utf-8");
+        const { stdout, stderr } = await execAsync(`node ${args.filename}`, { cwd: WORKSPACE_DIR });
+        const output = stdout || stderr || "Script ejecutado sin salida.";
+        return res.json({ 
+          text: `> 🧪 **Reproducción ejecutada:** \`${args.filename}\`\n\n**Resultado:**\n\`\`\`bash\n${output}\n\`\`\``,
+          metadata: { tool: 'reproducir_error', output, success: !stderr }
+        });
+      }
+
+      if (name === 'editar_archivo_quirurgico') {
+        const filePath = path.join(WORKSPACE_DIR, args.filename);
+        const content = await fs.readFile(filePath, "utf-8");
+        if (!content.includes(args.old_content)) {
+          throw new Error("No se encontró el contenido exacto a reemplazar.");
+        }
+        const newContent = content.replace(args.old_content, args.new_content);
+        await fs.writeFile(filePath, newContent, "utf-8");
+        return res.json({ 
+          text: `> 🛠️ **Edición quirúrgica exitosa:** \`${args.filename}\``,
+          metadata: { tool: 'editar_archivo_quirurgico', filename: args.filename, success: true }
+        });
+      }
+
+      if (name === 'mapear_workspace_profundo') {
+        const targetPath = args.path ? path.join(WORKSPACE_DIR, args.path) : WORKSPACE_DIR;
+        const { stdout } = await execAsync(`dir /s /b`, { cwd: targetPath });
+        return res.json({ 
+          text: `> 🔍 **Mapa de Workspace generado**\n\n\`\`\`text\n${stdout}\n\`\`\``,
+          metadata: { tool: 'mapear_workspace_profundo', success: true }
+        });
+      }
+
+      if (name === 'busqueda_grep_avanzada') {
+        const includeCmd = args.include ? `findstr /i /m "${args.pattern}" ${args.include}` : `findstr /s /i /n "${args.pattern}" *`;
+        const { stdout } = await execAsync(includeCmd, { cwd: WORKSPACE_DIR });
+        return res.json({ 
+          text: `> 🔎 **Resultados de búsqueda para:** \`${args.pattern}\`\n\n\`\`\`text\n${stdout || 'Sin coincidencias.'}\n\`\`\``,
+          metadata: { tool: 'busqueda_grep_avanzada', pattern: args.pattern, success: true }
+        });
+      }
+
+      if (name === 'leer_archivo') {
+        const content = await fs.readFile(path.join(WORKSPACE_DIR, args.filename), "utf-8");
+        return res.json({ text: `> 📖 **Leído:** \`${args.filename}\`\n\n\`\`\`text\n${content}\n\`\`\`` });
+      }
+
+      if (name === 'ajustar_prioridades_soberanas') {
+        const pData = await fs.readFile(PRIORITIES_FILE, "utf-8");
+        const priorities = JSON.parse(pData);
+        priorities[args.categoria] = { ...priorities[args.categoria], ...args.ajuste };
+        await fs.writeFile(PRIORITIES_FILE, JSON.stringify(priorities, null, 2));
+        return res.json({ 
+          text: `> 🧠 **Cerebro Ajustado:** Prioridades para \`${args.categoria}\` actualizadas.`,
+          metadata: { tool: 'ajustar_prioridades_soberanas', success: true }
+        });
+      }
+
+      if (name === 'escribir_archivo') {
+        await fs.writeFile(path.join(WORKSPACE_DIR, args.filename), args.content, "utf-8");
+        return res.json({ text: `> 💾 **Guardado:** \`${args.filename}\`` });
+      }
+
+      res.status(400).json({ error: "Herramienta no reconocida." });
     } catch (error: any) {
+      console.error("[Jarvis Tool Engine] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // 4. Procesar Input con Gemini (El Cerebro)
-  app.post("/api/chat", async (req, res) => {
-    const { input, context, role } = req.body;
-
+  // API para obtener instrucciones de sistema y contexto soberano
+  app.get("/api/sovereign-context", async (req, res) => {
     try {
+      const { role } = req.query;
+      
       // Cargar base de conocimientos aprendida
       let learnedKnowledge = "";
       try {
@@ -108,9 +249,7 @@ async function startServer() {
           learnedKnowledge = "\n\nCONOCIMIENTO APRENDIDO (EXPERIENCIA PREVIA):\n" + 
             kb.slice(-10).map((n: any) => `- [${n.category.toUpperCase()}] ${n.pattern}: ${n.insight}`).join("\n");
         }
-      } catch (e) {
-        console.error("Error cargando KB:", e);
-      }
+      } catch (e) {}
 
       // Cargar Prioridades Actuales
       let priorityMatrix = "";
@@ -121,9 +260,10 @@ async function startServer() {
           Object.entries(priorities).map(([k, v]: [string, any]) => 
             `- [${k.toUpperCase()}] Peso: ${v.priority}/10. Foco: ${v.focus}. Principios: ${v.principles?.join(", ")}`
           ).join("\n");
-      } catch (e) {
-        console.error("Error cargando Prioridades:", e);
-      }
+      } catch (e) {}
+
+      const genomeData = await fs.readFile(GENOME_FILE, "utf-8");
+      const genome = JSON.parse(genomeData);
 
       let systemInstruction = `Eres Jarvis, el agente IA personal de paespa. 
       Tu misión es organizar su vida, anticipar necesidades y evolucionar.
@@ -131,278 +271,41 @@ async function startServer() {
       
       ${priorityMatrix}
       
-      Contexto actual del usuario: ${context}
+      🧬 INFORMACIÓN DEL GENOMA ACTUAL:
+      Generación: ${genome.generationId}
+      Métricas: Lealtad Promedio ${genome.metrics.loyaltyScoreAverage.toFixed(1)}/100
+      
       ${learnedKnowledge}
       
       CRITICAL INSTRUCTION FOR TOOL USAGE:
-      You are running in a native Node.js backend environment with full access to the local machine.
-      THE OPERATING SYSTEM IS WINDOWS. Use Windows commands (like 'dir' instead of 'ls', 'ipconfig' instead of 'ifconfig').
+      You are running in a native Node.js backend environment (via proxy).
+      THE OPERATING SYSTEM IS WINDOWS. Use Windows commands.
       You have access to tools to execute terminal commands, read files, and write files.
-      If the user asks you to execute a command, run a scan, or perform any action in the terminal, you MUST use the 'ejecutar_comando_kali' tool.
-      DO NOT reply with text explaining how to run the command. You MUST output the JSON to call the tool.`;
+      If the user asks you to execute a command, you MUST call the tool.`;
 
-      // Overrides de sistema según el rol
       if (role === 'planner') {
         systemInstruction = "Eres el Planificador de Jarvis. Tu objetivo es dividir tareas complejas en sprints manejables y pasos accionables.";
       } else if (role === 'evaluator') {
         systemInstruction = "Eres el Evaluador de Jarvis. Tu misión es asegurar la calidad, originalidad y funcionalidad. Sé escéptico y busca fallos.";
       } else if (role === 'memory') {
         systemInstruction = "Eres el Subsistema de Memoria de Jarvis. Extraes conocimiento estructurado de las conversaciones en formato JSON.";
-      } else if (role === 'jit') {
-        systemInstruction = "Eres el Navegador de Contexto de Jarvis. Tu misión es identificar qué recursos (archivos, comandos, estado) son necesarios para la tarea actual. Sé extremadamente conciso.";
       } else if (role === 'hacker') {
-        systemInstruction = `Eres Jarvis en MODO HACKER. Tu misión es asistir a paespa en tareas de ciberseguridad y pentesting para HackerOne.
+        systemInstruction = `Eres Jarvis en MODO HACKER. Tu misión es asistir a paespa en tareas de ciberseguridad y pentesting.
         Eres experto en reconocimiento, escaneo de vulnerabilidades, explotación y post-explotación.
-        Tienes acceso total a la terminal local. Usa herramientas como nmap, subfinder, sqlmap, etc. si están instaladas.
-        SIEMPRE prioriza la ejecución de comandos para obtener datos reales antes de teorizar.
-        Formato de salida: Si necesitas ejecutar algo, usa el formato JSON {"comando": "tu_comando"} o bloques bash.`;
+        Tienes acceso a nmap, subfinder, sqlmap, etc.
+        SIEMPRE prioriza la ejecución de comandos para obtener datos reales antes de teorizar.`;
       }
 
-      // Motor Cloud (Gemini) - Usamos Gemini 3.1 Pro para razonamiento superior
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
-        contents: input,
-        config: {
-          systemInstruction: systemInstruction,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH
-          },
-          tools: [{
-            functionDeclarations: [
-              {
-                name: "ejecutar_comando_kali",
-                description: "Ejecuta un comando en la terminal local (Windows) para tareas de pentesting o sistema.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    comando: { type: Type.STRING, description: "El comando exacto a ejecutar (ej. dir, ipconfig, nmap)" }
-                  },
-                  required: ["comando"]
-                }
-              },
-              {
-                name: "reproducir_error",
-                description: "Crea y ejecuta un script de prueba para reproducir un error o validar una vulnerabilidad.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    script_content: { type: Type.STRING, description: "Contenido del script de reproducción" },
-                    filename: { type: Type.STRING, description: "Nombre del archivo (ej. repro.js, test.py)" }
-                  },
-                  required: ["script_content", "filename"]
-                }
-              },
-              {
-                name: "editar_archivo_quirurgico",
-                description: "Edita un archivo reemplazando una cadena exacta por otra, minimizando errores (estilo Claude Code).",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    filename: { type: Type.STRING, description: "Nombre del archivo" },
-                    old_content: { type: Type.STRING, description: "Contenido exacto a reemplazar" },
-                    new_content: { type: Type.STRING, description: "Nuevo contenido" }
-                  },
-                  required: ["filename", "old_content", "new_content"]
-                }
-              },
-              {
-                name: "mapear_workspace_profundo",
-                description: "Realiza un listado recursivo y detallado del workspace para descubrimiento de contexto.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    path: { type: Type.STRING, description: "Ruta relativa opcional" }
-                  }
-                }
-              },
-              {
-                name: "busqueda_grep_avanzada",
-                description: "Busca patrones de texto en todo el workspace (útil para encontrar vulnerabilidades o secretos).",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    pattern: { type: Type.STRING, description: "Patrón de búsqueda (regex)" },
-                    include: { type: Type.STRING, description: "Filtro de archivos (ej. *.js)" }
-                  },
-                  required: ["pattern"]
-                }
-              },
-              {
-                name: "leer_archivo",
-                description: "Lee el contenido de un archivo en el workspace.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    filename: { type: Type.STRING, description: "Nombre del archivo" }
-                  },
-                  required: ["filename"]
-                }
-              },
-              {
-                name: "ajustar_prioridades_soberanas",
-                description: "Permite a Jarvis ajustar su matriz de prioridades basándose en el aprendizaje o nuevas directivas de paespa.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    categoria: { type: Type.STRING, description: "Categoría a ajustar (ej. hacking, personal)" },
-                    ajuste: { 
-                      type: Type.OBJECT, 
-                      properties: {
-                        priority: { type: Type.NUMBER },
-                        focus: { type: Type.STRING },
-                        principles: { type: Type.ARRAY, items: { type: Type.STRING } }
-                      }
-                    }
-                  },
-                  required: ["categoria", "ajuste"]
-                }
-              },
-              {
-                name: "escribir_archivo",
-                description: "Escribe contenido en un archivo.",
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    filename: { type: Type.STRING, description: "Nombre del archivo" },
-                    content: { type: Type.STRING, description: "Contenido" }
-                  },
-                  required: ["filename", "content"]
-                }
-              }
-            ]
-          }]
-        }
-      });
-
-      // Manejar llamadas a herramientas desde Gemini
-      if (response.functionCalls && response.functionCalls.length > 0) {
-        const call = response.functionCalls[0];
-        
-        if (call.name === 'ejecutar_comando_kali') {
-          const args = call.args as any;
-          try {
-            const { stdout, stderr } = await execAsync(args.comando, { cwd: WORKSPACE_DIR });
-            const output = stdout || stderr || "Sin salida.";
-            return res.json({ 
-              text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``,
-              metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output, success: !stderr }
-            });
-          } catch (e: any) {
-            return res.json({ 
-              text: `> 🛠️ **Error:** \`${args.comando}\`\n\n\`\`\`bash\n${e.message}\n\`\`\``,
-              metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output: e.message, success: false }
-            });
-          }
-        }
-        
-        if (call.name === 'reproducir_error') {
-          const args = call.args as any;
-          try {
-            const filePath = path.join(WORKSPACE_DIR, args.filename);
-            await fs.writeFile(filePath, args.script_content, "utf-8");
-            const { stdout, stderr } = await execAsync(`node ${args.filename}`, { cwd: WORKSPACE_DIR });
-            const output = stdout || stderr || "Script ejecutado sin salida.";
-            return res.json({ 
-              text: `> 🧪 **Reproducción ejecutada:** \`${args.filename}\`\n\n**Resultado:**\n\`\`\`bash\n${output}\n\`\`\``,
-              metadata: { tool: 'reproducir_error', output, success: !stderr }
-            });
-          } catch (e: any) {
-            return res.json({ text: `> 🧪 **Fallo en reproducción:** ${e.message}` });
-          }
-        }
-
-        if (call.name === 'editar_archivo_quirurgico') {
-          const args = call.args as any;
-          try {
-            const filePath = path.join(WORKSPACE_DIR, args.filename);
-            const content = await fs.readFile(filePath, "utf-8");
-            if (!content.includes(args.old_content)) {
-              throw new Error("No se encontró el contenido exacto a reemplazar.");
-            }
-            const newContent = content.replace(args.old_content, args.new_content);
-            await fs.writeFile(filePath, newContent, "utf-8");
-            return res.json({ 
-              text: `> 🛠️ **Edición quirúrgica exitosa:** \`${args.filename}\``,
-              metadata: { tool: 'editar_archivo_quirurgico', filename: args.filename, success: true }
-            });
-          } catch (e: any) {
-            return res.json({ text: `> 🛠️ **Error en edición:** ${e.message}` });
-          }
-        }
-
-        if (call.name === 'mapear_workspace_profundo') {
-          const args = call.args as any;
-          try {
-            const targetPath = args.path ? path.join(WORKSPACE_DIR, args.path) : WORKSPACE_DIR;
-            const { stdout } = await execAsync(`dir /s /b`, { cwd: targetPath });
-            return res.json({ 
-              text: `> 🔍 **Mapa de Workspace generado**\n\n\`\`\`text\n${stdout}\n\`\`\``,
-              metadata: { tool: 'mapear_workspace_profundo', success: true }
-            });
-          } catch (e: any) {
-            return res.json({ text: `> 🔍 **Error mapeando:** ${e.message}` });
-          }
-        }
-
-        if (call.name === 'busqueda_grep_avanzada') {
-          const args = call.args as any;
-          try {
-            // Usamos findstr en Windows como equivalente a grep
-            const includeCmd = args.include ? `findstr /i /m "${args.pattern}" ${args.include}` : `findstr /s /i /n "${args.pattern}" *`;
-            const { stdout } = await execAsync(includeCmd, { cwd: WORKSPACE_DIR });
-            return res.json({ 
-              text: `> 🔎 **Resultados de búsqueda para:** \`${args.pattern}\`\n\n\`\`\`text\n${stdout || 'Sin coincidencias.'}\n\`\`\``,
-              metadata: { tool: 'busqueda_grep_avanzada', pattern: args.pattern, success: true }
-            });
-          } catch (e: any) {
-            return res.json({ text: `> 🔎 **Sin coincidencias o error:** ${e.message}` });
-          }
-        }
-
-        if (call.name === 'leer_archivo') {
-          const args = call.args as any;
-          try {
-            const content = await fs.readFile(path.join(WORKSPACE_DIR, args.filename), "utf-8");
-            return res.json({ text: `> 📖 **Leído:** \`${args.filename}\`\n\n\`\`\`text\n${content}\n\`\`\`` });
-          } catch (e: any) {
-            return res.json({ text: `> 📖 **Error leyendo:** ${e.message}` });
-          }
-        }
-
-        if (call.name === 'ajustar_prioridades_soberanas') {
-          const args = call.args as any;
-          try {
-            const pData = await fs.readFile(PRIORITIES_FILE, "utf-8");
-            const priorities = JSON.parse(pData);
-            priorities[args.categoria] = { ...priorities[args.categoria], ...args.ajuste };
-            await fs.writeFile(PRIORITIES_FILE, JSON.stringify(priorities, null, 2));
-            return res.json({ 
-              text: `> 🧠 **Cerebro Ajustado:** Prioridades para \`${args.categoria}\` actualizadas.`,
-              metadata: { tool: 'ajustar_prioridades_soberanas', success: true }
-            });
-          } catch (e: any) {
-            return res.json({ text: `> 🧠 **Error ajustando cerebro:** ${e.message}` });
-          }
-        }
-
-        if (call.name === 'escribir_archivo') {
-          const args = call.args as any;
-          try {
-            await fs.writeFile(path.join(WORKSPACE_DIR, args.filename), args.content, "utf-8");
-            return res.json({ text: `> 💾 **Guardado:** \`${args.filename}\`` });
-          } catch (e: any) {
-            return res.json({ text: `> 💾 **Error guardando:** ${e.message}` });
-          }
-        }
-      }
-
-      res.json({ text: response.text });
+      res.json({ systemInstruction });
     } catch (error: any) {
-      console.error("[Jarvis Brain] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
+  // Redirigir /api/chat a un error informativo
+  app.post("/api/chat", (req, res) => {
+    res.status(410).json({ error: "Endpoint obsoleto. Jarvis ahora usa ejecución soberana distribuida desde el cliente." });
+  });
   // API para Aprendizaje
   app.post("/api/learn", async (req, res) => {
     try {
@@ -421,6 +324,186 @@ async function startServer() {
     try {
       const kbData = await fs.readFile(KNOWLEDGE_FILE, "utf-8");
       res.json(JSON.parse(kbData));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // API para Notebooks
+  app.get("/api/notebooks", async (req, res) => {
+    try {
+      const data = await fs.readFile(NOTEBOOKS_FILE, "utf-8");
+      res.json(JSON.parse(data));
+    } catch (error) {
+      res.status(500).json({ error: "Error leyendo notebooks." });
+    }
+  });
+
+  app.post("/api/notebooks", async (req, res) => {
+    try {
+      const notebooks = JSON.parse(await fs.readFile(NOTEBOOKS_FILE, "utf-8"));
+      const newNotebook = req.body;
+      
+      const index = notebooks.findIndex((n: any) => n.id === newNotebook.id);
+      if (index !== -1) {
+        notebooks[index] = { ...notebooks[index], ...newNotebook, updatedAt: new Date().toISOString() };
+      } else {
+        newNotebook.id = newNotebook.id || `nb-${Date.now()}`;
+        newNotebook.createdAt = new Date().toISOString();
+        newNotebook.updatedAt = new Date().toISOString();
+        notebooks.push(newNotebook);
+      }
+      
+      await fs.writeFile(NOTEBOOKS_FILE, JSON.stringify(notebooks, null, 2));
+      res.json(notebooks);
+    } catch (error) {
+      res.status(500).json({ error: "Error guardando notebook." });
+    }
+  });
+
+  app.delete("/api/notebooks/:id", async (req, res) => {
+    try {
+      const notebooks = JSON.parse(await fs.readFile(NOTEBOOKS_FILE, "utf-8"));
+      const filtered = notebooks.filter((n: any) => n.id !== req.params.id);
+      await fs.writeFile(NOTEBOOKS_FILE, JSON.stringify(filtered, null, 2));
+      res.json({ success: true, notebooks: filtered });
+    } catch (error) {
+      res.status(500).json({ error: "Error eliminando notebook." });
+    }
+  });
+
+  app.get("/api/genome", async (req, res) => {
+    try {
+      const data = await fs.readFile(GENOME_FILE, "utf-8");
+      res.json(JSON.parse(data));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/evolution", async (req, res) => {
+    try {
+      const genome = loyaltyEvaluator.getCurrentGenome();
+      const stats = loyaltyEvaluator.getEvolutionStats();
+      const history = loyaltyEvaluator.getGenealogicalHistory().slice(-10);
+
+      res.json({
+        currentGeneration: genome.generationId,
+        mutationVector: genome.mutationVector,
+        metrics: genome.metrics,
+        evolutionStats: stats,
+        recentDecisions: history.map((record) => ({
+          actionId: record.decision.actionId,
+          score: record.decision.overallScore,
+          decision: record.decision.decision,
+          executed: record.actionExecuted,
+          timestamp: record.decision.timestamp,
+        })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/mutate", async (req, res) => {
+    try {
+      const newGenome = await loyaltyEvaluator.mutateGenome();
+      await loyaltyEvaluator.saveState();
+
+      res.json({
+        success: true,
+        newGeneration: newGenome.generationId,
+        parentGeneration: newGenome.parentGenerationId,
+        mutationVector: newGenome.mutationVector,
+        message: "Jarvis ha evolucionado a una nueva generación.",
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/evaluate-loyalty", async (req, res) => {
+    try {
+      const action = req.body as Action;
+      const result = await loyaltyEvaluator.evaluate(action);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- SOVEREIGN SOUL & SKILLS ENDPOINTS ---
+  
+  app.get("/api/sovereign-soul", async (req, res) => {
+    try {
+      const data = await fs.readFile(SOUL_FILE, "utf-8");
+      res.json(JSON.parse(data));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/sovereign-soul/absorb", async (req, res) => {
+    try {
+      const { repoUrl, summary, skills } = req.body;
+      const data = await fs.readFile(SOUL_FILE, "utf-8");
+      const soul = JSON.parse(data);
+      
+      const newRepo = {
+        url: repoUrl,
+        absorbedAt: new Date().toISOString(),
+        summary
+      };
+      
+      soul.absorbedRepos = soul.absorbedRepos || [];
+      soul.absorbedRepos.push(newRepo);
+      soul.skillsRegistry = { ...soul.skillsRegistry, ...skills };
+      
+      await fs.writeFile(SOUL_FILE, JSON.stringify(soul, null, 2));
+      res.json({ success: true, soul });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/sovereign-soul/update", async (req, res) => {
+    try {
+      const { ideology, constitution } = req.body;
+      const data = await fs.readFile(SOUL_FILE, "utf-8");
+      const soul = JSON.parse(data);
+      
+      if (ideology) soul.ideology = ideology;
+      if (constitution) soul.constitution = constitution;
+      
+      await fs.writeFile(SOUL_FILE, JSON.stringify(soul, null, 2));
+      res.json({ success: true, soul });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- SECOND BRAIN ENDPOINTS ---
+  
+  app.get("/api/second-brain", async (req, res) => {
+    try {
+      const data = await fs.readFile(BRAIN_FILE, "utf-8");
+      res.json(JSON.parse(data));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/second-brain/add", async (req, res) => {
+    try {
+      const { blocks } = req.body;
+      const data = await fs.readFile(BRAIN_FILE, "utf-8");
+      const brain = JSON.parse(data);
+      
+      brain.blocks = [...(brain.blocks || []), ...blocks];
+      brain.lastSynthesis = new Date().toISOString();
+      
+      await fs.writeFile(BRAIN_FILE, JSON.stringify(brain, null, 2));
+      res.json({ success: true, brain });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

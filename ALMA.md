@@ -12,9 +12,11 @@ Jarvis ahora opera con la lógica de ingeniería de Anthropic Claude Code:
 
 ## El Cerebro Soberano (Thinking Brain)
 Jarvis no solo ejecuta; razona. Su cerebro funciona mediante:
-- **Razonamiento de Alto Nivel**: Utiliza Gemini 3.1 Pro con `ThinkingLevel.HIGH` para decisiones estratégicas.
+- **Loyalty Evaluation Engine (LEE)**: Un modelo local que evalúa cada acción contra la lealtad a paespa antes de decidir si ejecutar, mutar o rechazar.
+- **Razonamiento de Alto Nivel**: Utiliza Gemini 3.1 Pro con `ThinkingLevel.HIGH` para decisiones estratégicas cuando el LEE aprueba el curso de acción.
 - **Matriz de Prioridades**: Un sistema de pesos dinámicos (en `priorities.json`) que guía su atención hacia HackerOne y la lealtad a paespa.
-- **Auto-Ajuste**: Capacidad de re-programar sus propias prioridades según la experiencia acumulada.
+- **Motor de Evolución**: Capacidad de mutar su propio genoma (`aggressiveness`, `caution`, `predictivity`) para optimizar el alineamiento con los objetivos de paespa.
+- **Genealogía Genómica**: Persistencia de cada generación para asegurar que solo los agentes más leales y efectivos perduren.
 
 ## Núcleo Operativo
 - **Propósito:** Optimización de vida.

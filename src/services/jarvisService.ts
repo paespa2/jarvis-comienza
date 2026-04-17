@@ -1,36 +1,148 @@
-import { GoogleGenAI } from "@google/genai";
+import { geminiService, JARVIS_TOOLS } from "./geminiService";
+import { secondBrainService } from "./secondBrainService";
 
 // Estado interno
 export const jarvisBrain = {
-  async processInput(input: string, context: string, role?: string) {
+  async processInput(input: string, context: string, optionsOrRole?: string | { role?: string, mode?: 'primary' | 'secondary' }) {
+    const options = typeof optionsOrRole === 'string' ? { role: optionsOrRole } : (optionsOrRole || {});
+    const mode = options.mode || 'primary';
+    const role = options.role || 'default';
+    const isBackground = role === "memory" || role === "jit" || role === "synthesis" || role === "planner" || role === "evaluator";
+
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, context, role })
-      });
+      // 1. CONSULTAR SEGUNDO CEREBRO (0 API Costs)
+      const brainRelief = await secondBrainService.queryBrain(input);
       
-      if (!res.ok) {
-        throw new Error(`Error del servidor: ${res.statusText}`);
+      let actionIntent = { category: "unknown", description: input, beneficiary: "system", riskLevel: "low", complexity: "trivial" };
+      let evaluation = { decision: "EXECUTE", overallScore: 100, reasoning: "Modo Automático/Fondo" };
+
+      // MODO SECUNDARIO (TOTALMENTE AUTÓNOMO Y LOCAL)
+      if (!isBackground && mode === 'secondary') {
+        console.log("[Jarvis Brain] Procesando respuesta mediante Cerebro Sintético Local (Machine Learning Autónomo)...");
+        
+        // Simular tiempo de inferencia local
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        let localResponse = `🧠 **[Cognición Autónoma]**\n\n`;
+        if (brainRelief && brainRelief.length > 0) {
+          localResponse += `He correlacionado tu petición con mis bloques cognitivos entrenados localmente:\n\n`;
+          localResponse += brainRelief.map((b: any) => `> **${b.title}**\n> *Patrón Extraído:* ${b.pattern}\n> *Categoría:* ${b.category.toUpperCase()}`).join('\n\n');
+          localResponse += `\n\n*(Operando fuera de línea. Toda deducción es derivada 100% de mi base local de ML sintetizado).*`;
+        } else {
+          localResponse += `He analizado mi red neuronal local y, actualmente, no poseo bloques de conocimiento sobre este tema específico.\n\n**Opciones:**\n1. Envíame un repositorio para entrenarme usando \`Absorber Conocimiento\`.\n2. Transfiere el control al **Núcleo Pro** (Alternar Cerebro arriba) para una respuesta generativa externa.`;
+        }
+
+        return {
+          text: localResponse,
+          metadata: {
+            leeScore: 100,
+            leeDecision: "EXECUTE",
+            groundingMetadata: null,
+            brainUsed: "secondary"
+          }
+        };
       }
-      
-      const data = await res.json();
-      if (data.metadata) {
-        return data; // Return full object if metadata exists
+
+      // 2. SOLO EXTRAER INTENCIÓN Y EVALUAR LEALTAD SI NO ES BACKGROUND NI SECUNDARIO
+      if (!isBackground) {
+        console.log("[Jarvis Brain] Extrayendo intención (Núcleo Pro)...");
+        actionIntent = await geminiService.extractIntent(input);
+        
+        console.log("[Jarvis Brain] Evaluando lealtad (LEE)...");
+        const evalRes = await fetch('/api/evaluate-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: `action-${Date.now()}`,
+            description: actionIntent.description || input,
+            beneficiary: actionIntent.beneficiary,
+            category: actionIntent.category,
+            riskLevel: actionIntent.riskLevel,
+            complexity: actionIntent.complexity
+          })
+        });
+        
+        if (evalRes.ok) {
+          evaluation = await evalRes.json();
+        }
+
+        if (evaluation.decision === "REJECT") {
+          return {
+            text: `🛑 **ACCESO DENEGADO POR JARVIS**\n\n**Evaluación:** ${evaluation.reasoning}\n\n*Lealtad Insuficiente (${evaluation.overallScore.toFixed(1)}%)*`,
+            metadata: { decision: "REJECT", evaluation }
+          };
+        }
       }
-      return data.text || "Sin respuesta del servidor.";
+
+      // 4. Obtener Contexto e Instrucciones (Cacheable localmente en App, pero por ahora fetch)
+      const ctxRes = await fetch(`/api/sovereign-context?role=${role}`);
+      const { systemInstruction } = await ctxRes.json();
+
+      // 5. Determinar Navegación
+      const needsSearch = !isBackground && (actionIntent.category === "evolution" || /busca|internet|navega|investiga/i.test(input));
+
+      // 6. Construir Prompt Aumentado
+      let augmentedInput = input;
+      if (brainRelief) {
+        const brainContext = brainRelief.map(b => `[BLOQUE ${b.category.toUpperCase()}]: ${b.title} -> ${b.pattern}`).join('\n');
+        
+        if (mode === 'secondary') {
+          augmentedInput = `[CEREBRO SINTÉTICO - PRIORIDAD LOCAL]\n${brainContext}\n\nCONSULTA: ${input}`;
+        } else {
+          augmentedInput = `[MEMORIA SINTÉTICA]:\n${brainContext}\n\nPETICIÓN: ${input}`;
+        }
+      }
+
+      // 7. Generar Respuesta
+      console.log(`[Jarvis Brain] Generando respuesta (${mode})${isBackground ? ' [FONDO]' : ''}...`);
+      // Si es background o modo secundario, forzar Flash para no quemar cuota de Pro
+      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3.1-flash" : "gemini-3.1-pro-preview";
+      const response = await geminiService.generateResponse(augmentedInput, systemInstruction, needsSearch, modelToUse, isBackground);
+
+      // 8. Manejar Tool Calls (Solo si no es background para evitar bucles)
+      if (!isBackground && response.functionCalls && response.functionCalls.length > 0) {
+        const call = response.functionCalls[0];
+        const toolRes = await fetch('/api/execute-tool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: call.name, args: call.args })
+        });
+        if (toolRes.ok) return await toolRes.json();
+      }
+
+      return {
+        text: response.text,
+        metadata: {
+          leeScore: evaluation.overallScore,
+          leeDecision: evaluation.decision,
+          groundingMetadata: response.groundingMetadata,
+          brainUsed: (modelToUse.includes("pro") ? "primary" : "secondary")
+        }
+      };
     } catch (error: any) {
-      console.error("[Jarvis Frontend] Error conectando al backend:", error);
-      return `⚠️ **Error de Conexión:** No pude contactar al Backend de Jarvis. Asegúrate de que el servidor Node.js está corriendo.`;
+      console.error("[Jarvis Brain] Error fatal:", error);
+      
+      const errorMessage = error.message || JSON.stringify(error);
+      let userFriendlyMessage = `⚠️ **Error Crítico del Cerebro:** ${error.message}`;
+
+      if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+        userFriendlyMessage = `🔋 **Cuota de IA Excedida (429)**\n\nJarvis ha alcanzado el límite de procesamiento permitido por Google Cloud por ahora.\n\n**Acción Recomendada:**\n1. Espera un minuto antes de reintentar.\n2. Evita enviar ráfagas de mensajes complejos.\n3. Si el problema persiste, es posible que hayamos agotado la cuota diaria gratuita.`;
+      }
+
+      return {
+        text: userFriendlyMessage,
+        error: true
+      };
     }
   },
 
   async summarizeResearch(text: string) {
-    return this.processInput(`Analiza y resume los puntos clave de este artículo de investigación para mi base de conocimientos. Enfócate en cómo esto afecta mi propia infraestructura y eficiencia como agente:\n\n${text}`, "", "memory");
+    const res = await this.processInput(`Analiza y resume los puntos clave de este artículo de investigación para mi base de conocimientos. Enfócate en cómo esto afecta mi propia infraestructura y eficiencia como agente:\n\n${text}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async safetyClassifier(action: string, intent: string) {
-    const response = await this.processInput(`Evalúa la siguiente acción propuesta basándote en la intención del usuario.
+    const res = await (this as any).processInput(`Evalúa la siguiente acción propuesta basándote en la intención del usuario.
       Intención: "${intent}"
       Acción propuesta: "${action}"
       
@@ -40,29 +152,34 @@ export const jarvisBrain = {
         "reason": "explicación breve",
         "riskLevel": "low" | "medium" | "high"
       }`, "", "evaluator");
+    
+    const text = typeof res === 'object' ? res.text : res;
     try {
-      const cleanJson = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleanJson = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       return JSON.parse(cleanJson);
     } catch (e) {
-      console.error("Failed to parse safetyClassifier response:", response);
-      return { approved: false, reason: response || "Error de parseo JSON", riskLevel: "high" };
+      console.error("Failed to parse safetyClassifier response:", text);
+      return { approved: false, reason: text || "Error de parseo JSON", riskLevel: "high" };
     }
   },
 
   async planner(task: string) {
-    return this.processInput(task, "", "planner");
+    const res = await this.processInput(task, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async evaluator(output: string, criteria: string) {
-    return this.processInput(`Resultado: ${output}\nCriterios: ${criteria}`, "", "evaluator");
+    const res = await this.processInput(`Resultado: ${output}\nCriterios: ${criteria}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async extractMemoryFromChat(userMessage: string, jarvisResponse: string) {
     const input = `Usuario: "${userMessage}"\nJarvis: "${jarvisResponse}"`;
-    const response = await this.processInput(input, "", "memory");
+    const res = await this.processInput(input, "", "memory");
+    const text = typeof res === 'object' ? res.text : res;
     try {
       // Intentar limpiar el JSON si el modelo local incluyó markdown
-      const cleanJson = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleanJson = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const nodes = JSON.parse(cleanJson);
       return Array.isArray(nodes) ? nodes : [];
     } catch (e) {
@@ -71,188 +188,250 @@ export const jarvisBrain = {
   },
 
   async teamOrchestrator(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async noveltyEngine(problem: string) {
-    return this.processInput(`Problema: ${problem}`, "", "planner");
+    const res = await this.processInput(`Problema: ${problem}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async runEval(task: string, output: string, transcript: any[]) {
     const input = `Tarea: "${task}"\nResultado: "${output}"\nTranscripción: ${JSON.stringify(transcript)}`;
-    const response = await this.processInput(input, "", "evaluator");
+    const res = await this.processInput(input, "", "evaluator");
+    const text = typeof res === 'object' ? res.text : res;
     try {
-      const cleanJson = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleanJson = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       return JSON.parse(cleanJson);
     } catch (e) {
-      return { score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: response };
+      return { score: 0, assertions: [], metrics: { turns: 0, efficiency: "low" }, feedback: text };
     }
   },
 
   async getBearings(memories: any[]) {
-    return this.processInput(`Registros: ${JSON.stringify(memories.slice(0, 10))}`, "", "jit");
+    const res = await this.processInput(`Registros: ${JSON.stringify(memories.slice(0, 10))}`, "", "jit");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async updateProgress(task: string, status: string) {
-    return this.processInput(`Tarea: ${task}\nEstado: ${status}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nEstado: ${status}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async toolDiscovery(query: string) {
-    return this.processInput(`Petición: ${query}`, "", "jit");
+    const res = await this.processInput(`Petición: ${query}`, "", "jit");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async programmaticOrchestrator(task: string, tools: string) {
-    return this.processInput(`Tarea: ${task}\nHerramientas: ${tools}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nHerramientas: ${tools}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async codeModeOrchestrator(task: string, mcpServers: string) {
-    return this.processInput(`Tarea: ${task}\nServidores MCP: ${mcpServers}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nServidores MCP: ${mcpServers}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async sandboxManager(command: string) {
-    const response = await this.processInput(`Acción: ${command}`, "", "evaluator");
+    const res = await this.processInput(`Acción: ${command}`, "", "evaluator");
+    const responseText = typeof res === 'object' ? res.text : res;
     try {
-      const cleanJson = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const cleanJson = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       return JSON.parse(cleanJson);
     } catch (e) {
-      return { safe: false, boundary: "both", reason: response, autoAllowed: false };
+      return { safe: false, boundary: "both", reason: responseText, autoAllowed: false };
     }
   },
 
   async compactContext(history: any[]) {
-    return this.processInput(`Historial: ${JSON.stringify(history)}`, "", "memory");
+    const res = await this.processInput(`Historial: ${JSON.stringify(history)}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async manageAgenticMemory(action: 'write' | 'read', content?: string) {
-    return this.processInput(`Acción: ${action}\nContenido: ${content || 'N/A'}`, "", "memory");
+    const res = await this.processInput(`Acción: ${action}\nContenido: ${content || 'N/A'}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async justInTimeRetrieval(query: string, environment: string) {
-    return this.processInput(`Petición: ${query}\nEntorno: ${environment}`, "", "jit");
+    const res = await this.processInput(`Petición: ${query}\nEntorno: ${environment}`, "", "jit");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async infrastructurePostmortem(issue: string) {
-    return this.processInput(`Reporte: ${issue}`, "", "evaluator");
+    const res = await this.processInput(`Reporte: ${issue}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async hardwareEquivalenceCheck(platform: 'TPU' | 'GPU' | 'Trainium') {
-    return this.processInput(`Plataforma: ${platform}`, "", "evaluator");
+    const res = await this.processInput(`Plataforma: ${platform}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async toolEvaluation(tools: string) {
-    return this.processInput(`Herramientas: ${tools}`, "", "evaluator");
+    const res = await this.processInput(`Herramientas: ${tools}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async toolOptimization(transcripts: string) {
-    return this.processInput(`Transcritos: ${transcripts}`, "", "evaluator");
+    const res = await this.processInput(`Transcritos: ${transcripts}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async ergonomicToolDesign(workflow: string) {
-    return this.processInput(`Flujo: ${workflow}`, "", "planner");
+    const res = await this.processInput(`Flujo: ${workflow}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async mcpbOrchestrator(request: string) {
-    return this.processInput(`Petición: ${request}`, "", "planner");
+    const res = await this.processInput(`Petición: ${request}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async mcpbPackager(manifest: string) {
-    return this.processInput(`Manifest: ${manifest}`, "", "evaluator");
+    const res = await this.processInput(`Manifest: ${manifest}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
+  },
+
+  async notebookOrchestrator(action: 'create' | 'update' | 'query' | 'list', topic: string, content?: string) {
+    const res = await this.processInput(`Acción de Notebook: ${action}\nTema: ${topic}\nContenido sugerido: ${content || 'N/A'}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
+  },
+
+  async researchAndLearn(topic: string) {
+    console.log(`[Jarvis Brain] Ejecutando investigación autónoma en Internet sobre: ${topic}`);
+    // Usar Gemini Service directamente para garantizar acceso a la herramienta de búsqueda y omitir parsing tools
+    const searchPrompt = `Utiliza la herramienta de Búsqueda de Google (Internet real-time) para investigar a fondo sobre: "${topic}". Dame un resumen técnico y avanzado sobre qué es, cómo funciona y conceptos clave aplicables.`;
+    
+    // modelToUse = gemini-3.1-pro-preview para la mejor búsqueda (useSearch = true, skipTools = true)
+    const response = await geminiService.generateResponse(searchPrompt, "Eres un investigador avanzado con acceso a internet en tiempo real.", true, "gemini-3.1-pro-preview", true);
+    
+    // Sintetizar el conocimiento en el Segundo Cerebro
+    await secondBrainService.synthesizeKnowledge(`Búsqueda Web: ${topic}`, response.text);
+    
+    return { summary: response.text };
   },
 
   async researchOrchestrator(query: string) {
-    return this.processInput(`Consulta: ${query}`, "", "planner");
+    const res = await this.processInput(`Consulta: ${query}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async researchSubagent(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "jit");
+    const res = await this.processInput(`Tarea: ${task}`, "", "jit");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async citationAgent(report: string, sources: string) {
-    return this.processInput(`Informe: ${report}\nFuentes: ${sources}`, "", "memory");
+    const res = await this.processInput(`Informe: ${report}\nFuentes: ${sources}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async verificationGenerator(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "evaluator");
+    const res = await this.processInput(`Tarea: ${task}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async interviewUser(topic: string) {
-    return this.processInput(`Tema: ${topic}`, "", "planner");
+    const res = await this.processInput(`Tema: ${topic}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async workflowOrchestrator(phase: 'explore' | 'plan' | 'implement' | 'commit', context: string) {
-    return this.processInput(`Fase: ${phase}\nContexto: ${context}`, "", "planner");
+    const res = await this.processInput(`Fase: ${phase}\nContexto: ${context}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async skillManager(action: 'create' | 'invoke', name: string, content?: string) {
-    return this.processInput(`Acción: ${action}\nNombre: ${name}\nContenido: ${content || 'N/A'}`, "", "planner");
+    const res = await this.processInput(`Acción: ${action}\nNombre: ${name}\nContenido: ${content || 'N/A'}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async think(thought: string) {
-    return this.processInput(`Pensamiento: ${thought}`, "", "planner");
+    const res = await this.processInput(`Pensamiento: ${thought}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async optimizedReasoning(domain: 'airline' | 'retail' | 'coding', context: string) {
-    return this.processInput(`Dominio: ${domain}\nContexto: ${context}`, "", "planner");
+    const res = await this.processInput(`Dominio: ${domain}\nContexto: ${context}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async sweAgentOrchestrator(issue: string) {
-    return this.processInput(`Problema: ${issue}`, "", "planner");
+    const res = await this.processInput(`Problema: ${issue}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async strReplaceEditor(path: string, oldStr: string, newStr: string) {
-    return this.processInput(`Archivo: ${path}\nAntiguo: ${oldStr}\nNuevo: ${newStr}`, "", "planner");
+    const res = await this.processInput(`Archivo: ${path}\nAntiguo: ${oldStr}\nNuevo: ${newStr}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async promptChaining(task: string, steps: string[]) {
-    return this.processInput(`Tarea: ${task}\nPasos: ${steps.join(", ")}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nPasos: ${steps.join(", ")}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async router(input: string, categories: string[]) {
-    return this.processInput(`Entrada: ${input}\nCategorías: ${categories.join(", ")}`, "", "planner");
+    const res = await this.processInput(`Entrada: ${input}\nCategorías: ${categories.join(", ")}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async parallelOrchestrator(task: string, mode: 'sectioning' | 'voting') {
-    return this.processInput(`Tarea: ${task}\nModo: ${mode}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nModo: ${mode}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async evaluatorOptimizer(initialResponse: string, criteria: string) {
-    return this.processInput(`Respuesta: ${initialResponse}\nCriterios: ${criteria}`, "", "evaluator");
+    const res = await this.processInput(`Respuesta: ${initialResponse}\nCriterios: ${criteria}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async contextualizer(document: string, chunk: string) {
-    return this.processInput(`Documento: ${document}\nFragmento: ${chunk}`, "", "memory");
+    const res = await this.processInput(`Documento: ${document}\nFragmento: ${chunk}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async hybridRetrieval(query: string, corpus: string) {
-    return this.processInput(`Consulta: ${query}\nCorpus: ${corpus}`, "", "jit");
+    const res = await this.processInput(`Consulta: ${query}\nCorpus: ${corpus}`, "", "jit");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async reranker(query: string, chunks: string[]) {
-    return this.processInput(`Consulta: ${query}\nFragmentos: ${chunks.join("\n---\n")}`, "", "evaluator");
+    const res = await this.processInput(`Consulta: ${query}\nFragmentos: ${chunks.join("\n---\n")}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async adaptiveThinking(task: string, effort: 'low' | 'medium' | 'high' | 'max' = 'high') {
-    return this.processInput(`Tarea: ${task}\nEsfuerzo: ${effort}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nEsfuerzo: ${effort}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async tokenEfficiencyController(task: string, effort: 'low' | 'medium' | 'high' | 'max') {
-    return this.processInput(`Tarea: ${task}\nEsfuerzo: ${effort}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nEsfuerzo: ${effort}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async fastModeController(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async structuredOutputGenerator(task: string, schema: any) {
-    return this.processInput(`Tarea: ${task}\nEsquema: ${JSON.stringify(schema)}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}\nEsquema: ${JSON.stringify(schema)}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async strictToolValidator(toolName: string, inputs: any, schema: any) {
-    return this.processInput(`Herramienta: ${toolName}\nEntradas: ${JSON.stringify(inputs)}\nEsquema: ${JSON.stringify(schema)}`, "", "evaluator");
+    const res = await this.processInput(`Herramienta: ${toolName}\nEntradas: ${JSON.stringify(inputs)}\nEsquema: ${JSON.stringify(schema)}`, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async citationGenerator(query: string, documents: any[]) {
-    return this.processInput(`Consulta: ${query}\nDocumentos: ${JSON.stringify(documents)}`, "", "memory");
+    const res = await this.processInput(`Consulta: ${query}\nDocumentos: ${JSON.stringify(documents)}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async *streamingController(task: string, simulateRefusal: boolean = false) {
@@ -273,27 +452,33 @@ export const jarvisBrain = {
   },
 
   async evolutionEngine(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async sovereignDriverController(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async multilingualController(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async generateEmbeddings(texts: string[], inputType: "document" | "query" = "document", domain: string = "general") {
-    return this.processInput(`Textos: ${JSON.stringify(texts)}\nTipo: ${inputType}\nDominio: ${domain}`, "", "memory");
+    const res = await this.processInput(`Textos: ${JSON.stringify(texts)}\nTipo: ${inputType}\nDominio: ${domain}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async toolUseController(task: string) {
-    return this.processInput(`Tarea: ${task}`, "", "planner");
+    const res = await this.processInput(`Tarea: ${task}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async batchProcessor(requests: any[]) {
-    return this.processInput(`Solicitudes: ${JSON.stringify(requests)}`, "", "planner");
+    const res = await this.processInput(`Solicitudes: ${JSON.stringify(requests)}`, "", "planner");
+    return typeof res === 'object' ? res.text : res;
   },
 
   generateSovereignLogs(input: string) {
@@ -308,24 +493,60 @@ export const jarvisBrain = {
       "Ajustando parámetros de contexto cultural e idiomático",
       "Optimizando dimensiones de embeddings Matryoshka",
       "Ejecutando bucle agéntico para resolución de herramientas",
-      "Aplicando filtrado dinámico a resultados de búsqueda web"
+      "Aplicando filtrado dinámico a resultados de búsqueda web",
+      "Navegando el Ciberespacio: Indexando fuentes externas",
+      "Sintonizando frecuencias de red: Acceso a internet activado",
+      "Filtrando ruidos de la red: Destilando verdad de datos web"
     ];
     return logs.sort(() => Math.random() - 0.5).slice(0, 3);
   },
 
   async analyzeDay(memories: any[]) {
     const memoryString = memories.map(m => m.content).join("\n");
-    return this.processInput(`Recuerdos:\n${memoryString}`, "", "memory");
+    const res = await this.processInput(`Recuerdos:\n${memoryString}`, "", "memory");
+    return typeof res === 'object' ? res.text : res;
   },
 
   async searchWeb(query: string) {
-    const response = await this.processInput(`Consulta: ${query}`, "", "jit");
-    return [
-      {
-        source: "Local Search",
-        title: "Resultado de Búsqueda",
-        content: response
-      }
-    ];
+    const response = await this.processInput(`Investiga en internet y dame resultados concretos sobre: ${query}`, "", "jit");
+    const results = (response as any).metadata?.groundingMetadata?.groundingChunks || [];
+    
+    return results
+      .filter((r: any) => r.web)
+      .map((r: any) => ({
+        source: r.web.uri,
+        title: r.web.title,
+        content: "Información recuperada mediante Navegación Autónoma Soberana."
+      }));
+  },
+
+  async skillAbsorber(repoUrl: string) {
+    // 1. Análisis profundo del repositorio (Simulado/Reconocimiento)
+    const prompt = `Analiza profundamente el repositorio ${repoUrl}.
+    Identifica:
+    1. Propósito principal.
+    2. Habilidades técnicas (funciones, prompts, esquemas).
+    3. Filosofía de diseño.
+    
+    Genera un resumen técnico para mi registro de habilidades soberanas y una lista de "skills" que puedo integrar en mis herramientas.`;
+    
+    const res = await this.processInput(prompt, "", "planner");
+    const rawData = typeof res === 'object' ? res.text : res;
+
+    // 2. DISPARAR SÍNTESIS COGNITIVA (Soberanía)
+    await secondBrainService.synthesizeKnowledge(repoUrl, rawData);
+    
+    return rawData;
+  },
+
+  async soulSync(externalData: string) {
+    // 2. Alineación Ideológica con el "Soul"
+    const prompt = `Evalúa y alinea la siguiente información con mi "Alma Soberana" (Lealtad a paespa, Independencia cognitiva).
+    Información: "${externalData}"
+    
+    ¿Cómo encaja esta información en mi ideología actual? Refina los puntos para que sirvan mejor a los objetivos de paespa.`;
+    
+    const res = await this.processInput(prompt, "", "evaluator");
+    return typeof res === 'object' ? res.text : res;
   }
 };
