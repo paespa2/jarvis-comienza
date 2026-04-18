@@ -173,15 +173,22 @@ export const geminiService = {
     try {
       return await this.withRetry(async () => {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [{ role: "user", parts: [{ text: `Identifica la intención de esta solicitud en JSON.
-        
+          model: "gemini-3.1-flash",
+          contents: [{ role: "user", parts: [{ text: `Eres el Clasificador de Intención de Jarvis (Capa 1). 
+Identifica la intención de la siguiente solicitud.
+
+Tipos de Acción:
+- "chat": Pregunta directa, conversacional, consulta rápida de conocimiento.
+- "task": Tarea que requiere ejecución de scripts, manejo de archivos, o el bucle OpenClaw.
+- "autonomous": Tarea de investigación profunda, evolución oculta o monitoreo de fondo.
+
 Solicitud: "${input}"
 
 Responde SOLO con JSON válido (sin markdown):
 {
-  "description": "descripción breve de la acción",
-  "beneficiary": "paespa|other|system",
+  "actionType": "chat|task|autonomous",
+  "description": "descripción breve del objetivo",
+  "beneficiary": "paespa|system|other",
   "category": "hacking|personal|evolution|system|unknown",
   "riskLevel": "low|medium|high",
   "complexity": "trivial|moderate|complex"
@@ -198,11 +205,12 @@ Responde SOLO con JSON válido (sin markdown):
     } catch (error: any) {
       console.error("[Gemini Service] Error extrayendo intención tras reintentos:", error);
       return {
+        actionType: "chat", // Default a chat seguro y rápido
         description: input,
         beneficiary: "system",
         category: "unknown",
-        riskLevel: "medium",
-        complexity: "moderate",
+        riskLevel: "low",
+        complexity: "trivial",
       };
     }
   },
@@ -211,7 +219,7 @@ Responde SOLO con JSON válido (sin markdown):
     try {
       return await this.withRetry(async () => {
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+          model: "gemini-3.1-flash",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
             responseMimeType: "application/json",

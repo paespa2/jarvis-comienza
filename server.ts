@@ -8,21 +8,48 @@ import path from "path";
 import * as dotenv from "dotenv";
 import LoyaltyEvaluator, { Action, LoyaltyEvaluation, AgentGenome } from "./src/brain/loyaltyEvaluator";
 
+import multer from "multer";
+
 dotenv.config();
 
 const execAsync = promisify(exec);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 8080;
+
+  // Configuración de Multer para subidas en el workspace
+  const WORKSPACE_DIR = path.join(process.cwd(), "jarvis_workspace");
+  await fs.mkdir(WORKSPACE_DIR, { recursive: true });
+
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, WORKSPACE_DIR);
+    },
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    }
+  });
+  const upload = multer({ storage });
 
   app.use(cors());
   app.use(express.json());
 
-  // Workspace directory para Jarvis
-  const WORKSPACE_DIR = path.join(process.cwd(), "jarvis_workspace");
-  await fs.mkdir(WORKSPACE_DIR, { recursive: true });
+  const isWindows = process.platform === "win32";
 
+  // API para subida de archivos
+  app.post("/api/upload", upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
+    res.json({ 
+      message: "Archivo subido con éxito", 
+      filename: req.file.filename,
+      path: req.file.path,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+  });
+
+  // Workspace directory para Jarvis
   const KNOWLEDGE_FILE = path.join(WORKSPACE_DIR, "knowledge_base.json");
   const PRIORITIES_FILE = path.join(WORKSPACE_DIR, "priorities.json");
   const GENOME_FILE = path.join(WORKSPACE_DIR, "genome.json");
@@ -155,15 +182,6 @@ async function startServer() {
     const { name, args } = req.body;
     
     try {
-      if (name === 'ejecutar_comando_kali') {
-        const { stdout, stderr } = await execAsync(args.comando, { cwd: WORKSPACE_DIR });
-        const output = stdout || stderr || "Sin salida.";
-        return res.json({ 
-          text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``,
-          metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output, success: !stderr }
-        });
-      }
-      
       if (name === 'reproducir_error') {
         const filePath = path.join(WORKSPACE_DIR, args.filename);
         await fs.writeFile(filePath, args.script_content, "utf-8");
@@ -189,17 +207,23 @@ async function startServer() {
         });
       }
 
-      if (name === 'mapear_workspace_profundo') {
+      if (name === 'mapear_workspace_profundo' || name?.includes('mapear')) {
         const targetPath = args.path ? path.join(WORKSPACE_DIR, args.path) : WORKSPACE_DIR;
-        const { stdout } = await execAsync(`dir /s /b`, { cwd: targetPath });
+        const cmd = isWindows ? `dir /s /b` : `find . -maxdepth 3 -not -path '*/.*'`;
+        const { stdout } = await execAsync(cmd, { cwd: targetPath });
         return res.json({ 
           text: `> 🔍 **Mapa de Workspace generado**\n\n\`\`\`text\n${stdout}\n\`\`\``,
           metadata: { tool: 'mapear_workspace_profundo', success: true }
         });
       }
 
-      if (name === 'busqueda_grep_avanzada') {
-        const includeCmd = args.include ? `findstr /i /m "${args.pattern}" ${args.include}` : `findstr /s /i /n "${args.pattern}" *`;
+      if (name === 'busqueda_grep_avanzada' || name?.includes('grep') || name?.includes('buscar')) {
+        let includeCmd;
+        if (isWindows) {
+          includeCmd = args.include ? `findstr /i /m "${args.pattern}" ${args.include}` : `findstr /s /i /n "${args.pattern}" *`;
+        } else {
+          includeCmd = args.include ? `grep -ril "${args.pattern}" ${args.include}` : `grep -rin "${args.pattern}" .`;
+        }
         const { stdout } = await execAsync(includeCmd, { cwd: WORKSPACE_DIR });
         return res.json({ 
           text: `> 🔎 **Resultados de búsqueda para:** \`${args.pattern}\`\n\n\`\`\`text\n${stdout || 'Sin coincidencias.'}\n\`\`\``,
@@ -207,9 +231,18 @@ async function startServer() {
         });
       }
 
-      if (name === 'leer_archivo') {
+      if (name === 'leer_archivo' || name?.includes('leer')) {
         const content = await fs.readFile(path.join(WORKSPACE_DIR, args.filename), "utf-8");
         return res.json({ text: `> 📖 **Leído:** \`${args.filename}\`\n\n\`\`\`text\n${content}\n\`\`\`` });
+      }
+
+      if (name === 'ejecutar_comando_kali' || name?.includes('comando') || name?.includes('kali')) {
+        const { stdout, stderr } = await execAsync(args.comando, { cwd: WORKSPACE_DIR });
+        const output = stdout || stderr || "Sin salida.";
+        return res.json({ 
+          text: `> 🛠️ **Comando ejecutado:** \`${args.comando}\`\n\n**Resultados de la Terminal:**\n\`\`\`bash\n${output}\n\`\`\``,
+          metadata: { tool: 'ejecutar_comando_kali', command: args.comando, output, success: !stderr }
+        });
       }
 
       if (name === 'ajustar_prioridades_soberanas') {
@@ -277,9 +310,17 @@ async function startServer() {
       
       ${learnedKnowledge}
       
+      ARTEFACTOS DE CÓDIGO Y DISEÑO:
+      Si generas código extenso (React, HTML, CSS, Scripts), diagramas o documentos, DEBES usar el formato de ARTEFACTO:
+      <artifact type="code|web|markdown" title="Título Descriptivo" language="typescript|html|css|javascript|bash|python">
+      [Contenido aquí]
+      </artifact>
+      Usa 'web' para HTML completo que se pueda visualizar en un iframe.
+      Usa 'code' para fragmentos de código.
+      
       CRITICAL INSTRUCTION FOR TOOL USAGE:
       You are running in a native Node.js backend environment (via proxy).
-      THE OPERATING SYSTEM IS WINDOWS. Use Windows commands.
+      THE OPERATING SYSTEM IS ${isWindows ? 'WINDOWS' : 'LINUX'}. Use ${isWindows ? 'Windows' : 'Linux'} commands.
       You have access to tools to execute terminal commands, read files, and write files.
       If the user asks you to execute a command, you MUST call the tool.`;
 

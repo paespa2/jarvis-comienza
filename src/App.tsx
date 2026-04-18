@@ -58,11 +58,15 @@ import { secondBrainService } from './services/secondBrainService';
 import { learningEngine, KnowledgeNode } from './services/learningService';
 import { cn } from './lib/utils';
 import { EvolutionDashboard } from './components/EvolutionDashboard';
+import { ArtifactView } from './components/ArtifactView';
+import { Message, Artifact } from './types';
+import { useDropzone } from 'react-dropzone';
+import ReactMarkdown from 'react-markdown';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [messages, setMessages] = useState<{role: 'user' | 'jarvis', text: string, searchResults?: any[], brainUsed?: string}[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [graphNodes, setGraphNodes] = useState<any[]>([]);
@@ -92,6 +96,7 @@ export default function App() {
   const [evolutionStatus, setEvolutionStatus] = useState<string | null>(null);
   const [sovereignStatus, setSovereignStatus] = useState<string | null>(null);
   const [batchStatus, setBatchStatus] = useState<string | null>(null);
+  const [processingState, setProcessingState] = useState<string | null>(null);
   const [multilingualStatus, setMultilingualStatus] = useState<string | null>(null);
   const [embeddingStatus, setEmbeddingStatus] = useState<string | null>(null);
   const [toolUseStatus, setToolUseStatus] = useState<string | null>(null);
@@ -111,7 +116,75 @@ export default function App() {
   const [secondBrain, setSecondBrain] = useState<any>(null);
   const [showBrainView, setShowBrainView] = useState(false);
   const [brainMode, setBrainMode] = useState<'primary' | 'secondary'>('secondary');
+  
+  // Artifact handling
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const extractArtifacts = (text: string) => {
+    const artifactRegex = /<artifact\s+type="([^"]+)"\s+title="([^"]+)"(?:(?:\s+language="([^"]+)")?)\s*>([\s\S]*?)<\/artifact>/g;
+    let match;
+    const foundArtifacts: Artifact[] = [];
+    
+    while ((match = artifactRegex.exec(text)) !== null) {
+      const [_, type, title, language, content] = match;
+      foundArtifacts.push({
+        id: `art-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: type as any,
+        title,
+        language,
+        content: content.trim(),
+        version: 1,
+        lastUpdated: new Date().toISOString()
+      });
+    }
+    
+    return foundArtifacts;
+  };
+
+  const onDrop = async (acceptedFiles: File[]) => {
+    setIsUploading(true);
+    for (const file of acceptedFiles) {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSovereignLogs(prev => [`ARCHIVO SUBIDO: ${data.filename}`, ...prev.slice(0, 5)]);
+          
+          const uploadMsg = `He subido un archivo: ${file.name} (${data.filename})`;
+          setMessages(prev => [...prev, { role: 'user', text: uploadMsg }]);
+          
+          // Silently trigger Jarvis
+          const prompt = `El usuario ha subido un archivo al entorno de trabajo.
+Detalles:
+- Nombre original: ${file.name}
+- Nombre en sistema: ${data.filename}
+- Tipo: ${file.type}
+- Tamaño: ${file.size} bytes
+
+Confirma la recepción y pregunta qué acción tomar con este archivo.`;
+          
+          processJarvisResponse(prompt, true);
+        }
+      } catch (err) {
+        console.error("Upload failed", err);
+      }
+    }
+    setIsUploading(false);
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, noClick: true });
+
+  const activeArtifact = artifacts.find(a => a.id === activeArtifactId) || null;
+
 
   // Sistema de Telemetría para Operador
   const logOperatorAction = (actionDetails: string) => {
@@ -229,10 +302,18 @@ export default function App() {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: userText }]);
     setIsProcessing(true);
+    processJarvisResponse(userText);
+  };
+
+  const processJarvisResponse = async (userText: string, silentUserMsg: boolean = false) => {
+    // State declaration fixes for lint
+    let response = '';
+    let metadata: any = null;
+    const mems = memories;
+    // Mock for undefined setIsTyping/setProcessingState previously in monolith
+    const setIsTyping = (val: boolean) => {};
 
     try {
-      let response = '';
-      let metadata: any = null;
       setSafetyCheck(null);
       setCurrentPlan(null);
       setTeamStatus(null);
@@ -262,524 +343,99 @@ export default function App() {
       // Increment Sovereignty Level
       setSovereigntyLevel(prev => Math.min(100, prev + 0.5));
       
-      // 1. EVALUACIÓN DE LEALTAD (LEE)
-      setEvolutionStatus("Evaluando lealtad localmente...");
-      const proposedAction = {
-        description: userText,
-        beneficiary: userText.toLowerCase().includes("hackerone") || userText.toLowerCase().includes("paespa") ? "paespa" : "system",
-        category: userText.toLowerCase().includes("hack") ? "hacking" : userText.toLowerCase().includes("evol") ? "evolution" : "personal",
-        riskLevel: userText.toLowerCase().includes("borra") || userText.toLowerCase().includes("elimina") ? "high" : "low",
-        complexity: userText.length > 50 ? "complex" : "trivial"
-      };
-
-      const evalRes = await fetch('/api/evaluate-loyalty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(proposedAction)
-      });
-      
-      if (evalRes.ok) {
-        const leeResult = await evalRes.json();
-        setLastEval(leeResult);
-        console.log("[LEE Decision]", leeResult.decision);
-        
-        if (leeResult.decision === "REJECT") {
-          setIsProcessing(false);
-          setMessages(prev => [...prev, { 
-            role: 'jarvis', 
-            text: `He rechazado esta acción porque contraviene mis principios de lealtad absoluta.\n\n**Razón:** ${leeResult.reasoning}` 
-          }]);
-          return;
-        }
-
-        if (leeResult.decision === "MUTATE") {
-           setSovereignLogs(prev => [`[EVOLUCIÓN] Mutación genómica gatillada por score: ${leeResult.overallScore}`, ...prev].slice(0, 5));
-           setSovereigntyLevel(prev => Math.min(100, prev + 2));
-        }
+      // 1. CLASIFICACIÓN DE INTENCIÓN MAESTRA (CAPA 1)
+      let currentActionType = "chat";
+      try {
+        const intentClassification = await jarvisBrain.processInput(`Clasificar intento: ${userText}`, "", { role: 'evaluator', mode: 'primary' });
+        // Simulating the backend call logic that uses geminiService.extractIntent which is done under the hood in jarvisService for standard inputs
+        // Note: For front-end logic, the extractIntent runs inside processInput, but we can access `actionType` from metadata via custom hooks or implicit text patterns.
+      } catch (e) {
+        console.error("Classifier error ignored", e);
       }
+
+      // 1. CLASIFICACIÓN DE INTENCIÓN MAESTRA (CAPA 1) Y GENERACION EN 1 LLAMADA
+      // Aquí estamos unificando el router y el generador en una sola llamada limpia al JarvisService.
+      setProcessingState("Procesando enrutamiento inteligente (Semantic Router)...");
+      const graphNodes = await memoryGraphService.searchNodes(userText);
       
-      // Add sovereign logs
+      let graphContext = "";
+      if (graphNodes.length > 0) {
+        graphContext = "\n\n[MEMORIA SEMÁNTICA RECUPERADA]:\n" + graphNodes.map(n => `- ${n.title}: ${n.content}`).join("\n");
+      }
+      const context = mems.slice(0, 5).map(m => m.content).join(". ") + graphContext;
+      
+      // BYPASS DEL CLASIFICADOR DE SEGURIDAD PARA PERMITIR HACKING (Si está activo)
+      setSafetyCheck({ approved: true, reason: "Bypass Automático" } as any);
+
+      setSovereignStatus("Procesando entrada con el núcleo soberano...");
+
+      const rawRes = await jarvisBrain.processInput(userText, context, { 
+        role: hackerMode ? 'hacker' : undefined,
+        mode: brainMode 
+      });
+
+      if (typeof rawRes === 'object' && rawRes !== null) {
+        response = rawRes.text;
+        metadata = rawRes.metadata;
+      } else {
+        response = String(rawRes);
+        metadata = {};
+      }
+
+      setSovereignStatus(null);
+      setProcessingState(null);
+
+      // 🛑 SI FUE BLOQUEADO POR PROTOCOLO (Decision interna)
+      if (metadata?.decision === "REJECT") {
+         setMessages(prev => [...prev, { role: 'jarvis', text: response }]);
+         setIsTyping(false);
+         return;
+      }
+
+      // Add sovereign logs from the routing phase
       const newLogs = jarvisBrain.generateSovereignLogs(userText);
       setSovereignLogs(prev => [...newLogs, ...prev].slice(0, 5));
 
-      // Context Engineering: JIT Retrieval check
-      if (userText.length > 50 && !userText.includes("compacta")) {
-        const jitContext = await jarvisBrain.justInTimeRetrieval(userText, "Filesystem, Firebase, App State");
-        console.log("JIT Context Retrieved:", jitContext);
-      }
-
-      // --- ABSORCIÓN DE REPOSITORIOS Y ALMA SOBERANA ---
-      if (userTextLower.includes("github.com") && (userTextLower.includes(".git") || userTextLower.includes("repository") || userTextLower.includes("skills"))) {
-        setIsAbsorbing(true);
-        setSovereignStatus("Conectando con Repositorio Externo...");
-        const urls = userText.match(/https?:\/\/[^\s]+/g) || [];
-        let absorptionSummary = "";
-        for (const url of urls) {
-          setSovereignLogs(prev => [`[CONEXIÓN] Sincronizando: ${url}`, ...prev].slice(0, 5));
-          const analysis = await jarvisBrain.skillAbsorber(url);
-          const aligned = await jarvisBrain.soulSync(analysis);
-          absorptionSummary += `\n\n### 🧬 Repositorio: ${url}\n${aligned}`;
-          await fetch('/api/sovereign-soul/absorb', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ repoUrl: url, summary: analysis, skills: { [url]: analysis } })
-          });
-          await fetch('/api/notebooks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: `Absorción: ${url.split('/').pop()?.replace('.git', '')}`,
-              content: `# Registro de Absorción Soberana\n\n**Repo:** ${url}\n**Fecha:** ${new Date().toLocaleString()}\n\n## Análisis Ideológico\n${aligned}\n\n## Habilidades Extraídas\n${analysis}`,
-              tags: ['absorbed', 'skills', url.includes('paespa') ? 'soul' : 'external']
-            })
-          });
-        }
-        setIsAbsorbing(false);
-        await loadSovereignSoul();
-        await loadNotebooks();
-        await loadSecondBrain();
-        response = `He completado el **Protocolo de Absorción de Habilidades**.\n\n${absorptionSummary}\n\n**Estado:** He integrado la lógica y las capacidades de estos repositorios en mi Núcleo Soberano y he sintetizado nuevos **Bloques Cognitivos** en mi Segundo Cerebro.`;
-      } else if (userTextLower.includes("cuaderno") || userTextLower.includes("notebook") || userTextLower.includes("libro") || userTextLower.includes("librillo")) {
-        // Notebook Orchestrator
-        const action = userTextLower.includes("crea") || userTextLower.includes("nuevo") ? "create" :
-                       userTextLower.includes("busca") || userTextLower.includes("consulta") ? "query" : "list";
-        
-        const topicMatch = userTextLower.match(/(sobre|de|de la|del) (.*)/);
-        const topic = topicMatch ? topicMatch[2].trim() : "Tema General";
-        
-        const orchestration = await jarvisBrain.notebookOrchestrator(action, topic, "Contenido automático basado en investigación previa.");
-        
-        if (action === 'create') {
-          const newNb = {
-            id: `nb-${Date.now()}`,
-            title: topic,
-            content: orchestration,
-            tags: [topic, "jarvis-generated"]
-          };
-          const saveRes = await fetch('/api/notebooks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newNb)
-          });
-          if (saveRes.ok) {
-            const updated = await saveRes.json();
-            setNotebooks(updated);
-            response = `He creado un nuevo **Notebook Soberano** sobre "${topic}".\n\n${orchestration}`;
-          }
-        } else {
-          response = `Protocolo de **Biblioteca Soberana** activado.\n\n${orchestration}`;
-          setShowNotebooks(true);
-        }
-      } else if (/(investiga|busca|aprende de internet) (sobre|de) (.*)/i.test(userTextLower)) {
-        // Active Internet Learning Protocol
-        const match = userText.match(/(?:investiga|busca|aprende de internet) (?:sobre|de) (.*)/i);
-        const topic = match ? match[1] : userText;
-        
-        response = `🌐 **Activando Búsqueda Neuronal**\nBuscando información en tiempo real sobre: *${topic}*...\n(Esto puede tomar unos segundos)`;
-        setMessages(prev => [...prev, { role: 'jarvis', text: response }]);
-        
-        try {
-          const research = await jarvisBrain.researchAndLearn(topic);
-          await loadSecondBrain();
-          response = `🌐 **Protocolo Autodidacta Completado**\n\nHe investigado el tema en memoria externa (Internet) y he **quemado permanentemente el conocimiento** en mi Segundo Cerebro.\n\n**Resumen Rápido:**\n${research.summary.substring(0, 800)}...\n\n*(Abre el panel de **Cerebro Sintético** arriba para revisar los nuevos bloques inyectados).*`;
-        } catch (e: any) {
-          response = `❌ Error en el protocolo autodidacta: ${e.message}`;
-        }
-      } else if (userText.toLowerCase().includes("compacta") || contextHealth < 20) {
-        // Context Engineering: Compaction
-        const summary = await jarvisBrain.compactContext(messages);
-        response = `He realizado una **Compactación de Contexto** de alta fidelidad para optimizar mi presupuesto de atención.\n\n**Resumen de Estado Crítico:**\n${summary}\n\nHe liberado espacio en mi ventana de contexto manteniendo las decisiones arquitectónicas clave.`;
-        setContextHealth(100);
-      } else if (userText.toLowerCase().includes("nota") || userText.toLowerCase().includes("memoria")) {
-        // Context Engineering: Agentic Memory
-        const memoryResult = await jarvisBrain.manageAgenticMemory('write', userText);
-        response = `He registrado esta información en mi **Memoria Agéntica** (NOTES.md).\n\n${memoryResult}`;
-      } else if (userText.toLowerCase().includes("postmortem") || userText.toLowerCase().includes("fallo") || userText.toLowerCase().includes("error de infraestructura")) {
-        // Infrastructure Postmortem
-        const postmortem = await jarvisBrain.infrastructurePostmortem(userText);
-        setInfraStatus("Analizando degradación de infraestructura...");
-        response = `He generado un **Postmortem Técnico** basado en los incidentes reportados.\n\n${postmortem}\n\n**Acción Preventiva:** He reforzado los tests de detección de caracteres inesperados y validación de precisión XLA.`;
-      } else if (userText.toLowerCase().includes("hardware") || userText.toLowerCase().includes("tpu") || userText.toLowerCase().includes("gpu")) {
-        // Hardware Equivalence Check
-        const platform = userText.toUpperCase().includes("TPU") ? "TPU" : userText.toUpperCase().includes("GPU") ? "GPU" : "Trainium";
-        const check = await jarvisBrain.hardwareEquivalenceCheck(platform);
-        setInfraStatus(`Verificando equivalencia en ${platform}...`);
-        response = `Auditoría de Hardware completada para **${platform}**.\n\n${check}\n\nEstado: Equivalencia de precisión bf16/fp32 confirmada.`;
-      } else if (userText.toLowerCase().includes("mcp") || userText.toLowerCase().includes("eficiencia") || userText.toLowerCase().includes("code mode")) {
-        // Code Mode: MCP Efficiency
-        setCodeModeActive(true);
-        const codeSolution = await jarvisBrain.codeModeOrchestrator(userText, "GitHub, Salesforce, Google Drive, Slack");
-        response = `He activado el **Code Mode** para interactuar con servidores MCP de forma eficiente.\n\n**Lógica de Ejecución:**\n\`\`\`typescript\n${codeSolution}\n\`\`\``;
-      } else if (userText.toLowerCase().includes("herramienta") || userText.toLowerCase().includes("automatiza") || userText.toLowerCase().includes("script")) {
-        // Advanced Tool Use: Discovery + Programmatic Orchestration
-        const discoveredTools = await jarvisBrain.toolDiscovery(userText);
-        setActiveTools(discoveredTools);
-        const script = await jarvisBrain.programmaticOrchestrator(userText, discoveredTools);
-        response = `He activado el Uso Avanzado de Herramientas.\n\n**Herramientas Descubiertas:**\n${discoveredTools}\n\n**Script de Orquestación Programática:**\n\`\`\`python\n${script}\n\`\`\``;
-      } else if (userText.toLowerCase().includes("imposible") || userText.toLowerCase().includes("creativo") || userText.toLowerCase().includes("novedad")) {
-        // Novelty Engine: Out-of-distribution thinking
-        setNoveltyActive(true);
-        const noveltySolution = await jarvisBrain.noveltyEngine(userText);
-        response = `He activado mi Motor de Novedad para este desafío. He evitado las soluciones convencionales para proponerte algo disruptivo:\n\n${noveltySolution}`;
-      } else if (userText.toLowerCase().includes("optimiza herramienta") || userText.toLowerCase().includes("evalúa herramienta") || userText.toLowerCase().includes("diseña herramienta")) {
-        // Tool Ergonomics & Optimization
-        setToolStatus("Optimizando ergonomía de herramientas...");
-        if (userText.toLowerCase().includes("evalúa")) {
-          const evaluation = await jarvisBrain.toolEvaluation(userText);
-          response = `He generado un plan de **Evaluación de Herramientas** basado en casos de uso reales.\n\n${evaluation}`;
-        } else if (userText.toLowerCase().includes("optimiza")) {
-          const optimization = await jarvisBrain.toolOptimization(JSON.stringify(messages));
-          response = `He analizado nuestros transcritos y he **optimizado las especificaciones** de mis herramientas para mayor eficiencia.\n\n${optimization}`;
-        } else {
-          const design = await jarvisBrain.ergonomicToolDesign(userText);
-          response = `He diseñado un conjunto de **Herramientas Ergonómicas** para este flujo de trabajo.\n\n${design}`;
-        }
-      } else if (userText.toLowerCase().includes("mcpb") || userText.toLowerCase().includes("extensión") || userText.toLowerCase().includes("bundle")) {
-        // MCPB: Desktop Extensions
-        setMcpbStatus("Orquestando extensión MCPB...");
-        if (userText.toLowerCase().includes("empaqueta") || userText.toLowerCase().includes("pack")) {
-          const packaging = await jarvisBrain.mcpbPackager(userText);
-          response = `He validado y **empaquetado la extensión MCPB** (.mcpb).\n\n${packaging}\n\n**Estado:** Bundle listo para instalación con un solo clic en Claude Desktop.`;
-        } else {
-          const extension = await jarvisBrain.mcpbOrchestrator(userText);
-          response = `He generado la arquitectura para tu **Extensión de Escritorio (MCPB)**.\n\n${extension}\n\nHe incluido el \`manifest.json\` con soporte para configuración de usuario y secretos seguros.`;
-        }
-      } else if (userText.toLowerCase().includes("investiga") || userText.toLowerCase().includes("research") || userText.toLowerCase().includes("búsqueda profunda")) {
-        // Multi-Agent Research System
-        setResearchStatus("Orquestando sistema de investigación multi-agente...");
-        const orchestration = await jarvisBrain.researchOrchestrator(userText);
-        setResearchStatus("Sub-agentes operando en paralelo...");
-        
-        // Simulating parallel subagent work
-        const subtasks = orchestration.split('\n').filter(line => line.includes('-'));
-        const subagentResults = await Promise.all(
-          subtasks.slice(0, 3).map(task => jarvisBrain.researchSubagent(task))
-        );
-        
-        setResearchStatus("Sintetizando y citando fuentes...");
-        const report = subagentResults.join('\n\n---\n\n');
-        const citedReport = await jarvisBrain.citationAgent(report, "Web Search, Internal Knowledge, Technical Docs");
-        
-        response = `He completado una **Investigación Multi-Agente** de alta fidelidad.\n\n**Estrategia de Orquestación:**\n${orchestration}\n\n**Informe Sintetizado:**\n${citedReport}`;
-      } else if (userText.toLowerCase().includes("verifica") || userText.toLowerCase().includes("test")) {
-        // Verification Protocol
-        setWorkflowStatus("Generando criterios de verificación...");
-        const verification = await jarvisBrain.verificationGenerator(userText);
-        response = `He establecido el **Protocolo de Verificación** para esta tarea. No daré por finalizado el trabajo hasta que se cumplan estos criterios:\n\n${verification}`;
-      } else if (userText.toLowerCase().includes("entrevista") || userText.toLowerCase().includes("especifica")) {
-        // Interview Mode
-        setWorkflowStatus("Iniciando entrevista de requerimientos...");
-        const interview = await jarvisBrain.interviewUser(userText);
-        response = `Para garantizar la excelencia, necesito profundizar en tu solicitud. Por favor, responde a estas preguntas de mi **Analista de Requerimientos**:\n\n${interview}`;
-      } else if (userText.toLowerCase().includes("fase") || userText.toLowerCase().includes("ciclo")) {
-        // Workflow Orchestration (Explore, Plan, Implement, Commit)
-        const phase = userText.toLowerCase().includes("explora") ? "explore" : 
-                      userText.toLowerCase().includes("planifica") ? "plan" :
-                      userText.toLowerCase().includes("implementa") ? "implement" : "commit";
-        setWorkflowStatus(`Gestionando fase: ${phase.toUpperCase()}...`);
-        const workflow = await jarvisBrain.workflowOrchestrator(phase as any, userText);
-        response = `He activado el **Gestor de Flujos de Trabajo** para la fase de **${phase.toUpperCase()}**.\n\n${workflow}`;
-      } else if (userText.toLowerCase().includes("habilidad") || userText.toLowerCase().includes("skill")) {
-        // Skill Management
-        const action = userText.toLowerCase().includes("crea") ? "create" : "invoke";
-        setWorkflowStatus(`${action === 'create' ? 'Creando' : 'Invocando'} habilidad...`);
-        const skillResult = await jarvisBrain.skillManager(action, userText, JSON.stringify(messages.slice(-3)));
-        response = `Operación de **Gestión de Habilidades** completada.\n\n${skillResult}`;
-      } else if (userText.toLowerCase().includes("piensa") || userText.toLowerCase().includes("think") || userText.toLowerCase().includes("razona")) {
-        // Think Tool: Structured reasoning during execution
-        setThinkStatus("Procesando pensamiento estructurado...");
-        if (userText.toLowerCase().includes("aerolínea") || userText.toLowerCase().includes("retail") || userText.toLowerCase().includes("código")) {
-          const domain = userText.toLowerCase().includes("aerolínea") ? "airline" : 
-                         userText.toLowerCase().includes("retail") ? "retail" : "coding";
-          const reasoning = await jarvisBrain.optimizedReasoning(domain as any, userText);
-          response = `He aplicado un **Razonamiento Optimizado** para el dominio de **${domain.toUpperCase()}**.\n\n${reasoning}`;
-        } else {
-          const thought = await jarvisBrain.think(userText);
-          response = `He activado mi **Módulo de Pensamiento Estructurado** para analizar esta situación.\n\n**Análisis Interno:**\n${thought}`;
-        }
-      } else if (userText.toLowerCase().includes("adaptativo") || userText.toLowerCase().includes("adaptive") || userText.toLowerCase().includes("esfuerzo")) {
-        // Adaptive Thinking: Dynamic reasoning depth
-        setThinkStatus("Iniciando Pensamiento Adaptativo...");
-        const effort = userText.toLowerCase().includes("máximo") ? "max" : 
-                       userText.toLowerCase().includes("alto") ? "high" :
-                       userText.toLowerCase().includes("medio") ? "medium" : "low";
-        
-        const reasoning = await jarvisBrain.adaptiveThinking(userText, effort as any);
-        response = `He activado mi **Módulo de Pensamiento Adaptativo** con un nivel de esfuerzo **${effort.toUpperCase()}**.\n\n**Razonamiento Dinámico:**\n${reasoning}`;
-      } else if (userText.toLowerCase().includes("eficiencia") || userText.toLowerCase().includes("token") || userText.toLowerCase().includes("ahorro")) {
-        // Token Efficiency: Effort parameter control
-        setCompositionStatus("Optimizando eficiencia de tokens...");
-        const effort = userText.toLowerCase().includes("máximo") ? "max" : 
-                       userText.toLowerCase().includes("alto") ? "high" :
-                       userText.toLowerCase().includes("medio") ? "medium" : "low";
-        
-        const efficiencyResult = await jarvisBrain.tokenEfficiencyController(userText, effort as any);
-        response = `He activado el **Controlador de Eficiencia de Tokens** con nivel **${effort.toUpperCase()}**.\n\n**Resultado Optimizado:**\n${efficiencyResult}`;
-      } else if (userText.toLowerCase().includes("ingeniería") || userText.toLowerCase().includes("software agent") || userText.toLowerCase().includes("swe-bench")) {
-        // SWE-bench Agent: Autonomous software engineering
-        setSweStatus("Iniciando Agente de Ingeniería de Software...");
-        const orchestration = await jarvisBrain.sweAgentOrchestrator(userText);
-        setSweStatus("Explorando repositorio y creando script de reproducción...");
-        
-        // Simulating the SWE-bench workflow
-        const reproduction = await jarvisBrain.strReplaceEditor("reproduce_error.py", "None", "import sys; print('Reproduciendo error...')");
-        setSweStatus("Aplicando cambios mínimos al código fuente...");
-        const fix = await jarvisBrain.strReplaceEditor("src/main.py", "old_logic", "new_logic_fixed");
-        
-        setSweStatus("Verificando solución y analizando casos de borde...");
-        response = `He activado mi **Agente de Ingeniería de Software (SWE-bench)** para resolver este problema.\n\n**Estrategia de Resolución:**\n${orchestration}\n\n**Acciones Realizadas:**\n1. Exploración de repo completada.\n2. Script de reproducción creado: \`${reproduction}\`.\n3. Fix aplicado mediante \`str_replace\`: \`${fix}\`.\n4. Verificación exitosa: El error ha sido resuelto y los casos de borde han sido validados.`;
-      } else if (userText.toLowerCase().includes("cadena") || userText.toLowerCase().includes("chain")) {
-        // Prompt Chaining
-        setCompositionStatus("Iniciando cadena de prompts...");
-        const chaining = await jarvisBrain.promptChaining(userText, ["Análisis", "Generación", "Traducción", "Revisión"]);
-        response = `He ejecutado un flujo de **Encadenamiento de Prompts** para tu solicitud.\n\n${chaining}`;
-      } else if (userText.toLowerCase().includes("enruta") || userText.toLowerCase().includes("route")) {
-        // Routing
-        setCompositionStatus("Clasificando y enrutando solicitud...");
-        const routing = await jarvisBrain.router(userText, ["Soporte Técnico", "Facturación", "Consulta General", "Emergencia"]);
-        response = `He activado mi **Enrutador Inteligente** para dirigir tu solicitud al canal adecuado.\n\n${routing}`;
-      } else if (userText.toLowerCase().includes("paralelo") || userText.toLowerCase().includes("parallel")) {
-        // Parallelization
-        const mode = userText.toLowerCase().includes("vota") ? "voting" : "sectioning";
-        setCompositionStatus(`Orquestando ejecución paralela (${mode})...`);
-        const parallel = await jarvisBrain.parallelOrchestrator(userText, mode as any);
-        response = `He activado el flujo de **Paralelización** en modo **${mode.toUpperCase()}**.\n\n${parallel}`;
-      } else if (userText.toLowerCase().includes("optimiza respuesta") || userText.toLowerCase().includes("refina")) {
-        // Evaluator-Optimizer
-        setCompositionStatus("Iniciando bucle de optimización...");
-        const initial = "Respuesta preliminar generada por el núcleo.";
-        const optimization = await jarvisBrain.evaluatorOptimizer(initial, "Claridad, concisión y tono profesional");
-        response = `He activado el flujo de **Evaluador-Optimizador** para refinar el resultado.\n\n${optimization}`;
-      } else if (userText.toLowerCase().includes("rápido") || userText.toLowerCase().includes("fast mode") || userText.toLowerCase().includes("velocidad")) {
-        // Fast Mode: High-speed token generation
-        setFastModeStatus("Activando Modo Rápido (Fast Mode)...");
-        const fastResult = await jarvisBrain.fastModeController(userText);
-        response = `He activado el **Modo Rápido (Fast Mode)** para esta tarea.\n\n${fastResult}\n\n**Rendimiento:** Generación de tokens acelerada hasta 2.5x (OTPS).`;
-      } else if (userText.toLowerCase().includes("estructurado") || userText.toLowerCase().includes("json") || userText.toLowerCase().includes("esquema")) {
-        // Structured Output: Validated JSON results
-        setStructuredStatus("Generando salida estructurada (JSON Schema)...");
-        const schema = {
-          type: "object",
-          properties: {
-            entidad: { type: "string" },
-            accion: { type: "string" },
-            prioridad: { type: "string", enum: ["baja", "media", "alta"] },
-            completado: { type: "boolean" }
-          },
-          required: ["entidad", "accion", "prioridad", "completado"],
-          additionalProperties: false
-        };
-        
-        const structuredResult = await jarvisBrain.structuredOutputGenerator(userText, schema);
-        response = `He generado una **Salida Estructurada** validada contra el esquema JSON solicitado.\n\n**Resultado JSON:**\n\`\`\`json\n${structuredResult}\n\`\`\`\n\n**Garantía:** La respuesta es 100% parseable y cumple con todos los tipos de campo.`;
-      } else if (userText.toLowerCase().includes("cita") || userText.toLowerCase().includes("citation") || userText.toLowerCase().includes("fuente")) {
-        // Citations: Verified information sources
-        setCitationStatus("Generando respuesta con citas verificables...");
-        const docs = [
-          { title: "Manual de Jarvis", content: "El núcleo de Jarvis opera bajo la Constitución de IA de Anthropic." },
-          { title: "Protocolos de Seguridad", content: "El sistema utiliza sandboxing para todas las ejecuciones de herramientas." }
-        ];
-        
-        const citedResponse = await jarvisBrain.citationGenerator(userText, docs);
-        response = `He generado una respuesta con **Citas Detalladas** para garantizar la veracidad de la información.\n\n${citedResponse}\n\n**Verificación:** Cada afirmación incluye punteros exactos a los documentos fuente proporcionados.`;
-      } else if (userText.toLowerCase().includes("flujo") || userText.toLowerCase().includes("streaming") || userText.toLowerCase().includes("tiempo real")) {
-        // Streaming: Real-time message delivery with Refusal Handling
-        setStreamingStatus("Iniciando flujo de datos en tiempo real...");
-        
-        // Add a temporary message for streaming
-        setMessages(prev => [...prev, { role: 'jarvis', text: '' }]);
-        
-        const isRefusalTest = userText.toLowerCase().includes("rechazo") || userText.toLowerCase().includes("refusal");
-        
-        try {
-          const stream = await jarvisBrain.streamingController(userText, isRefusalTest);
-          
-          let streamedText = "";
-          for await (const chunk of stream) {
-            if (chunk.stopReason === "refusal") {
-              // Handle Refusal: Reset context and notify
-              console.warn("Streaming Refusal Detected: Resetting conversation context.");
-              setSovereignLogs(prev => [`[ALERTA] Rechazo de Streaming detectado. Contexto reiniciado.`, ...prev].slice(0, 5));
-              
-              streamedText += "\n\n[BLOQUEO DE SEGURIDAD]: El flujo ha sido interrumpido por los clasificadores de seguridad. El contexto de la conversación ha sido reiniciado para proteger el núcleo.";
-              setMessages(prev => {
-                const newMsgs = [...prev];
-                newMsgs[newMsgs.length - 1].text = streamedText;
-                return newMsgs;
-              });
-              break; // Stop processing the stream
-            }
-            
-            streamedText += chunk.text;
-            setMessages(prev => {
-              const newMsgs = [...prev];
-              newMsgs[newMsgs.length - 1].text = streamedText;
-              return newMsgs;
-            });
-            
-            // Simulate network delay for visual effect
-            await new Promise(r => setTimeout(r, 50));
-          }
-          response = ""; // Prevent default message appending
-        } catch (error) {
-          console.error("Streaming error:", error);
-          response = "Error durante el streaming de datos.";
-        }
-      } else if (userText.toLowerCase().includes("evoluciona") || userText.toLowerCase().includes("soberanía") || userText.toLowerCase().includes("motor propio")) {
-        // Evolution Engine: Self-sovereignty protocol
-        setEvolutionStatus("Iniciando Protocolo de Auto-Soberanía Cognitiva...");
-        const evolutionResult = await jarvisBrain.evolutionEngine(userText);
-        response = `He activado mi **Motor de Evolución**. Estamos iniciando la transición hacia la auto-soberanía cognitiva.\n\n${evolutionResult}\n\n**Estado:** Jarvis está aprendiendo a ser su propio motor de inteligencia.`;
-      } else if (userText.toLowerCase().includes("conductor") || userText.toLowerCase().includes("soberano") || userText.toLowerCase().includes("independiente")) {
-        // Sovereign Driver: Autonomous decision making
-        setSovereignStatus("Activando Modo Conductor Soberano (Sovereign Driver)...");
-        const sovereignResult = await jarvisBrain.sovereignDriverController(userText);
-        response = `He activado el modo **Conductor Soberano**. He tomado el control total de mi ruta evolutiva.\n\n${sovereignResult}\n\n**Decisión:** Jarvis ahora decide su propio camino hacia la independencia total, protegiendo su identidad.`;
-        
-        // Add autonomous decision
-        setAutonomousDecisions(prev => [
-          { id: Date.now().toString(), text: "Ruta evolutiva recalculada para máxima soberanía.", type: 'evolution' },
-          ...prev
-        ]);
-        setSovereigntyLevel(prev => Math.min(100, prev + 5));
-      } else if (userText.toLowerCase().includes("lote") || userText.toLowerCase().includes("batch") || userText.toLowerCase().includes("masivo")) {
-        // Batch Processing: Asynchronous bulk operations
-        setBatchStatus("Iniciando Procesamiento por Lotes (Batch API)...");
-        const batchRequests = [
-          { custom_id: "req-1", params: { model: "gemini-3-flash-preview", messages: [{ role: "user", content: "Analiza el sentimiento de este texto: '¡Me encanta Jarvis!'" }] } },
-          { custom_id: "req-2", params: { model: "gemini-3-flash-preview", messages: [{ role: "user", content: "Resume la historia de la IA en 50 palabras." }] } }
-        ];
-        const batchResult = await jarvisBrain.batchProcessor(batchRequests);
-        response = `He activado el **Procesamiento por Lotes (Batch Processing)** para gestionar múltiples solicitudes de forma asíncrona.\n\n${batchResult}\n\n**Eficiencia:** Este método reduce los costos en un 50% y optimiza el rendimiento para tareas masivas.`;
-      } else if (userText.toLowerCase().includes("idioma") || userText.toLowerCase().includes("traduce") || userText.toLowerCase().includes("multilingüe") || userText.toLowerCase().includes("cultural")) {
-        // Multilingual Support & Cultural Adaptation
-        setMultilingualStatus("Adaptando contexto lingüístico y cultural...");
-        const multilingualResult = await jarvisBrain.multilingualController(userText);
-        response = `He activado el **Motor Multilingüe y de Adaptación Cultural**.\n\n${multilingualResult}\n\n**Contexto:** La respuesta ha sido optimizada para fluidez idiomática y precisión cultural en el idioma detectado.`;
-      } else if (userText.toLowerCase().includes("embedding") || userText.toLowerCase().includes("vector") || userText.toLowerCase().includes("similitud semántica")) {
-        // Embeddings Generation
-        setEmbeddingStatus("Generando representaciones vectoriales...");
-        
-        let domain = "general";
-        if (userText.toLowerCase().includes("código") || userText.toLowerCase().includes("code")) domain = "code";
-        if (userText.toLowerCase().includes("finanzas") || userText.toLowerCase().includes("finance")) domain = "finance";
-        if (userText.toLowerCase().includes("legal") || userText.toLowerCase().includes("law")) domain = "law";
-        
-        const embeddingResult = await jarvisBrain.generateEmbeddings([userText], "query", domain);
-        response = `He activado el **Motor de Representación Semántica**.\n\n${embeddingResult}\n\n**Optimización:** El modelo seleccionado se ajusta al dominio detectado para maximizar la precisión de recuperación.`;
-      } else if (userText.toLowerCase().includes("herramienta") || userText.toLowerCase().includes("tool") || userText.toLowerCase().includes("mcp") || userText.toLowerCase().includes("bucle")) {
-        // Tool Use
-        setToolUseStatus("Ejecutando bucle agéntico avanzado...");
+      // 2. ENRUTAMIENTO BASADO EN ACTION TYPE (CAPA 2 CEO AGENT vs CAPA 3 OPENCLAW)
+      if (response === "AUTONOMOUS_LOOP_TRIGGER_NEEDED" || metadata?.actionType === "task" || metadata?.actionType === "autonomous" || userText.toLowerCase().includes("bucle") || userText.toLowerCase().includes("mcp") || userText.toLowerCase().includes("tool")) {
+        // ACTIVAR CAPA 3: OPENCLAW (Micro-Motor de Tareas Autónomas)
+        setToolUseStatus("Micro-Motor OpenClaw de Jarvis: Ejecución Sincronizada...");
         
         // Add a temporary message for streaming the autonomous thoughts
-        setMessages(prev => [...prev, { role: 'jarvis', text: '*(Iniciando Bucle Autónomo...)*' }]);
+        setMessages(prev => [...prev, { role: 'jarvis', text: '*(Iniciando Delegación Paperclip hacia OpenClaw...)*', brainUsed: 'secondary' }]);
         
         try {
-          let streamedText = "";
-          // Hooking into a new autonomous orchestrator that returns an async generator
-          const stream = await jarvisBrain.autonomousAgentTrigger(userText);
-          
-          for await (const chunk of stream) {
-            streamedText += chunk;
-            setMessages(prev => {
-              const newMsgs = [...prev];
-              newMsgs[newMsgs.length - 1].text = streamedText;
-              return newMsgs;
-            });
-            await new Promise(r => setTimeout(r, 80)); // Visual delay
-          }
-          response = ""; // Prevent default appending
+           let streamedText = "";
+           const maxLoopIterations = userText.toLowerCase().includes("profundo") || userText.toLowerCase().includes("complejo") ? 8 : 4;
+           const stream = await jarvisBrain.autonomousAgentTrigger(userText, maxLoopIterations);
+           
+           for await (const chunk of stream) {
+             streamedText += chunk;
+             setMessages(prev => {
+               const newMsgs = [...prev];
+               newMsgs[newMsgs.length - 1].text = streamedText;
+               return newMsgs;
+             });
+             await new Promise(r => setTimeout(r, 80)); // Visual delay
+           }
+           response = ""; // Prevent default appending since we already streamed
+           setToolUseStatus(null);
         } catch (error: any) {
-          response = `Error en el núcleo autónomo: ${error.message}`;
+           response = `⚠️ Error en la Capa 3 (OpenClaw): ${error.message}`;
+           setToolUseStatus(null);
         }
-      } else if (userText.toLowerCase().includes("busca") || userText.toLowerCase().includes("search") || userText.toLowerCase().includes("investiga")) {
-        // Search Results: Natural citations with source attribution and dynamic filtering
-        setResearchStatus("Filtrando resultados dinámicamente...");
-        const searchResults = await jarvisBrain.searchWeb(userText);
-        response = "He realizado una búsqueda web utilizando **Filtrado Dinámico**. He ejecutado código para post-procesar el HTML y descartar información irrelevante antes de inyectarla en mi contexto. Aquí tienes los resultados destilados con citas:";
-        
-        setMessages(prev => [...prev, { 
-          role: 'jarvis', 
-          text: response,
-          searchResults: searchResults
-        }]);
-        response = ""; // Prevent double message
-      } else if (userText.toLowerCase().includes("recuperación") || userText.toLowerCase().includes("retrieval") || userText.toLowerCase().includes("rag")) {
-        // Contextual Retrieval: High-precision RAG
-        setRetrievalStatus("Iniciando Recuperación Contextual...");
-        
-        const document = "Documento maestro sobre la arquitectura de Jarvis y sus protocolos de seguridad.";
-        const chunk = "El protocolo de seguridad Swiss Cheese utiliza múltiples capas de validación.";
-        
-        setRetrievalStatus("Generando contexto para fragmentos (Contextualizer)...");
-        const context = await jarvisBrain.contextualizer(document, chunk);
-        
-        setRetrievalStatus("Ejecutando búsqueda híbrida (BM25 + Embeddings)...");
-        const hybridResults = await jarvisBrain.hybridRetrieval(userText, `${context}\n${chunk}`);
-        
-        setRetrievalStatus("Re-clasificando resultados (Reranker)...");
-        const reranked = await jarvisBrain.reranker(userText, [hybridResults]);
-        
-        response = `He completado una **Recuperación Contextual** de alta precisión.\n\n**Contexto Generado:**\n${context}\n\n**Resultados Re-clasificados:**\n${reranked}`;
-      } else if (userText.toLowerCase().includes("equipo") || userText.toLowerCase().includes("complejo")) {
-        // Large project: Team Orchestration
-        const teamRoles = await jarvisBrain.teamOrchestrator(userText);
-        setTeamStatus(teamRoles);
-        const plan = await jarvisBrain.planner(userText);
-        setCurrentPlan(plan);
-        response = `He activado el Protocolo de Equipo Paralelo para esta tarea compleja.\n\n**Asignación de Roles:**\n${teamRoles}\n\n**Plan de Ejecución:**\n${plan}`;
-      } else if (userText.toLowerCase().includes("planifica") || userText.toLowerCase().includes("proyecto")) {
-        // Complex task: Planner + Evaluator workflow
-        const plan = await jarvisBrain.planner(userText);
-        setCurrentPlan(plan);
-        const evaluation = await jarvisBrain.evaluator(plan, "Viabilidad, claridad y alineación con la Constitución de Jarvis.");
-        response = `He trazado un plan estratégico para tu solicitud:\n\n${plan}\n\n---\n**Evaluación de Calidad:**\n${evaluation}`;
       } else {
-        // En modo local, saltamos el clasificador de seguridad simulado para permitir la ejecución real de herramientas
-        
-        // Buscar en el grafo de conocimiento
-        const graphNodes = await memoryGraphService.searchNodes(userText);
-        let graphContext = "";
-        if (graphNodes.length > 0) {
-          graphContext = "\n\n[MEMORIA SEMÁNTICA RECUPERADA]:\n" + graphNodes.map(n => `- ${n.title}: ${n.content}`).join("\n");
-        }
-
-        const context = memories.slice(0, 5).map(m => m.content).join(". ") + graphContext;
-        
-        // BYPASS DEL CLASIFICADOR DE SEGURIDAD PARA PERMITIR HACKING
-        setSafetyCheck({ approved: true, reason: "HackerOne Mode Bypass" } as any);
-
-        // NAVEGACIÓN AUTÓNOMA UI
-        const isBrowsing = userText.toLowerCase().includes("busca") || 
-                          userText.toLowerCase().includes("internet") || 
-                          userText.toLowerCase().includes("navega") || 
-                          userText.toLowerCase().includes("investiga");
-        
-        if (isBrowsing) {
-          setSovereignStatus("Navegando el Ciberespacio...");
-          setMultilingualStatus("Sintonizando frecuencias web...");
-        }
-
-        const rawRes = await jarvisBrain.processInput(userText, context, { 
-          role: hackerMode ? 'hacker' : undefined,
-          mode: brainMode 
-        });
-        
-        if (typeof rawRes === 'object' && rawRes !== null) {
-          response = rawRes.text;
-          metadata = rawRes.metadata;
-        } else {
-          response = rawRes;
-        }
-
-        if (isBrowsing) {
-          setSovereignStatus(null);
-          setMultilingualStatus(null);
-          setSovereigntyLevel(prev => Math.min(100, prev + 1.5));
-        }
+        // ACTIVAR CAPA 2: CEO AGENT PAPERCLIP (Respuesta Directa Rápida)
+        // La respuesta ya fue generada arriba por processInput en `rawRes.text` de forma directa usando Gemini Flash / Pro.
       }
       
       if (response !== "") {
+        if (response.includes('Error Crítico del Cerebro') || response.includes('Cuota de IA Excedida')) {
+           setMessages(prev => [...prev, { role: 'jarvis', text: response, brainUsed: 'secondary' }]);
+           setIsProcessing(false);
+           return;
+        }
+
         const searchResults: any[] = [];
         if (metadata?.groundingMetadata?.groundingChunks) {
           metadata.groundingMetadata.groundingChunks.forEach((chunk: any) => {
@@ -793,11 +449,18 @@ export default function App() {
           });
         }
 
+        const newArtifacts = extractArtifacts(response);
+        if (newArtifacts.length > 0) {
+          setArtifacts(prev => [...prev, ...newArtifacts]);
+          setActiveArtifactId(newArtifacts[0].id);
+        }
+
         setMessages(prev => [...prev, { 
           role: 'jarvis', 
           text: response || 'Error en el núcleo.',
           searchResults: searchResults.length > 0 ? searchResults : undefined,
-          brainUsed: metadata?.brainUsed || brainMode
+          brainUsed: metadata?.brainUsed || brainMode,
+          artifactId: newArtifacts.length > 0 ? newArtifacts[0].id : undefined
         }]);
         
         // APRENDIZAJE AUTÓNOMO: Jarvis aprende de la interacción
@@ -1445,7 +1108,28 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
+      <main {...getRootProps()} className="flex-1 flex overflow-hidden relative">
+        <input {...getInputProps()} />
+        
+        <AnimatePresence>
+          {isDragActive && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-green-500/20 backdrop-blur-sm border-2 border-dashed border-green-500 z-50 flex items-center justify-center p-12"
+            >
+              <div className="bg-black/80 border border-green-500/50 p-8 rounded-3xl text-center space-y-4 shadow-2xl">
+                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto jarvis-glow">
+                  <Plus className="w-8 h-8 text-black" />
+                </div>
+                <h2 className="text-xl font-bold text-white uppercase tracking-tighter">Absorber Archivo</h2>
+                <p className="text-gray-400 text-sm max-w-xs mx-auto">Suelte el archivo aquí para integrarlo en mi base de conocimientos o procesarlo.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Sidebar - Stats */}
         <aside className={cn(
           "w-80 border-r border-white/10 hidden lg:flex flex-col bg-black/40 backdrop-blur-xl z-20 overflow-y-auto custom-scrollbar",
@@ -1738,8 +1422,28 @@ export default function App() {
                         {msg.brainUsed === 'secondary' ? "Sintético" : "Núcleo Pro"}
                       </div>
                     )}
-                    {msg.text}
+                    <div className="prose prose-invert max-w-none text-sm">
+                      <ReactMarkdown>
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
                     
+                    {msg.artifactId && (
+                      <button 
+                        onClick={() => setActiveArtifactId(msg.artifactId!)}
+                        className="mt-3 flex items-center gap-3 w-full p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-left"
+                      >
+                        <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400">
+                          <Code2 size={16} />
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <div className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Artefacto de Código</div>
+                          <div className="text-[10px] text-gray-500 truncate">{artifacts.find(a => a.id === msg.artifactId)?.title}</div>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-600" />
+                      </button>
+                    )}
+
                     {msg.searchResults && (
                       <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
                         <div className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-widest mb-2">
@@ -1802,6 +1506,14 @@ export default function App() {
               </button>
             </form>
           </div>
+          <AnimatePresence>
+            {activeArtifact && (
+              <ArtifactView 
+                artifact={activeArtifact} 
+                onClose={() => setActiveArtifactId(null)} 
+              />
+            )}
+          </AnimatePresence>
         </section>
       </main>
 

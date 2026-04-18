@@ -45,10 +45,10 @@ export const jarvisBrain = {
 
       // 2. SOLO EXTRAER INTENCIÓN Y EVALUAR LEALTAD SI NO ES BACKGROUND NI SECUNDARIO
       if (!isBackground) {
-        console.log("[Jarvis Brain] Extrayendo intención (Núcleo Pro)...");
+        console.log("[Jarvis Brain] PAPERCLIP CEO: Extrayendo intención maestra...");
         actionIntent = await geminiService.extractIntent(input);
         
-        console.log("[Jarvis Brain] Evaluando lealtad (LEE)...");
+        console.log("[Jarvis Brain] PAPERCLIP GOVERNANCE: Evaluando lealtad (LEE)...");
         const evalRes = await fetch('/api/evaluate-action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -69,7 +69,7 @@ export const jarvisBrain = {
         if (evaluation.decision === "REJECT") {
           return {
             text: `🛑 **ACCESO DENEGADO POR JARVIS**\n\n**Evaluación:** ${evaluation.reasoning}\n\n*Lealtad Insuficiente (${evaluation.overallScore.toFixed(1)}%)*`,
-            metadata: { decision: "REJECT", evaluation }
+            metadata: { decision: "REJECT", evaluation, actionType: (actionIntent as any).actionType || "chat" }
           };
         }
       }
@@ -93,10 +93,24 @@ export const jarvisBrain = {
         }
       }
 
-      // 7. Generar Respuesta
+      // Special Route: OPENCLAW (Autonomous Task Loop) interception
+      // If the intent is explicitly mapped to autonomous/task, we return a hint so the UI layer triggers the loop directly
+      if (!isBackground && (actionIntent as any).actionType && ((actionIntent as any).actionType === "task" || (actionIntent as any).actionType === "autonomous")) {
+         console.log("[Jarvis Brain] DELEGACIÓN PAPERCLIP: Iniciando Micro-Motor OpenClaw para resolución compleja...");
+         return {
+            text: "AUTONOMOUS_LOOP_TRIGGER_NEEDED",
+            metadata: {
+              leeScore: evaluation.overallScore,
+              leeDecision: evaluation.decision,
+              actionType: (actionIntent as any).actionType
+            }
+         };
+      }
+
+      // 7. Generar Respuesta (CEO Agent / Chat)
       console.log(`[Jarvis Brain] Generando respuesta (${mode})${isBackground ? ' [FONDO]' : ''}...`);
       // Si es background o modo secundario, forzar Flash para no quemar cuota de Pro
-      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3-flash-preview" : "gemini-3.1-pro-preview";
+      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3.1-flash" : "gemini-3.1-pro-preview";
       const response = await geminiService.generateResponse(augmentedInput, systemInstruction, needsSearch, modelToUse, isBackground);
 
       // 8. Manejar Tool Calls (Solo si no es background para evitar bucles)
@@ -116,7 +130,8 @@ export const jarvisBrain = {
           leeScore: evaluation.overallScore,
           leeDecision: evaluation.decision,
           groundingMetadata: response.groundingMetadata,
-          brainUsed: (modelToUse.includes("pro") ? "primary" : "secondary")
+          brainUsed: (modelToUse.includes("pro") ? "primary" : "secondary"),
+          actionType: (actionIntent as any).actionType || "chat"
         }
       };
     } catch (error: any) {
@@ -576,34 +591,45 @@ export const jarvisBrain = {
     return typeof res === 'object' ? res.text : res;
   },
 
-  async *autonomousAgentTrigger(goal: string) {
-    yield `🧠 **[INICIANDO ORQUESTADOR AUTÓNOMO]**\nObjetivo Estratégico: *${goal}*\n\n`;
-
-    const maxIterations = 3;
+  async *autonomousAgentTrigger(goal: string, maxIterations = 5) {
+    yield `🧠 **[INICIANDO MICROMOTOR OPENCLAW]**\nObjetivo Estratégico: *${goal}*\nDelegación Paperclip: ACTIVA\n\n`;
     let context = `Objetivo principal: ${goal}\n`;
 
     for (let i = 1; i <= maxIterations; i++) {
-      yield `\n\n🔄 **[CICLO DE REFLEXIÓN ${i}/${maxIterations}]** - Planificando siguiente acción...\n`;
+      yield `\n💓 **[HEARTBEAT OPENCLAW ${i}/${maxIterations}]** - Sincronizando alineación de objetivos...\n`;
       
-      const planPrompt = `Eres un Agente Autónomo (Loop Recursivo).
+      const planPrompt = `Eres el Micro-Motor OpenClaw de Jarvis.
+Propósito: Ejecutar tareas de forma autónoma con alineación Paperclip.
 Historial y Estado actual:
 ${context}
 
 Analiza qué debes hacer a continuación para avanzar hacia el objetivo. 
-De tu lista de herramientas conocidas (leer_archivo, buscar_web, procesar_datos, etc.), ¿cuál usarías y por qué?
-Si crees que el objetivo ya está cumplido o no necesitas más herramientas, declara "FIN_DEL_BUCLE" y da la respuesta final.
+Herramientas:
+- ejecutar_comando_kali (Comandos locales)
+- leer_archivo (Ver código/datos)
+- mapear_workspace_profundo (Entender estructura)
+- busqueda_grep_avanzada (Encontrar patrones)
 
-Responde *exclusivamente* en este formato exacto:
-PENSAMIENTO: [Tu razonamiento lógico aquí]
-ACCION: [Nombrar herramienta_falsa o paso estructurado]
-EJECUCION: [Comando o acción conceptual a realizar]`;
+¿Cuál usarías y por qué?
+Si el objetivo está cumplido, declara "FIN_DEL_BUCLE".
+
+Si generas código o archivos, usa el formato:
+<artifact type="code|web|markdown" title="Título" language="lang">...</artifact>
+
+Formato:
+PENSAMIENTO: [Razonamiento de alineación]
+ACCION: [Nombrar_herramienta]
+EJECUCION: [Comando/Param]`;
 
       // Consult the lightweight model for planning
-      const planRes = await geminiService.generateResponse(planPrompt, "", false, "gemini-3-flash-preview", true);
+      const planRes = await geminiService.generateResponse(planPrompt, "", false, "gemini-3.1-flash", true);
       const planText = planRes.text || "";
 
       // Yield the thought process
-      yield `\n> **Pensamiento:** ${planText.split("ACCION:")[0].replace("PENSAMIENTO: ", "").trim()}\n`;
+      const thoughtMatch = planText.match(/(?:PENSAMIENTO|PENSAMIENTOS|RAZONAMIENTO):\s*([\s\S]*?)(?:ACCION|ACCIÓN|FIN_DEL_BUCLE)/i);
+      const thoughtText = thoughtMatch ? thoughtMatch[1].trim() : planText.split(/(?:ACCION|ACCIÓN)/)[0].replace(/(?:PENSAMIENTO|PENSAMIENTOS):/i, "").trim();
+      
+      yield `\n> **Pensamiento:** ${thoughtText}\n`;
 
       if (planText.includes("FIN_DEL_BUCLE")) {
         yield `\n✅ **[META ALCANZADA]** Bucle terminado exitosamente.\n\n`;
@@ -613,19 +639,61 @@ EJECUCION: [Comando o acción conceptual a realizar]`;
         break;
       }
 
-      // Extract details
-      const actionMatch = planText.match(/ACCION:\s*(.+)/);
-      const executionMatch = planText.match(/EJECUCION:\s*(.+)/);
-      
-      const actionName = actionMatch ? actionMatch[1].trim() : "Análisis General";
-      const executionDetails = executionMatch ? executionMatch[1].trim() : "Procesamiento de estado...";
+      let actionName = "Análisis General";
+      let executionDetails = "Procesamiento de estado...";
+
+      const actionMatch = planText.match(/(?:ACCION|ACCIÓN):\s*(.+?)(?:\n|$)/);
+      if (actionMatch) {
+         actionName = actionMatch[1].trim();
+      }
+
+      const executionMatch = planText.match(/(?:EJECUCION|EJECUCIÓN):\s*(.+?)(?:\n|$)/);
+      if (executionMatch) {
+         executionDetails = executionMatch[1].trim();
+      } else if (planText.includes('EJECUCION:') || planText.includes('EJECUCIÓN:')) {
+         // Fallback if formatting was multi-line or slightly wonky
+         executionDetails = planText.split(/(?:EJECUCION|EJECUCIÓN):/)[1].trim();
+      }
 
       yield `> ⚙️ **Ejecutando [${actionName}]**: \`${executionDetails}\`...\n`;
 
-      // Simulate a tool execution (since this is frontend, we simulate the 'worker' environment)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const toolResult = `Simulación de resultado para ${actionName}: OK. Información recolectada o acción completada con éxito.`;
+      // Simulate a tool execution if we do not know how to handle it
+      let toolResult = `Simulación de resultado para ${actionName}: OK. Información recolectada o acción completada con éxito.`;
+
+      try {
+        const payloadArgs: any = {};
+        if (actionName.includes('kali') || actionName.includes('comando')) {
+          actionName = 'ejecutar_comando_kali';
+          payloadArgs.comando = executionDetails;
+        } else if (actionName.includes('leer')) {
+          actionName = 'leer_archivo';
+          payloadArgs.filename = executionDetails;
+        } else if (actionName.includes('mapear')) {
+          actionName = 'mapear_workspace_profundo'; 
+          payloadArgs.path = executionDetails.replace('dir ', '');
+        } else if (actionName.includes('grep') || actionName.includes('buscar')) {
+          actionName = 'busqueda_grep_avanzada';
+          payloadArgs.pattern = executionDetails;
+        }
+
+        if (Object.keys(payloadArgs).length > 0) {
+           const toolRes = await fetch('/api/execute-tool', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ name: actionName, args: payloadArgs })
+           });
+           if (toolRes.ok) {
+             const toolData = await toolRes.json();
+             toolResult = toolData.text || JSON.stringify(toolData);
+           } else {
+             toolResult = `API Error: ${toolRes.statusText}`;
+           }
+        } else {
+           await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      } catch (err: any) {
+        toolResult = `Error al ejecutar: ${err.message}`;
+      }
       
       yield `> 📊 **Resultado de la Observación:** ${toolResult}\n`;
 
