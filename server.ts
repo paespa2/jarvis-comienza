@@ -35,6 +35,11 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Healthcheck básico para Railway
+  app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+  });
+
   const isWindows = process.platform === "win32";
 
   // API para subida de archivos
@@ -568,7 +573,9 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Jarvis System] Servidor Full-Stack corriendo en http://localhost:${PORT}`);
+    console.log(`[Jarvis System] PORT: ${PORT}`);
+    console.log(`[Jarvis System] NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`[Jarvis System] Servidor Full-Stack corriendo en http://0.0.0.0:${PORT}`);
     console.log(`[Jarvis System] Workspace de Hacking: ${WORKSPACE_DIR}`);
   });
 }

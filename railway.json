@@ -7,7 +7,7 @@
   "deploy": {
     "startCommand": "npm run start",
     "port": 8080,
-    "healthcheckPath": "/api/sovereign-context",
+    "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE"
   }
 }
