@@ -1335,11 +1335,17 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
               <div className="p-3 flex flex-col gap-1.5 hover:bg-white/5 transition-colors group relative border-t border-white/5">
                 <div className="flex items-center justify-between">
                   <span className="text-white/30 uppercase tracking-[0.1em]">NODE_03: GROQ_LLAMA_3</span>
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]",
+                    externalHealth.groq === 'online' ? "bg-amber-500" : "bg-zinc-700"
+                  )} />
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-light tracking-tighter uppercase italic text-amber-400">
-                    ONLINE
+                  <span className={cn(
+                    "text-lg font-light tracking-tighter uppercase italic",
+                    externalHealth.groq === 'online' ? "text-amber-400" : "text-zinc-600"
+                  )}>
+                    {externalHealth.groq === 'online' ? "ONLINE" : "WAITING_KEY"}
                   </span>
                   <span className="text-[7px] opacity-20 uppercase">Burst/Enabled</span>
                 </div>

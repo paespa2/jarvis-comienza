@@ -624,6 +624,7 @@ export const jarvisBrain = {
     const results: any = { 
       paperclip: 'offline', 
       openclaw: 'offline',
+      groq: groqService.isAvailable() ? 'online' : 'offline',
       diagnostics: {} 
     };
     
