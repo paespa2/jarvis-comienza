@@ -1,4 +1,5 @@
 import { geminiService, JARVIS_TOOLS } from "./geminiService";
+import { groqService } from "./groqService";
 import { secondBrainService } from "./secondBrainService";
 
 // Estado interno
@@ -46,7 +47,14 @@ export const jarvisBrain = {
       // 2. SOLO EXTRAER INTENCIÓN Y EVALUAR LEALTAD SI NO ES BACKGROUND NI SECUNDARIO
       if (!isBackground) {
         console.log("[Jarvis Brain] PAPERCLIP CEO: Extrayendo intención maestra...");
-        actionIntent = await geminiService.extractIntent(input);
+        // Usamos Groq para extracción de intención por su extrema velocidad
+        try {
+          actionIntent = await groqService.extractIntent(input);
+          console.log("[Jarvis Brain] Intención extraída vía Groq (Ultra-Fast)");
+        } catch (e) {
+          actionIntent = await geminiService.extractIntent(input);
+          console.log("[Jarvis Brain] Intención extraída vía Gemini (Fallback)");
+        }
         
         console.log("[Jarvis Brain] PAPERCLIP GOVERNANCE: Evaluando lealtad (LEE)...");
         const evalRes = await fetch('/api/evaluate-action', {
@@ -111,7 +119,24 @@ export const jarvisBrain = {
       console.log(`[Jarvis Brain] Generando respuesta (${mode})${isBackground ? ' [FONDO]' : ''}...`);
       // Si es background o modo secundario, forzar Flash para no quemar cuota de Pro
       const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3-flash-preview" : "gemini-3.1-pro-preview";
-      const response = await geminiService.generateResponse(augmentedInput, systemInstruction, needsSearch, modelToUse, isBackground);
+      let response;
+      
+      try {
+        response = await geminiService.generateResponse(augmentedInput, systemInstruction, needsSearch, modelToUse, isBackground);
+      } catch (error: any) {
+        const errMsg = error.message || "";
+        if (errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+          console.warn("[Jarvis Brain] Quota Gemini agotada. Intentando Nodo Groq (Llama 3)...");
+          const groqRes = await groqService.generateResponse(augmentedInput, systemInstruction);
+          response = {
+            text: groqRes.text,
+            functionCalls: [], // Groq no soporta nuestras herramientas de la misma forma aún
+            groundingMetadata: null
+          };
+        } else {
+          throw error;
+        }
+      }
 
       // 8. Manejar Tool Calls (Solo si no es background para evitar bucles)
       if (!isBackground && response.functionCalls && response.functionCalls.length > 0) {

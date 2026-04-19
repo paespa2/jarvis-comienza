@@ -1221,6 +1221,7 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
               {[
                 { name: 'Paperclip CEO', desc: 'Enrutamiento y Estrategia', active: !!processingState && !toolUseStatus, color: 'text-blue-400', icon: Globe },
                 { name: 'Governance (LEE)', desc: 'Evaluación de Lealtad', active: !!processingState, color: 'text-emerald-400', icon: Shield },
+                { name: 'Groq Node (Llama)', desc: 'Clasificación Ultra-Rápida', active: !!processingState, color: 'text-amber-400', icon: Zap },
                 { name: 'OpenClaw Loop', desc: 'Ejecución Autónoma', active: !!toolUseStatus, color: 'text-orange-400', icon: Cpu }
               ].map((layer) => (
                 <div key={layer.name} className={cn(
@@ -1327,6 +1328,20 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
                       {externalHealth.diagnostics.openclaw}
                     </p>
                   )}
+                </div>
+              </div>
+
+              {/* Added Groq Node Status */}
+              <div className="p-3 flex flex-col gap-1.5 hover:bg-white/5 transition-colors group relative border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/30 uppercase tracking-[0.1em]">NODE_03: GROQ_LLAMA_3</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-lg font-light tracking-tighter uppercase italic text-amber-400">
+                    ONLINE
+                  </span>
+                  <span className="text-[7px] opacity-20 uppercase">Burst/Enabled</span>
                 </div>
               </div>
             </div>
