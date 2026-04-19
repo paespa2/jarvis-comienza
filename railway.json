@@ -5,7 +5,7 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "npm run start",
+    "startCommand": "NODE_ENV=production npm run start",
     "port": 8080,
     "healthcheckPath": "/health",
     "restartPolicyType": "ON_FAILURE"
