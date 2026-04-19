@@ -105,6 +105,44 @@ async function startServer() {
     });
   });
 
+  // Proxy para Groq (Para evitar problemas de API Keys en el cliente)
+  app.post("/api/groq", async (req, res) => {
+    const { input, systemInstruction, model } = req.body;
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "GROQ_API_KEY no configurada en el servidor." });
+    }
+
+    try {
+      const { default: Groq } = await import("groq-sdk");
+      const groq = new Groq({ apiKey });
+      
+      const completion = await groq.chat.completions.create({
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: input }
+        ],
+        model: model || "llama-3.3-70b-versatile",
+      });
+
+      res.json({ text: completion.choices[0]?.message?.content || "" });
+    } catch (error: any) {
+      console.error("[Server Groq Proxy] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Nuevo endpoint para comprobar estado de llaves en el servidor
+  app.get("/api/env-health", (req, res) => {
+    res.json({
+      gemini: !!process.env.GEMINI_API_KEY,
+      groq: !!process.env.GROQ_API_KEY,
+      paperclip: !!process.env.PAPERCLIP_AGENT_API_KEY,
+      openclaw: !!process.env.OPENCLAW_GATEWAY_TOKEN
+    });
+  });
+
   // Workspace directory para Jarvis
   const KNOWLEDGE_FILE = path.join(WORKSPACE_DIR, "knowledge_base.json");
   const PRIORITIES_FILE = path.join(WORKSPACE_DIR, "priorities.json");

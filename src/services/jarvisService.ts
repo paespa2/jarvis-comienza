@@ -621,10 +621,20 @@ export const jarvisBrain = {
     const paperclipUrl = meta.env?.VITE_PAPERCLIP_URL || 'https://paperclip-jarvis-ia.up.railway.app';
     const openclawUrl = meta.env?.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
     
+    // 1. Obtener salud de variables de entorno desde el servidor
+    let envStatus = { gemini: false, groq: false, paperclip: false, openclaw: false };
+    try {
+      const envRes = await fetch('/api/env-health');
+      if (envRes.ok) envStatus = await envRes.json();
+    } catch (e) {
+      console.warn("No se pudo obtener el estado de env desde el servidor");
+    }
+
     const results: any = { 
-      paperclip: 'offline', 
-      openclaw: 'offline',
-      groq: groqService.isAvailable() ? 'online' : 'offline',
+      paperclip: envStatus.paperclip ? 'online' : 'offline', 
+      openclaw: envStatus.openclaw ? 'online' : 'offline',
+      groq: envStatus.groq ? 'online' : 'offline',
+      gemini: envStatus.gemini ? 'online' : 'offline',
       diagnostics: {} 
     };
     

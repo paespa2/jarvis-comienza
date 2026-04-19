@@ -1150,8 +1150,16 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
 
           {/* System Status Indicator */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-[10px] text-blue-400 font-bold tracking-wider">GEMINI CLOUD ACTIVE</span>
+            <span className={cn(
+              "w-1.5 h-1.5 rounded-full animate-pulse",
+              externalHealth.gemini === 'online' ? "bg-blue-500" : "bg-zinc-700"
+            )} />
+            <span className={cn(
+              "text-[10px] font-bold tracking-wider",
+              externalHealth.gemini === 'online' ? "text-blue-400" : "text-zinc-600"
+            )}>
+              {externalHealth.gemini === 'online' ? "GEMINI CLOUD ACTIVE" : "GEMINI DISCONNECTED"}
+            </span>
           </div>
 
           {/* Hacker Mode Toggle */}
