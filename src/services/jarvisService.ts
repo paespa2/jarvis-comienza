@@ -593,8 +593,9 @@ export const jarvisBrain = {
 
   async checkExternalServiceHealth() {
     const meta = import.meta as any;
-    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://triumphant-hope-jarvis-ia.up.railway.app';
-    const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://triumphant-hope-jarvis-ia.up.railway.app';
+    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://openclaw-jarvis-ia.up.railway.app';
+    const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
+    // Nota: El tráfico llega por HTTPS (443) y Railway lo mapea internamente al 18789.
     
     const results: any = { 
       paperclip: 'offline', 
