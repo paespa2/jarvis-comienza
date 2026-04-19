@@ -603,14 +603,20 @@ export const jarvisBrain = {
     };
     
     const checkService = async (serviceName: 'paperclip' | 'openclaw', url: string) => {
-      // Intentar primero vía TUNEL PROXY (Bunker Mode)
-      const proxyUrl = serviceName === 'paperclip' ? '/paperclip-proxy/health' : '/openclaw-proxy/health';
+      // Ajustar endpoint según el servicio
+      const healthPath = serviceName === 'paperclip' ? '/api/health' : '/health';
+      const proxyUrl = `${serviceName === 'paperclip' ? '/paperclip-proxy' : '/openclaw-proxy'}${healthPath}`;
       
       try {
-        const proxyRes = await fetch(proxyUrl);
-        if (proxyRes.ok) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // Dar más margen a Railway
+        
+        const proxyRes = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (proxyRes.ok || proxyRes.status === 401) { // 401 es bueno, significa que el servidor respondió (está vivo pero pide auth)
           results[serviceName] = 'online';
-          results.diagnostics[serviceName] = "TUNNEL ACTIVE: Conexión segura vía Jarvis Backend (Bunker Mode).";
+          results.diagnostics[serviceName] = "TUNNEL ACTIVE: Enlace establecido vía Jarvis Backend.";
           return;
         }
       } catch (e) {}
@@ -649,7 +655,9 @@ export const jarvisBrain = {
   },
 
   async *autonomousAgentTrigger(goal: string, maxIterations = 5) {
-    yield `🧠 **[INICIANDO MICROMOTOR OPENCLAW]**\nObjetivo Estratégico: *${goal}*\nDelegación Paperclip: ACTIVA\n\n`;
+    const socketUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/openclaw-proxy/gateway/auth/token`;
+    
+    yield `🧠 **[INICIANDO MICROMOTOR OPENCLAW]**\nObjetivo Estratégico: *${goal}*\nDelegación Paperclip: ACTIVA\n📡 Enlace: \`${socketUrl}\` (Tunneled)\n\n`;
     let context = `Objetivo principal: ${goal}\n`;
 
     for (let i = 1; i <= maxIterations; i++) {
