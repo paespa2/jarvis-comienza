@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { BrainCircuit, Activity, Zap, Shield, Target, Dna, GitFork, ArrowUpRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 

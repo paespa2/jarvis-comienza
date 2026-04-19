@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Terminal, 
   Cpu, 
@@ -51,7 +51,23 @@ import {
   Compass,
   Network
 } from 'lucide-react';
-import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User, collection, query, orderBy, onSnapshot, addDoc, Timestamp } from './firebase';
+import { 
+  auth, 
+  db, 
+  googleProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  User, 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  addDoc, 
+  Timestamp,
+  setDoc,
+  doc
+} from './firebase';
 import { jarvisBrain } from './services/jarvisService';
 import { memoryGraphService } from './services/memoryGraphService';
 import { secondBrainService } from './services/secondBrainService';
@@ -278,17 +294,19 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      
       // Ensure user profile exists
-      import('firebase/firestore').then(({ setDoc, doc }) => {
-        setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          lastLogin: Date.now()
-        }, { merge: true }).catch(console.error);
-      });
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        lastLogin: Date.now()
+      }, { merge: true });
+      
+      logOperatorAction(`Login exitoso: ${user.displayName}`);
     } catch (error) {
       console.error("Login failed", error);
+      alert("Error en el inicio de sesión. Por favor, verifique su conexión o si las ventanas emergentes (popups) están bloqueadas.");
     }
   };
 
@@ -914,10 +932,23 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
     );
   };
 
-  if (loading) {
+  // Priorizar el renderizado: Si no hay usuario y ya pasó un tiempo prudencial, mostrar el login
+  // Aunque loading sea true, si no hay usuario después de 3 segundos forzamos mostrar el login
+  const [forceLogin, setForceLogin] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!user) setForceLogin(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [user]);
+
+  if (loading && !forceLogin) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-black">
-        <Loader2 className="w-12 h-12 text-green-500 animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-green-500 animate-spin" />
+          <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Iniciando Sistemas Jarvis...</p>
+        </div>
       </div>
     );
   }
