@@ -35,6 +35,30 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // === REMOTE CAPABILITIES MANAGER ===
+  const REMOTE_PAPERCLIP = process.env.VITE_PAPERCLIP_URL || process.env.PAPERCLIP_URL;
+  const REMOTE_OPENCLAW = process.env.VITE_OPENCLAW_URL || process.env.OPENCLAW_URL;
+
+  // Proxy genérico para evitar CORS y centralizar auth
+  app.all("/api/external-proxy", async (req, res) => {
+    const { target, path: targetPath, method, body } = req.body;
+    const baseUrl = target === 'paperclip' ? REMOTE_PAPERCLIP : REMOTE_OPENCLAW;
+    
+    if (!baseUrl) return res.status(400).json({ error: `Servidor ${target} no configurado.` });
+    
+    try {
+      const response = await fetch(`${baseUrl}${targetPath}`, {
+        method: method || 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (e: any) {
+      res.status(500).json({ error: `Error proxying to ${target}: ${e.message}` });
+    }
+  });
+
   // Healthcheck básico para Railway
   app.get("/health", (req, res) => {
     res.status(200).send("OK");
@@ -187,6 +211,42 @@ async function startServer() {
     const { name, args } = req.body;
     
     try {
+      // Priorizar DELEGACIÓN a OPENCLAW si está disponible y la herramienta es de ejecución
+      const isExecutionTool = ['ejecutar_comando_kali', 'leer_archivo', 'mapear_workspace_profundo', 'busqueda_grep_avanzada'].includes(name);
+      
+      if (isExecutionTool && REMOTE_OPENCLAW) {
+        console.log(`[Jarvis Tool] Delegando [${name}] a OpenClaw en ${REMOTE_OPENCLAW}...`);
+        try {
+          const remoteRes = await fetch(`${REMOTE_OPENCLAW}/api/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, args })
+          });
+          if (remoteRes.ok) {
+            const data = await remoteRes.json();
+            return res.json(data);
+          }
+          console.warn("[Jarvis Tool] OpenClaw remoto falló o no respondió. Reintentando localmente...");
+        } catch (e) {
+          console.warn("[Jarvis Tool] OpenClaw inalcanzable. Usando motor local.");
+        }
+      }
+
+      if (name === 'consultar_estrategia_paperclip') {
+        if (!REMOTE_PAPERCLIP) return res.json({ text: "⚠️ Paperclip no está configurado o no está en línea." });
+        
+        const paperclipRes = await fetch(`${REMOTE_PAPERCLIP}/api/orchestrate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal: args.consulta })
+        });
+        const strategy = await paperclipRes.json();
+        return res.json({ 
+           text: `> 🏢 **Consulta al CEO Paperclip:** \n\n${strategy.text || "La junta directiva de Paperclip está analizando tu solicitud..."}`,
+           metadata: { source: 'remote_paperclip', strategy }
+        });
+      }
+
       if (name === 'reproducir_error') {
         const filePath = path.join(WORKSPACE_DIR, args.filename);
         await fs.writeFile(filePath, args.script_content, "utf-8");

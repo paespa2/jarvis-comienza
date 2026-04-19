@@ -108,6 +108,17 @@ export const JARVIS_TOOLS = [
       },
       required: ["filename", "content"]
     }
+  },
+  {
+    name: "consultar_estrategia_paperclip",
+    description: "Consulta al servidor Paperclip para obtener una evaluación estratégica o la hoja de ruta de la compañía.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        consulta: { type: Type.STRING, description: "La duda estratégica o el objetivo a evaluar por el CEO Paperclip." }
+      },
+      required: ["consulta"]
+    }
   }
 ];
 

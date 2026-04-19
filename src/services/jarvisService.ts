@@ -596,16 +596,38 @@ export const jarvisBrain = {
     const paperclipUrl = meta.env.VITE_PAPERCLIP_URL;
     const openclawUrl = meta.env.VITE_OPENCLAW_URL;
     
-    const results: any = { paperclip: 'offline', openclaw: 'offline' };
+    const results: any = { 
+      paperclip: 'offline', 
+      openclaw: 'offline',
+      diagnostics: {} 
+    };
     
     try {
       if (paperclipUrl) {
-         const res = await fetch(`${paperclipUrl}/api/health`, { method: 'GET' }).catch(() => null);
-         if (res && res.ok) results.paperclip = 'online';
+         try {
+           const res = await fetch(`${paperclipUrl}/api/health`, { method: 'GET' });
+           if (res.ok) {
+             results.paperclip = 'online';
+           } else if (res.status === 503) {
+             results.paperclip = 'deploying';
+             results.diagnostics.paperclip = "Railway está construyendo el contenedor...";
+           }
+         } catch (e) {
+           results.diagnostics.paperclip = "Error de conexión. Verifica la URL y el Start Command.";
+         }
       }
       if (openclawUrl) {
-         const res = await fetch(`${openclawUrl}/api/health`, { method: 'GET' }).catch(() => null);
-         if (res && res.ok) results.openclaw = 'online';
+         try {
+           const res = await fetch(`${openclawUrl}/api/health`, { method: 'GET' });
+           if (res.ok) {
+             results.openclaw = 'online';
+           } else if (res.status === 503) {
+             results.openclaw = 'deploying';
+             results.diagnostics.openclaw = "Railway está construyendo el contenedor...";
+           }
+         } catch (e) {
+           results.diagnostics.openclaw = "Sin respuesta. Verifica Nixpacks y el Healthcheck Path.";
+         }
       }
     } catch (e) {
       console.error("Health check error:", e);
