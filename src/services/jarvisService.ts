@@ -621,8 +621,8 @@ export const jarvisBrain = {
           results.diagnostics[serviceName] = "Timeout: El servidor no responde. Probablemente Railway sigue en fase de 'Deployment'.";
           results[serviceName] = 'deploying';
         } else {
-          // Diagnóstico refinado para el bucle de Dockerfile/Metal Builder
-          results.diagnostics[serviceName] = "⚠️ ERROR DE BUILD: Railway sigue intentando usar Docker. RECOMENDACIÓN: Ve a SETTINGS -> BUILD, APAGA 'Metal Build Environment' y asegúrate de que el 'Dockerfile Path' esté VACÍO.";
+          // Diagnóstico para error de binario no encontrado en Docker
+          results.diagnostics[serviceName] = "⚠️ ERROR DE ARRANQUE: El comando 'gateway' no se encuentra en el contenedor. SOLUCIÓN: Borra el START COMMAND en Railway (déjalo VACÍO) para usar el comando por defecto de la imagen.";
           results[serviceName] = 'offline';
         }
       }
