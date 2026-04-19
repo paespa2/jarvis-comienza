@@ -621,7 +621,8 @@ export const jarvisBrain = {
           results.diagnostics[serviceName] = "Timeout: El servidor no responde. Probablemente Railway sigue en fase de 'Deployment'.";
           results[serviceName] = 'deploying';
         } else {
-          results.diagnostics[serviceName] = "⚠️ ERROR CRÍTICO: El comando de inicio podría estar mal. Asegúrate de que 'npx openclaw gateway' esté en el START COMMAND y no en el Build Command.";
+          // Diagnóstico refinado para el bucle de Dockerfile/Metal Builder
+          results.diagnostics[serviceName] = "⚠️ ERROR DE BUILD: Railway sigue intentando usar Docker. RECOMENDACIÓN: Ve a SETTINGS -> BUILD, APAGA 'Metal Build Environment' y asegúrate de que el 'Dockerfile Path' esté VACÍO.";
           results[serviceName] = 'offline';
         }
       }
