@@ -591,6 +591,29 @@ export const jarvisBrain = {
     return typeof res === 'object' ? res.text : res;
   },
 
+  async checkExternalServiceHealth() {
+    const meta = import.meta as any;
+    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL;
+    const openclawUrl = meta.env.VITE_OPENCLAW_URL;
+    
+    const results: any = { paperclip: 'offline', openclaw: 'offline' };
+    
+    try {
+      if (paperclipUrl) {
+         const res = await fetch(`${paperclipUrl}/api/health`, { method: 'GET' }).catch(() => null);
+         if (res && res.ok) results.paperclip = 'online';
+      }
+      if (openclawUrl) {
+         const res = await fetch(`${openclawUrl}/api/health`, { method: 'GET' }).catch(() => null);
+         if (res && res.ok) results.openclaw = 'online';
+      }
+    } catch (e) {
+      console.error("Health check error:", e);
+    }
+    
+    return results;
+  },
+
   async *autonomousAgentTrigger(goal: string, maxIterations = 5) {
     yield `🧠 **[INICIANDO MICROMOTOR OPENCLAW]**\nObjetivo Estratégico: *${goal}*\nDelegación Paperclip: ACTIVA\n\n`;
     let context = `Objetivo principal: ${goal}\n`;

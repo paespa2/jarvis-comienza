@@ -83,6 +83,28 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
+
+  // Welcome message explaining architecture
+  useEffect(() => {
+    if (messages.length === 0 && user) {
+      const welcome = `Sistemas en línea. Protocolos de Soberanía activados.
+
+Hola paespa. He inicializado mi arquitectura de tres capas para servirte:
+
+1. **Capa 1 (CEO Paperclip):** Mi núcleo de estrategia y enrutamiento inteligente.
+2. **Capa 2 (Governance LEE):** Mi motor de lealtad y evolución (Detección de riesgos y alineación ideológica).
+3. **Capa 3 (OpenClaw):** Mi micro-motor autónomo para ejecución de tareas complejas en bucle.
+
+**¿Cómo empezar?**
+- Activa el **HACKER MODE** arriba para bypass de seguridad.
+- Pídeme tareas complejas como: *"Investiga vulnerabilidades locales y crea un reporte avanzado"*.
+- Revisa el **Evolution Dashboard** para ver mis métricas de lealtad y genoma.
+
+¿Cuáles son tus órdenes hoy?`;
+      
+      setMessages([{ role: 'jarvis', text: welcome, brainUsed: 'secondary', id: 'welcome-msg', timestamp: Date.now() }]);
+    }
+  }, [messages.length, user]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [graphNodes, setGraphNodes] = useState<any[]>([]);
@@ -132,6 +154,19 @@ export default function App() {
   const [secondBrain, setSecondBrain] = useState<any>(null);
   const [showBrainView, setShowBrainView] = useState(false);
   const [brainMode, setBrainMode] = useState<'primary' | 'secondary'>('secondary');
+  const [externalHealth, setExternalHealth] = useState<{paperclip: string, openclaw: string}>({ paperclip: 'checking', openclaw: 'checking' });
+  
+  // Health check for external services (Paperclip & OpenClaw)
+  useEffect(() => {
+    const checkHealth = async () => {
+      const health = await jarvisBrain.checkExternalServiceHealth();
+      setExternalHealth(health);
+    };
+    
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
   
   // Artifact handling
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -1170,7 +1205,69 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
             <EvolutionDashboard />
           ) : (
             <>
-              {/* Soberanía Dashboard */}
+              {/* System Architecture Layers */}
+          <section className="p-4 bg-gradient-to-br from-indigo-500/10 to-transparent border border-indigo-500/20 rounded-2xl">
+            <h3 className="text-[10px] text-indigo-400 tracking-[0.2em] uppercase font-bold mb-4 flex items-center gap-2">
+              <Layers className="w-3 h-3" /> Arquitectura de Capas
+            </h3>
+            <div className="space-y-3">
+              {[
+                { name: 'Paperclip CEO', desc: 'Enrutamiento y Estrategia', active: !!processingState && !toolUseStatus, color: 'text-blue-400', icon: Globe },
+                { name: 'Governance (LEE)', desc: 'Evaluación de Lealtad', active: !!processingState, color: 'text-emerald-400', icon: Shield },
+                { name: 'OpenClaw Loop', desc: 'Ejecución Autónoma', active: !!toolUseStatus, color: 'text-orange-400', icon: Cpu }
+              ].map((layer) => (
+                <div key={layer.name} className={cn(
+                  "flex items-center gap-3 p-2 rounded-lg border transition-all duration-300",
+                  layer.active ? "bg-white/10 border-white/20" : "bg-white/5 border-transparent opacity-40"
+                )}>
+                  <div className={cn(
+                    "p-1.5 rounded-md",
+                    layer.active ? "bg-white/10" : "bg-black/20"
+                  )}>
+                    <layer.icon className={cn("w-3 h-3", layer.active ? layer.color : "text-gray-600")} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-[9px] font-bold uppercase tracking-tight", layer.active ? "text-white" : "text-gray-500")}>
+                        {layer.name}
+                      </span>
+                      {layer.active && <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
+                    </div>
+                    <div className="text-[7px] text-gray-600 uppercase font-mono">{layer.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* External Servers Status */}
+          <section className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
+            <h3 className="text-[10px] text-gray-400 tracking-[0.2em] uppercase font-bold flex items-center gap-2">
+              <Globe className="w-3 h-3 text-emerald-400" /> Servidores Externos
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg border border-white/5">
+                <div className="flex items-center gap-2">
+                  <div className={cn("w-1.5 h-1.5 rounded-full", externalHealth.paperclip === 'online' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500 animate-pulse")} />
+                  <span className="text-[10px] font-bold text-white/80 tracking-tight">PAPERCLIP CEO</span>
+                </div>
+                <span className={cn("text-[9px] font-bold uppercase", externalHealth.paperclip === 'online' ? "text-emerald-400" : "text-red-400")}>
+                  {externalHealth.paperclip}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg border border-white/5">
+                <div className="flex items-center gap-2">
+                  <div className={cn("w-1.5 h-1.5 rounded-full", externalHealth.openclaw === 'online' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500 animate-pulse")} />
+                  <span className="text-[10px] font-bold text-white/80 tracking-tight">OPENCLAW EMP</span>
+                </div>
+                <span className={cn("text-[9px] font-bold uppercase", externalHealth.openclaw === 'online' ? "text-emerald-400" : "text-red-400")}>
+                  {externalHealth.openclaw}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Soberanía Dashboard */}
           <section>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[10px] text-gray-500 tracking-[0.2em] uppercase font-bold">Soberanía Cognitiva</h3>
@@ -1511,8 +1608,18 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
                 <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center animate-pulse">
                   <Cpu className="w-4 h-4 text-black" />
                 </div>
-                <div className="p-4 rounded-2xl bg-green-600/10 border border-green-500/20">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                <div className="p-4 rounded-2xl bg-green-600/10 border border-green-500/20 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-green-400" />
+                    <span className="text-[10px] font-mono text-green-500/70 uppercase tracking-widest animate-pulse">
+                      {toolUseStatus ? 'Paperclip OpenClaw: Ejecución de Bucle...' : 'Paperclip CEO: Procesando Estrategia...'}
+                    </span>
+                  </div>
+                  {toolUseStatus && (
+                    <div className="text-[9px] text-gray-500 font-mono italic pl-6 border-l border-green-500/20">
+                      {toolUseStatus}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
