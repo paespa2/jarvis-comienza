@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getDatabase } from 'firebase/database';
 import { 
   getFirestore, 
   collection, 
@@ -22,6 +23,7 @@ import firebaseConfig from '../firebase-applet-config.json';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const rtdb = getDatabase(app, (import.meta as any).env?.VITE_FIREBASE_DB_URL || "https://asistente-jarvis-1741893602789-default-rtdb.firebaseio.com/");
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

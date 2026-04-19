@@ -40,6 +40,8 @@ async function startServer() {
   app.use(cors());
   
   // Proxy for OpenClaw (Handles both HTTP and WebSockets)
+  const OPENCLAW_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN;
+
   if (REMOTE_OPENCLAW) {
     const openclawProxy = createProxyMiddleware({
       target: REMOTE_OPENCLAW,
@@ -50,8 +52,17 @@ async function startServer() {
       },
       on: {
         proxyReq: (proxyReq, req, res) => {
-          // Inyectar el token si no viene en los params (opcional, seguridad Jarvis)
           proxyReq.setHeader('Origin', REMOTE_OPENCLAW);
+          // Inyectar token de acceso si está configurado en el env
+          if (OPENCLAW_TOKEN) {
+            proxyReq.setHeader('Authorization', `Bearer ${OPENCLAW_TOKEN}`);
+          }
+        },
+        proxyReqWs: (proxyReq, req, socket, options, head) => {
+          // Para WebSockets del micro-motor
+          if (OPENCLAW_TOKEN) {
+            proxyReq.setHeader('Authorization', `Bearer ${OPENCLAW_TOKEN}`);
+          }
         },
         error: (err, req, res) => {
           console.error('[Proxy OpenClaw] Error:', err);
