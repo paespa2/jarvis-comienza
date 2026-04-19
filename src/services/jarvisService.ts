@@ -593,8 +593,8 @@ export const jarvisBrain = {
 
   async checkExternalServiceHealth() {
     const meta = import.meta as any;
-    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL;
-    const openclawUrl = meta.env.VITE_OPENCLAW_URL;
+    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://openclaw-jarvis-ia.up.railway.app';
+    const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
     
     const results: any = { 
       paperclip: 'offline', 
@@ -602,36 +602,35 @@ export const jarvisBrain = {
       diagnostics: {} 
     };
     
-    try {
-      if (paperclipUrl) {
-         try {
-           const res = await fetch(`${paperclipUrl}/api/health`, { method: 'GET' });
-           if (res.ok) {
-             results.paperclip = 'online';
-           } else if (res.status === 503) {
-             results.paperclip = 'deploying';
-             results.diagnostics.paperclip = "Railway está construyendo el contenedor...";
-           }
-         } catch (e) {
-           results.diagnostics.paperclip = "Error de conexión. Verifica la URL y el Start Command.";
-         }
+    const checkService = async (serviceName: 'paperclip' | 'openclaw', url: string) => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        // Intentar primero el root (/) antes que /api/health
+        const res = await fetch(url, { 
+          method: 'GET',
+          mode: 'no-cors',
+          signal: controller.signal 
+        });
+        
+        clearTimeout(timeoutId);
+        results[serviceName] = 'online';
+      } catch (e: any) {
+        if (e.name === 'AbortError') {
+          results.diagnostics[serviceName] = "Timeout: El servidor no responde. Probablemente Railway sigue en fase de 'Deployment'.";
+          results[serviceName] = 'deploying';
+        } else {
+          results.diagnostics[serviceName] = "⚠️ ERROR CRÍTICO: El comando de inicio podría estar mal. Asegúrate de que 'npx openclaw gateway' esté en el START COMMAND y no en el Build Command.";
+          results[serviceName] = 'offline';
+        }
       }
-      if (openclawUrl) {
-         try {
-           const res = await fetch(`${openclawUrl}/api/health`, { method: 'GET' });
-           if (res.ok) {
-             results.openclaw = 'online';
-           } else if (res.status === 503) {
-             results.openclaw = 'deploying';
-             results.diagnostics.openclaw = "Railway está construyendo el contenedor...";
-           }
-         } catch (e) {
-           results.diagnostics.openclaw = "Sin respuesta. Verifica Nixpacks y el Healthcheck Path.";
-         }
-      }
-    } catch (e) {
-      console.error("Health check error:", e);
-    }
+    };
+
+    await Promise.all([
+      checkService('paperclip', paperclipUrl),
+      checkService('openclaw', openclawUrl)
+    ]);
     
     return results;
   },
