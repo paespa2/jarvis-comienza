@@ -665,6 +665,7 @@ export const jarvisBrain = {
       
       const planPrompt = `Eres el Micro-Motor OpenClaw de Jarvis.
 Propósito: Ejecutar tareas de forma autónoma con alineación Paperclip.
+CONFIGURACIÓN: Usar motor de pensamiento GOOGLE/GEMINI.
 Historial y Estado actual:
 ${context}
 
