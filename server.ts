@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import * as dotenv from "dotenv";
 import LoyaltyEvaluator, { Action, LoyaltyEvaluation, AgentGenome } from "./src/brain/loyaltyEvaluator";
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 import multer from "multer";
 
@@ -32,32 +33,47 @@ async function startServer() {
   });
   const upload = multer({ storage });
 
-  app.use(cors());
-  app.use(express.json());
-
   // === REMOTE CAPABILITIES MANAGER ===
   const REMOTE_PAPERCLIP = process.env.VITE_PAPERCLIP_URL || process.env.PAPERCLIP_URL;
   const REMOTE_OPENCLAW = process.env.VITE_OPENCLAW_URL || process.env.OPENCLAW_URL;
 
-  // Proxy genérico para evitar CORS y centralizar auth
-  app.all("/api/external-proxy", async (req, res) => {
-    const { target, path: targetPath, method, body } = req.body;
-    const baseUrl = target === 'paperclip' ? REMOTE_PAPERCLIP : REMOTE_OPENCLAW;
-    
-    if (!baseUrl) return res.status(400).json({ error: `Servidor ${target} no configurado.` });
-    
-    try {
-      const response = await fetch(`${baseUrl}${targetPath}`, {
-        method: method || 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-      });
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (e: any) {
-      res.status(500).json({ error: `Error proxying to ${target}: ${e.message}` });
-    }
-  });
+  app.use(cors());
+  
+  // Proxy for OpenClaw (Handles both HTTP and WebSockets)
+  if (REMOTE_OPENCLAW) {
+    const openclawProxy = createProxyMiddleware({
+      target: REMOTE_OPENCLAW,
+      changeOrigin: true,
+      ws: true,
+      pathRewrite: {
+        '^/openclaw-proxy': '',
+      },
+      on: {
+        proxyReq: (proxyReq, req, res) => {
+          // Inyectar el token si no viene en los params (opcional, seguridad Jarvis)
+          proxyReq.setHeader('Origin', REMOTE_OPENCLAW);
+        },
+        error: (err, req, res) => {
+          console.error('[Proxy OpenClaw] Error:', err);
+        }
+      }
+    });
+
+    app.use('/openclaw-proxy', openclawProxy);
+  }
+
+  // Proxy for Paperclip
+  if (REMOTE_PAPERCLIP) {
+    app.use('/paperclip-proxy', createProxyMiddleware({
+      target: REMOTE_PAPERCLIP,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/paperclip-proxy': '',
+      },
+    }));
+  }
+
+  app.use(express.json());
 
   // Healthcheck básico para Railway
   app.get("/health", (req, res) => {

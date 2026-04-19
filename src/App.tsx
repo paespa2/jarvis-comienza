@@ -1248,75 +1248,86 @@ Confirma la recepción y pregunta qué acción tomar con este archivo.`;
           </section>
 
           {/* External Servers Status */}
-          <section className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
+          <section className="p-4 hardware-panel rounded-lg space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] text-gray-400 tracking-[0.2em] uppercase font-bold flex items-center gap-2">
-                <Globe className="w-3 h-3 text-emerald-400" /> Servidores Externos
+              <h3 className="text-[10px] text-emerald-500/70 tracking-[0.2em] uppercase font-mono flex items-center gap-2">
+                <Globe className="w-3.5 h-3.5" /> // INFRA_DRIVERS
               </h3>
               <button 
                 onClick={refreshHealth}
                 disabled={isRefreshingHealth}
                 className={cn(
-                  "p-1 hover:bg-white/10 rounded transition-all",
+                  "p-1.5 hover:bg-emerald-500/10 rounded-sm border border-transparent hover:border-emerald-500/20 transition-all",
                   isRefreshingHealth && "animate-spin opacity-50"
                 )}
               >
-                <RefreshCw className="w-2.5 h-2.5 text-gray-500" />
+                <RefreshCw className="w-2.5 h-2.5 text-emerald-500/50" />
               </button>
             </div>
-            <div className="space-y-2">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg border border-white/5">
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "w-1.5 h-1.5 rounded-full", 
-                      externalHealth.paperclip === 'online' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
-                      externalHealth.paperclip === 'deploying' ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" :
-                      "bg-red-500 animate-pulse"
-                    )} />
-                    <span className="text-[10px] font-bold text-white/80 tracking-tight">PAPERCLIP CEO</span>
-                  </div>
+            
+            <div className="grid grid-cols-1 gap-px bg-white/5 overflow-hidden font-mono text-[9px]">
+              <div className="p-3 flex flex-col gap-1.5 hover:bg-white/5 transition-colors group relative border-b border-white/5">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/30 uppercase tracking-[0.1em]">NODE_01: PAPERCLIP</span>
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    externalHealth.paperclip === 'online' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
+                    externalHealth.paperclip === 'deploying' ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" :
+                    "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+                  )} />
+                </div>
+                <div className="flex items-baseline gap-2">
                   <span className={cn(
-                    "text-[9px] font-bold uppercase", 
+                    "text-lg font-light tracking-tighter uppercase italic selection:bg-emerald-500/30",
                     externalHealth.paperclip === 'online' ? "text-emerald-400" : 
                     externalHealth.paperclip === 'deploying' ? "text-amber-400" :
-                    "text-red-400"
+                    "text-rose-400"
                   )}>
                     {externalHealth.paperclip}
                   </span>
+                  <span className="text-[7px] opacity-20 uppercase">Core/V1.1</span>
                 </div>
                 {externalHealth.diagnostics?.paperclip && externalHealth.paperclip !== 'online' && (
-                  <span className="text-[8px] text-amber-500/80 px-1 leading-tight italic">
+                  <p className="text-[8px] text-amber-500/50 leading-tight italic pt-1">
                     {externalHealth.diagnostics.paperclip}
-                  </span>
+                  </p>
                 )}
               </div>
 
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg border border-white/5">
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "w-1.5 h-1.5 rounded-full", 
-                      externalHealth.openclaw === 'online' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
-                      externalHealth.openclaw === 'deploying' ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" :
-                      "bg-red-500 animate-pulse"
-                    )} />
-                    <span className="text-[10px] font-bold text-white/80 tracking-tight">OPENCLAW EMP</span>
-                  </div>
+              <div className="p-3 flex flex-col gap-1.5 hover:bg-white/5 transition-colors group relative">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/30 uppercase tracking-[0.1em]">NODE_02: OPENCLAW [TUNNEL]</span>
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    externalHealth.openclaw === 'online' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
+                    externalHealth.openclaw === 'deploying' ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" :
+                    "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+                  )} />
+                </div>
+                <div className="flex items-baseline gap-2">
                   <span className={cn(
-                    "text-[9px] font-bold uppercase", 
+                    "text-lg font-light tracking-tighter uppercase italic selection:bg-emerald-500/30",
                     externalHealth.openclaw === 'online' ? "text-emerald-400" : 
                     externalHealth.openclaw === 'deploying' ? "text-amber-400" :
-                    "text-red-400"
+                    "text-rose-400"
                   )}>
                     {externalHealth.openclaw}
                   </span>
+                  <span className="text-[7px] opacity-20 uppercase">Port/18789</span>
                 </div>
-                {externalHealth.diagnostics?.openclaw && externalHealth.openclaw !== 'online' && (
-                  <span className="text-[8px] text-amber-500/80 px-1 leading-tight italic">
-                    {externalHealth.diagnostics.openclaw}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <button 
+                    onClick={() => window.open('/openclaw-proxy/', '_blank')}
+                    className="text-[8px] px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-sm transition-all"
+                  >
+                    ABRIR TUNEL INFRA_G
+                  </button>
+                  {externalHealth.diagnostics?.openclaw && externalHealth.openclaw !== 'online' && (
+                    <p className="text-[8px] text-amber-500/50 leading-tight italic truncate max-w-[100px]">
+                      {externalHealth.diagnostics.openclaw}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </section>

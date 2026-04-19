@@ -6,26 +6,35 @@
 }
 
 :root {
-  --bg: #050505;
-  --accent: #00FF00; /* Neon Green for Jarvis */
-  --card: #121212;
-  --border: rgba(255, 255, 255, 0.1);
+  --bg-color: #0A0A0A;
+  --card-bg: #151619;
+  --accent: #10B981; /* Emerald for a more professional technical feel */
+  --text-primary: #FFFFFF;
+  --text-secondary: #8E9299;
+  --border: rgba(255, 255, 255, 0.05);
+  --line-dashed: rgba(255, 255, 255, 0.1);
 }
 
 body {
-  background-color: var(--bg);
-  color: #fff;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  letter-spacing: -0.01em;
 }
 
 .jarvis-card {
-  background: var(--card);
+  background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
+}
+
+.hardware-panel {
+  border: 1px dashed var(--line-dashed);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .jarvis-glow {
-  box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
 }
 
 .jarvis-scanline {

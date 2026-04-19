@@ -593,9 +593,8 @@ export const jarvisBrain = {
 
   async checkExternalServiceHealth() {
     const meta = import.meta as any;
-    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://openclaw-jarvis-ia.up.railway.app';
+    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://paperclip-jarvis-ia.up.railway.app';
     const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
-    // Nota: El tráfico llega por HTTPS (443) y Railway lo mapea internamente al 18789.
     
     const results: any = { 
       paperclip: 'offline', 
@@ -604,11 +603,23 @@ export const jarvisBrain = {
     };
     
     const checkService = async (serviceName: 'paperclip' | 'openclaw', url: string) => {
+      // Intentar primero vía TUNEL PROXY (Bunker Mode)
+      const proxyUrl = serviceName === 'paperclip' ? '/paperclip-proxy/health' : '/openclaw-proxy/health';
+      
+      try {
+        const proxyRes = await fetch(proxyUrl);
+        if (proxyRes.ok) {
+          results[serviceName] = 'online';
+          results.diagnostics[serviceName] = "TUNNEL ACTIVE: Conexión segura vía Jarvis Backend (Bunker Mode).";
+          return;
+        }
+      } catch (e) {}
+
+      // Fallback a conexión directa
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         
-        // Intentar primero el root (/) antes que /api/health
         const res = await fetch(url, { 
           method: 'GET',
           mode: 'no-cors',
@@ -617,14 +628,13 @@ export const jarvisBrain = {
         
         clearTimeout(timeoutId);
         results[serviceName] = 'online';
-        results.diagnostics[serviceName] = "Sistemas operativos y sincronizados con el núcleo de Jarvis.";
+        results.diagnostics[serviceName] = "DIRECT CONNECT: Sincronización de pulso establecida.";
       } catch (e: any) {
         if (e.name === 'AbortError') {
-          results.diagnostics[serviceName] = "Timeout: El servidor no responde. Probablemente Railway sigue en fase de 'Deployment'.";
+          results.diagnostics[serviceName] = "TUNNEL TIMEOUT: Node in 'deploying' phase or cold start.";
           results[serviceName] = 'deploying';
         } else {
-          // Diagnóstico para error de binario no encontrado en Docker
-          results.diagnostics[serviceName] = "⚠️ ERROR DE ARRANQUE: El comando 'gateway' no se encuentra en el contenedor. SOLUCIÓN: Borra el START COMMAND en Railway (déjalo VACÍO) para usar el comando por defecto de la imagen.";
+          results.diagnostics[serviceName] = "TUNNEL OFFLINE: El servidor de Jarvis no puede alcanzar el nodo. Revisa el estado en Railway.";
           results[serviceName] = 'offline';
         }
       }
