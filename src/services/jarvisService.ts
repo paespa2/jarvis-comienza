@@ -593,8 +593,8 @@ export const jarvisBrain = {
 
   async checkExternalServiceHealth() {
     const meta = import.meta as any;
-    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://openclaw-jarvis-ia.up.railway.app';
-    const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
+    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://triumphant-hope-jarvis-ia.up.railway.app';
+    const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://triumphant-hope-jarvis-ia.up.railway.app';
     
     const results: any = { 
       paperclip: 'offline', 
@@ -616,6 +616,7 @@ export const jarvisBrain = {
         
         clearTimeout(timeoutId);
         results[serviceName] = 'online';
+        results.diagnostics[serviceName] = "Sistemas operativos y sincronizados con el núcleo de Jarvis.";
       } catch (e: any) {
         if (e.name === 'AbortError') {
           results.diagnostics[serviceName] = "Timeout: El servidor no responde. Probablemente Railway sigue en fase de 'Deployment'.";
