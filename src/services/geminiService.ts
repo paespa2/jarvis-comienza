@@ -153,38 +153,48 @@ export const geminiService = {
   },
 
   async generateResponse(input: string, systemInstruction: string, useSearch = false, model = "gemini-3.1-pro-preview", skipTools = false) {
-    return this.withRetry(async () => {
-      const tools: any[] = [];
-      if (!skipTools) {
-        tools.push({ functionDeclarations: JARVIS_TOOLS });
-      }
-      if (useSearch) {
-        tools.push({ googleSearch: {} });
-      }
+    try {
+      return await this.withRetry(async () => {
+        const tools: any[] = [];
+        if (!skipTools) {
+          tools.push({ functionDeclarations: JARVIS_TOOLS });
+        }
+        if (useSearch) {
+          tools.push({ googleSearch: {} });
+        }
 
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: [{ role: "user", parts: [{ text: input }] }],
-        config: {
-          systemInstruction: systemInstruction,
-          tools: tools.length > 0 ? tools : undefined,
-          toolConfig: useSearch ? { includeServerSideToolInvocations: true } : undefined
-        },
+        const response = await ai.models.generateContent({
+          model: model,
+          contents: [{ role: "user", parts: [{ text: input }] }],
+          config: {
+            systemInstruction: systemInstruction,
+            tools: tools.length > 0 ? tools : undefined,
+            toolConfig: (tools.length > 0 && useSearch) ? { includeServerSideToolInvocations: true } : undefined
+          },
+        });
+
+        return {
+          text: response.text || "Operación procesada con éxito. (Respuesta en blanco)",
+          functionCalls: response.functionCalls,
+          groundingMetadata: (response.candidates?.[0] as any)?.groundingMetadata
+        };
       });
-
-      return {
-        text: response.text || "Operación procesada con éxito. (Respuesta en blanco)",
-        functionCalls: response.functionCalls,
-        groundingMetadata: (response.candidates?.[0] as any)?.groundingMetadata
-      };
-    });
+    } catch (error: any) {
+      // Fallback automático a Flash si Pro falla por cuota (429) excesiva o límite 0
+      const errMsg = error.message || "";
+      if ((errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) && model === "gemini-3.1-pro-preview") {
+        console.warn("[Gemini Service] 🔄 Quota Pro agotada. Activando modo Recuperación (Flash)...");
+        return this.generateResponse(input, systemInstruction, useSearch, "gemini-3-flash-preview", skipTools);
+      }
+      throw error;
+    }
   },
 
   async extractIntent(input: string) {
     try {
       return await this.withRetry(async () => {
         const response = await ai.models.generateContent({
-          model: "gemini-3.1-flash",
+          model: "gemini-3-flash-preview",
           contents: [{ role: "user", parts: [{ text: `Eres el Clasificador de Intención de Jarvis (Capa 1). 
 Identifica la intención de la siguiente solicitud.
 
@@ -230,7 +240,7 @@ Responde SOLO con JSON válido (sin markdown):
     try {
       return await this.withRetry(async () => {
         const response = await ai.models.generateContent({
-          model: "gemini-3.1-flash",
+          model: "gemini-3-flash-preview",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
             responseMimeType: "application/json",

@@ -110,7 +110,7 @@ export const jarvisBrain = {
       // 7. Generar Respuesta (CEO Agent / Chat)
       console.log(`[Jarvis Brain] Generando respuesta (${mode})${isBackground ? ' [FONDO]' : ''}...`);
       // Si es background o modo secundario, forzar Flash para no quemar cuota de Pro
-      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3.1-flash" : "gemini-3.1-pro-preview";
+      const modelToUse = (isBackground || mode === 'secondary') ? "gemini-3-flash-preview" : "gemini-3.1-pro-preview";
       const response = await geminiService.generateResponse(augmentedInput, systemInstruction, needsSearch, modelToUse, isBackground);
 
       // 8. Manejar Tool Calls (Solo si no es background para evitar bucles)
@@ -593,8 +593,8 @@ export const jarvisBrain = {
 
   async checkExternalServiceHealth() {
     const meta = import.meta as any;
-    const paperclipUrl = meta.env.VITE_PAPERCLIP_URL || 'https://paperclip-jarvis-ia.up.railway.app';
-    const openclawUrl = meta.env.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
+    const paperclipUrl = meta.env?.VITE_PAPERCLIP_URL || 'https://paperclip-jarvis-ia.up.railway.app';
+    const openclawUrl = meta.env?.VITE_OPENCLAW_URL || 'https://openclaw-jarvis-ia.up.railway.app';
     
     const results: any = { 
       paperclip: 'offline', 
@@ -688,7 +688,7 @@ ACCION: [Nombrar_herramienta]
 EJECUCION: [Comando/Param]`;
 
       // Consult the lightweight model for planning
-      const planRes = await geminiService.generateResponse(planPrompt, "", false, "gemini-3.1-flash", true);
+      const planRes = await geminiService.generateResponse(planPrompt, "", false, "gemini-3-flash-preview", true);
       const planText = planRes.text || "";
 
       // Yield the thought process
