@@ -10,10 +10,10 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 
 # Copiar package files
-COPY package*.json ./
+COPY package.json ./
 
-# Instalar solo dependencias de producción
-RUN npm ci --only=production && npm cache clean --force
+# Instalar dependencias de producción
+RUN npm install --production && npm cache clean --force
 
 # Copiar código fuente
 COPY . .
