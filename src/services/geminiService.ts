@@ -1,7 +1,28 @@
-import { GoogleGenAI, Type } from "@google/genai";
+/**
+ * GEMINI SERVICE
+ *
+ * Integración con Google Gemini API
+ * Con manejo graceful de dependencias opcionales
+ */
 
-// Inicializar la IA de Google - Siguiendo guías de AI Studio para React (Vite)
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai: any = null;
+let googleGenAI: any = null;
+
+// Intenta cargar Google GenAI - es opcional
+try {
+  const imported = require("@google/genai");
+  googleGenAI = imported;
+  const GoogleGenAI = imported.GoogleGenAI;
+
+  if (process.env.GEMINI_API_KEY) {
+    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+} catch (error) {
+  console.warn(`⚠️  @google/genai no disponible - Gemini service desactivado`);
+  console.warn(`   Para habilitar: npm install @google/genai`);
+}
+
+const Type = googleGenAI?.Type || {};
 
 export interface ToolCall {
   name: string;
