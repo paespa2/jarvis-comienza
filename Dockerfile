@@ -9,11 +9,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
+# Invalidar caché anterior
+ARG CACHEBUST=1
+RUN echo "Building at $(date)"
+
 # Copiar package files
 COPY package.json ./
 
-# Instalar dependencias de producción
-RUN npm install --production && npm cache clean --force
+# Instalar todas las dependencias (necesarias para build)
+RUN npm install --legacy-peer-deps && npm cache clean --force
 
 # Copiar código fuente
 COPY . .
@@ -23,6 +27,9 @@ RUN npm run build
 
 # Verificar que build fue exitoso
 RUN test -f /app/dist/server.js || (echo "Build failed: dist/server.js not found" && exit 1)
+
+# Eliminar devDependencies después del build
+RUN npm prune --omit=dev
 
 # Exponer puerto
 EXPOSE 3000
