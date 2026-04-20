@@ -19,7 +19,10 @@ RUN npm install --production && npm cache clean --force
 COPY . .
 
 # Compilar TypeScript
-RUN npm run build || echo "Build completed"
+RUN npm run build
+
+# Verificar que build fue exitoso
+RUN test -f /app/dist/server.js || (echo "Build failed: dist/server.js not found" && exit 1)
 
 # Exponer puerto
 EXPOSE 3000

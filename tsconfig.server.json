@@ -13,11 +13,13 @@
     "moduleResolution": "node",
     "noImplicitAny": false,
     "allowJs": true,
-    "declaration": false
+    "declaration": false,
+    "allowSyntheticDefaultImports": true,
+    "ignoreDeprecations": "5.0"
   },
   "include": [
     "src/server.ts",
-    "src/integrations/**/*"
+    "src/integrations/**/*.ts"
   ],
   "exclude": [
     "node_modules",
