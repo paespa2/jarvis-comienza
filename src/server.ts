@@ -23,7 +23,7 @@ interface JarvisRequest {
 
 // Variables globales
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 let orchestrator: IntegrationOrchestrator;
@@ -50,7 +50,7 @@ async function initializeJarvis() {
   // Inicializar integraciones
   await orchestrator.initialize({
     api: {
-      port: parseInt(PORT as string),
+      port: PORT,
     },
     database: {
       type: 'sqlite',
@@ -404,7 +404,7 @@ async function startServer() {
     await initializeJarvis();
 
     // Iniciar servidor
-    app.listen(PORT, HOST as any, () => {
+    app.listen(PORT, HOST, () => {
       console.log(`✅ Servidor iniciado en http://${HOST}:${PORT}`);
       console.log(`📚 Documentación: http://${HOST}:${PORT}/api/docs`);
       console.log(`💓 Health check: http://${HOST}:${PORT}/health`);
