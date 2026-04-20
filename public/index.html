@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jarvis IA - Conversación Agentica</title>
+    <title>JARVIS IA - RETRO 80S INTERFACE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,99 +15,180 @@
         }
 
         :root {
-            --primary: #667eea;
-            --primary-dark: #764ba2;
-            --success: #48bb78;
-            --warning: #ecc94b;
-            --danger: #f56565;
-            --bg-dark: #0a0e27;
-            --bg-medium: #1a1f3a;
-            --bg-light: #252d48;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
-            --border: #3a3f54;
+            --neon-cyan: #00ffff;
+            --neon-magenta: #ff00ff;
+            --neon-orange: #ff6600;
+            --neon-pink: #ff1493;
+            --neon-purple: #9d00ff;
+            --neon-blue: #0080ff;
+            --dark-bg: #0a0e27;
+            --dark-bg-2: #1a1f3a;
+            --text-primary: #00ffff;
+            --text-secondary: #ff1493;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-medium) 100%);
-            color: var(--text-primary);
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(45deg, #0a0e27 25%, #1a1f3a 25%, #1a1f3a 50%, #0a0e27 50%, #0a0e27 75%, #1a1f3a 75%, #1a1f3a);
+            background-size: 40px 40px;
+            color: var(--neon-cyan);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
+        }
+
+        /* CRT EFFECT */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(255, 0, 255, 0.03),
+                rgba(255, 0, 255, 0.03) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.95; }
+            50% { opacity: 1; }
+            100% { opacity: 0.95; }
+        }
+
+        /* GLITCH EFFECT */
+        @keyframes glitch {
+            0%, 100% { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); transform: translate(0); }
+            20% { clip-path: polygon(0% 20%, 100% 0%, 100% 80%, 0% 100%); transform: translate(-2px, 2px); }
+            40% { clip-path: polygon(0% 50%, 100% 30%, 100% 70%, 0% 50%); transform: translate(2px, -2px); }
+            60% { clip-path: polygon(0% 0%, 100% 20%, 100% 100%, 0% 80%); transform: translate(-2px, -2px); }
+            80% { clip-path: polygon(0% 30%, 100% 0%, 100% 70%, 0% 100%); transform: translate(2px, 2px); }
         }
 
         .container {
             display: flex;
             height: 100vh;
+            position: relative;
+            z-index: 1;
         }
 
         /* SIDEBAR */
         .sidebar {
-            width: 280px;
-            background: var(--bg-dark);
-            border-right: 1px solid var(--border);
+            width: 320px;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1f3a 100%);
+            border-right: 3px solid var(--neon-cyan);
+            border-right-style: dashed;
             display: flex;
             flex-direction: column;
-            padding: 20px;
+            padding: 30px 20px;
             overflow-y: auto;
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.1), 0 0 40px rgba(0, 255, 255, 0.2);
         }
 
         .logo {
-            font-size: 1.5em;
-            font-weight: 700;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.2em;
+            color: var(--neon-cyan);
             margin-bottom: 30px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            text-align: center;
+            text-shadow: 0 0 10px var(--neon-cyan),
+                         0 0 20px var(--neon-magenta),
+                         0 0 30px var(--neon-cyan);
+            animation: pulse 2s ease-in-out infinite;
+            letter-spacing: 2px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-magenta), 0 0 30px var(--neon-cyan); }
+            50% { text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-magenta), 0 0 60px var(--neon-cyan); }
+        }
+
+        .system-info {
+            background: rgba(0, 255, 255, 0.05);
+            border: 2px solid var(--neon-cyan);
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0;
+            font-size: 0.8em;
+            line-height: 1.8;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+        }
+
+        .system-info div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .system-info-label {
+            color: var(--neon-magenta);
+            font-weight: bold;
         }
 
         .new-chat-btn {
             width: 100%;
-            padding: 12px 16px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            border-radius: 8px;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--neon-magenta), var(--neon-cyan));
+            color: #000;
+            border: 2px solid var(--neon-cyan);
             cursor: pointer;
-            font-weight: 600;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.6em;
+            font-weight: bold;
+            margin-bottom: 25px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px var(--neon-magenta),
+                       inset 0 0 10px rgba(255, 0, 255, 0.3);
         }
 
         .new-chat-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 0 20px var(--neon-magenta),
+                       0 0 30px var(--neon-cyan),
+                       inset 0 0 20px rgba(255, 0, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .new-chat-btn:active {
+            transform: scale(0.98);
         }
 
         .conversation-history {
             flex: 1;
             overflow-y: auto;
+            border: 2px dashed var(--neon-orange);
+            padding: 10px;
+            background: rgba(255, 102, 0, 0.02);
         }
 
         .conversation-item {
-            padding: 12px;
+            padding: 10px;
             margin-bottom: 8px;
-            background: var(--bg-medium);
-            border-radius: 8px;
+            background: rgba(255, 0, 255, 0.1);
+            border: 1px solid var(--neon-magenta);
             cursor: pointer;
-            font-size: 0.9em;
-            color: var(--text-secondary);
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
+            font-size: 0.75em;
+            color: var(--neon-cyan);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .conversation-item:hover {
-            background: var(--bg-light);
-            color: var(--text-primary);
-            border-color: var(--primary);
-        }
-
-        .conversation-item.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
+            background: rgba(255, 0, 255, 0.3);
+            box-shadow: 0 0 10px var(--neon-magenta);
+            transform: translateX(5px);
         }
 
         /* MAIN CHAT */
@@ -112,63 +196,75 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            background: radial-gradient(circle at 50% 50%, rgba(255, 0, 255, 0.05) 0%, transparent 100%);
         }
 
         .chat-header {
-            background: var(--bg-light);
-            border-bottom: 1px solid var(--border);
+            background: linear-gradient(90deg, rgba(0, 255, 255, 0.1) 0%, rgba(255, 0, 255, 0.1) 100%);
+            border-bottom: 3px solid var(--neon-cyan);
             padding: 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
         }
 
         .chat-header-title {
-            font-size: 1.2em;
-            font-weight: 600;
-            color: var(--primary);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1em;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan),
+                         0 0 20px var(--neon-magenta);
+            letter-spacing: 2px;
+            animation: glitch 2s infinite;
         }
 
         .chat-header-status {
             display: flex;
-            gap: 10px;
+            gap: 15px;
             align-items: center;
-            font-size: 0.9em;
+            font-size: 0.7em;
+            color: var(--neon-orange);
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        .status-indicator {
-            width: 10px;
-            height: 10px;
+        .status-dot {
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            background: var(--success);
-            animation: pulse 2s ease-in-out infinite;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan),
+                       inset 0 0 5px rgba(255, 255, 255, 0.5);
+            animation: blink 0.5s infinite;
         }
 
-        @keyframes pulse {
+        @keyframes blink {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.3; }
         }
 
         /* MESSAGES */
         .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 25px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px;
         }
 
         .message {
             display: flex;
-            gap: 12px;
-            animation: slideIn 0.3s ease;
+            gap: 15px;
+            animation: slideInUp 0.4s ease;
         }
 
-        @keyframes slideIn {
+        @keyframes slideInUp {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
@@ -181,204 +277,199 @@
         }
 
         .message-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--neon-cyan);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 700;
-            font-size: 0.9em;
+            font-size: 1.2em;
             flex-shrink: 0;
+            font-family: 'Press Start 2P', cursive;
+            background: rgba(0, 255, 255, 0.1);
         }
 
         .message-avatar.jarvis {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
+            border-color: var(--neon-magenta);
+            color: var(--neon-magenta);
+            box-shadow: 0 0 15px var(--neon-magenta),
+                       inset 0 0 10px rgba(255, 0, 255, 0.2);
         }
 
         .message-avatar.user {
-            background: var(--warning);
-            color: var(--bg-dark);
+            border-color: var(--neon-orange);
+            color: var(--neon-orange);
+            box-shadow: 0 0 15px var(--neon-orange),
+                       inset 0 0 10px rgba(255, 102, 0, 0.2);
         }
 
         .message-content {
-            max-width: 70%;
+            max-width: 60%;
             flex: 1;
-        }
-
-        .message.user .message-content {
-            text-align: right;
         }
 
         .message-bubble {
-            padding: 12px 16px;
-            border-radius: 12px;
-            line-height: 1.5;
+            padding: 15px;
+            border: 2px solid;
+            line-height: 1.6;
             word-wrap: break-word;
+            font-size: 0.85em;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .message.user .message-bubble {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border-radius: 12px 4px 12px 12px;
+            border-color: var(--neon-orange);
+            background: rgba(255, 102, 0, 0.1);
+            color: var(--neon-orange);
+            text-shadow: 0 0 5px var(--neon-orange);
+            border-left: 4px solid var(--neon-orange);
         }
 
         .message.jarvis .message-bubble {
-            background: var(--bg-light);
-            color: var(--text-primary);
-            border: 1px solid var(--border);
-            border-radius: 4px 12px 12px 12px;
+            border-color: var(--neon-magenta);
+            background: rgba(255, 0, 255, 0.1);
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+            border-left: 4px solid var(--neon-magenta);
         }
 
-        .message-meta {
-            font-size: 0.75em;
-            color: var(--text-secondary);
-            margin-top: 6px;
-            padding: 0 4px;
+        .message-time {
+            font-size: 0.65em;
+            color: var(--neon-orange);
+            margin-top: 5px;
+            font-family: 'Press Start 2P', cursive;
+            letter-spacing: 1px;
         }
 
-        .message.user .message-meta {
-            text-align: right;
-        }
-
-        /* AGENTIC LOOP VISUALIZATION */
+        /* AGENTIC VIZ */
         .agentic-viz {
-            background: var(--bg-light);
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 2px solid var(--neon-cyan);
             padding: 12px;
-            margin-top: 8px;
-            font-size: 0.85em;
-        }
-
-        .phase-stages {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 8px;
-        }
-
-        .phase-stage {
-            flex: 1;
-            height: 4px;
-            background: var(--bg-medium);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .phase-stage.active {
-            background: var(--primary);
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
-        }
-
-        .phase-stage.completed {
-            background: var(--success);
-        }
-
-        .phase-label {
-            color: var(--text-secondary);
-            font-weight: 600;
-        }
-
-        .iteration-info {
-            color: var(--primary);
-            font-weight: 600;
-            margin-top: 4px;
-        }
-
-        .constitution-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
+            margin-top: 10px;
             font-size: 0.75em;
-            font-weight: 600;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+            font-family: 'Courier New', monospace;
+        }
+
+        .phase-bar {
+            display: flex;
+            gap: 3px;
+            margin: 8px 0;
+            height: 6px;
+        }
+
+        .phase {
+            flex: 1;
+            background: rgba(255, 0, 255, 0.3);
+            border: 1px solid var(--neon-cyan);
+        }
+
+        .phase.active {
+            background: var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan);
+            animation: glow 0.5s infinite alternate;
+        }
+
+        .phase.completed {
+            background: var(--neon-magenta);
+            box-shadow: 0 0 10px var(--neon-magenta);
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px var(--neon-cyan); }
+            to { box-shadow: 0 0 20px var(--neon-cyan); }
+        }
+
+        .constitution-status {
             margin-top: 8px;
-        }
-
-        .constitution-badge.approved {
-            background: rgba(72, 187, 120, 0.2);
-            color: var(--success);
-            border: 1px solid var(--success);
-        }
-
-        .constitution-badge.pending {
-            background: rgba(236, 201, 75, 0.2);
-            color: var(--warning);
-            border: 1px solid var(--warning);
+            padding: 8px;
+            border: 2px dashed var(--neon-magenta);
+            color: var(--neon-magenta);
+            text-align: center;
+            font-weight: bold;
         }
 
         /* INPUT AREA */
         .input-area {
-            background: var(--bg-light);
-            border-top: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255, 0, 255, 0.1) 0%, rgba(0, 255, 255, 0.05) 100%);
+            border-top: 3px solid var(--neon-magenta);
             padding: 20px;
             display: flex;
-            gap: 12px;
+            gap: 10px;
+            box-shadow: inset 0 10px 20px rgba(255, 0, 255, 0.1);
         }
 
         .input-form {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             width: 100%;
         }
 
         .input-field {
             flex: 1;
-            background: var(--bg-medium);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 0.95em;
+            background: rgba(26, 31, 58, 0.8);
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 12px 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
             resize: none;
             max-height: 100px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.1),
+                       0 0 10px rgba(0, 255, 255, 0.2);
         }
 
         .input-field:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 15px rgba(102, 126, 234, 0.2);
+            border-color: var(--neon-magenta);
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2),
+                       0 0 20px rgba(255, 0, 255, 0.3);
+        }
+
+        .input-field::placeholder {
+            color: rgba(0, 255, 255, 0.5);
         }
 
         .send-btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, var(--neon-magenta), var(--neon-cyan));
+            color: #000;
+            border: 2px solid var(--neon-cyan);
+            width: 50px;
+            height: 50px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2em;
-            transition: all 0.3s ease;
+            font-size: 1.3em;
+            transition: all 0.2s;
+            font-family: 'Press Start 2P', cursive;
             flex-shrink: 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            box-shadow: 0 0 15px var(--neon-magenta),
+                       inset 0 0 10px rgba(255, 0, 255, 0.3);
         }
 
         .send-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 0 30px var(--neon-magenta),
+                       0 0 40px var(--neon-cyan),
+                       inset 0 0 20px rgba(255, 0, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        .send-btn:active {
+            transform: scale(0.95);
         }
 
         .send-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-        }
-
-        .loading-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid var(--primary);
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
 
         .empty-state {
@@ -387,51 +478,50 @@
             justify-content: center;
             height: 100%;
             flex-direction: column;
-            color: var(--text-secondary);
+            color: var(--neon-cyan);
             text-align: center;
+            font-family: 'Press Start 2P', cursive;
         }
 
         .empty-state-title {
             font-size: 1.5em;
-            margin-bottom: 10px;
-            color: var(--text-primary);
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px var(--neon-cyan),
+                         0 0 40px var(--neon-magenta);
+            letter-spacing: 3px;
         }
 
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 0;
-                position: absolute;
-                height: 100%;
-                z-index: 100;
-                transition: all 0.3s ease;
-            }
-
-            .sidebar.open {
-                width: 280px;
-            }
-
-            .message-content {
-                max-width: 90%;
-            }
+        .empty-state p {
+            color: var(--neon-magenta);
+            font-size: 0.5em;
+            letter-spacing: 2px;
+            line-height: 2;
         }
 
         /* SCROLLBAR */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 10px;
         }
 
         ::-webkit-scrollbar-track {
-            background: var(--bg-medium);
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid var(--neon-cyan);
         }
 
         ::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 4px;
+            background: linear-gradient(180deg, var(--neon-magenta), var(--neon-cyan));
+            border: 1px solid var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-magenta);
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary);
+            background: linear-gradient(180deg, var(--neon-cyan), var(--neon-magenta));
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .sidebar { width: 0; position: absolute; z-index: 100; height: 100%; }
+            .message-content { max-width: 90%; }
         }
     </style>
 </head>
@@ -439,43 +529,47 @@
     <div class="container">
         <!-- SIDEBAR -->
         <div class="sidebar">
-            <div class="logo">🧠 Jarvis IA</div>
-            <button class="new-chat-btn" onclick="newChat()">+ Nueva Conversación</button>
+            <div class="logo">⚡ J.A.R.V.I.S</div>
+
+            <div class="system-info">
+                <div><span class="system-info-label">SYS</span> ONLINE</div>
+                <div><span class="system-info-label">CPU</span> 99.9%</div>
+                <div><span class="system-info-label">RAM</span> 1024MB</div>
+                <div><span class="system-info-label">NET</span> ACTIVE</div>
+            </div>
+
+            <button class="new-chat-btn" onclick="newChat()">► NEW SESSION</button>
+
             <div class="conversation-history" id="conversationHistory"></div>
         </div>
 
         <!-- MAIN CHAT -->
         <div class="chat-container">
-            <!-- HEADER -->
             <div class="chat-header">
-                <div class="chat-header-title">Jarvis IA - Agente Agentico</div>
+                <div class="chat-header-title">⚡ JARVIS.AGENTIC.SYS ⚡</div>
                 <div class="chat-header-status">
-                    <span class="status-indicator"></span>
-                    <span>Sistema Operativo</span>
+                    <span class="status-dot"></span>
+                    <span>ONLINE</span>
                 </div>
             </div>
 
-            <!-- MESSAGES -->
             <div class="messages" id="messages">
                 <div class="empty-state">
-                    <div class="empty-state-title">🚀 Bienvenido a Jarvis IA</div>
-                    <p>Sistema de Inteligencia Artificial Completamente Agentico con Constitutional AI</p>
-                    <p style="margin-top: 20px; font-size: 0.9em; color: var(--text-secondary);">
-                        Comienza una conversación para activar el agentic loop real.
-                    </p>
+                    <div class="empty-state-title">► SYSTEM READY ◄</div>
+                    <p>AGENTIC AI INTERFACE v80.NEON</p>
+                    <p style="margin-top: 30px; color: var(--neon-orange);">INITIALIZE CONVERSATION...</p>
                 </div>
             </div>
 
-            <!-- INPUT -->
             <div class="input-area">
                 <form class="input-form" onsubmit="sendMessage(event)">
                     <textarea
                         class="input-field"
                         id="messageInput"
-                        placeholder="Cuéntale a Jarvis qué necesitas... (Shift+Enter para nueva línea)"
+                        placeholder="> ENTER COMMAND..."
                         rows="1"
                     ></textarea>
-                    <button type="submit" class="send-btn" id="sendBtn">📤</button>
+                    <button type="submit" class="send-btn" id="sendBtn">►</button>
                 </form>
             </div>
         </div>
@@ -484,15 +578,12 @@
     <script>
         const API = window.location.origin;
         let currentConversationId = null;
-        let messageCount = 0;
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             startNewConversation();
             setupInputHandlers();
         });
 
-        // Setup input handlers
         function setupInputHandlers() {
             const input = document.getElementById('messageInput');
             input.addEventListener('keydown', (e) => {
@@ -502,34 +593,28 @@
                 }
             });
 
-            // Auto-resize textarea
             input.addEventListener('input', () => {
                 input.style.height = 'auto';
                 input.style.height = Math.min(input.scrollHeight, 100) + 'px';
             });
         }
 
-        // New conversation
         function newChat() {
             startNewConversation();
         }
 
         function startNewConversation() {
             currentConversationId = `conv-${Date.now()}`;
-            messageCount = 0;
             document.getElementById('messages').innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-state-title">🧠 Jarvis IA Listo</div>
-                    <p>Conversación agentica iniciada</p>
-                    <p style="margin-top: 20px; font-size: 0.9em; color: var(--text-secondary);">
-                        Cuéntame qué necesitas. Usaré mi loop agentico completo para ayudarte.
-                    </p>
+                    <div class="empty-state-title">► SESSION INITIALIZED ◄</div>
+                    <p>AGENTIC CORE ACTIVATED</p>
+                    <p style="margin-top: 30px; color: var(--neon-orange);">AWAITING INPUT...</p>
                 </div>
             `;
             document.getElementById('messageInput').focus();
         }
 
-        // Send message
         async function sendMessage(e) {
             e.preventDefault();
 
@@ -538,55 +623,37 @@
 
             if (!message) return;
 
-            // Clear input
             input.value = '';
             input.style.height = 'auto';
 
-            // Add user message
             addMessage(message, 'user');
 
-            // Show loading
             const loadingId = `loading-${Date.now()}`;
-            addMessage(
-                `<span class="loading-indicator"></span> Ejecutando agentic loop...`,
-                'jarvis',
-                loadingId
-            );
+            addMessage(`⚡ PROCESSING AGENTIC LOOP...`, 'jarvis', loadingId);
 
             try {
-                // Execute task
                 const response = await fetch(`${API}/api/tasks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: message,
-                        priority: 'medium',
-                    }),
+                    body: JSON.stringify({ query: message, priority: 'medium' }),
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    // Remove loading
                     removeMessage(loadingId);
-
-                    // Poll for result
                     await pollTaskResult(data.data.id, message);
                 } else {
-                    updateMessage(loadingId, `Error: ${data.error}`);
+                    updateMessage(loadingId, `ERROR: ${data.error}`);
                 }
             } catch (error) {
-                updateMessage(loadingId, `Error de conexión: ${error.message}`);
+                updateMessage(loadingId, `ERROR: CONNECTION FAILED`);
             }
         }
 
-        // Poll task result
         async function pollTaskResult(taskId, originalQuery, attempts = 0) {
             if (attempts > 30) {
-                addMessage(
-                    'Timeout ejecutando tarea. Jarvis requiere más tiempo para este análisis.',
-                    'jarvis'
-                );
+                addMessage(`ERROR: TIMEOUT - PROCESSING EXCEEDED`, 'jarvis');
                 return;
             }
 
@@ -598,85 +665,73 @@
                     const task = data.data;
 
                     if (task.status === 'completed') {
-                        // Show result
                         let resultMessage = '';
 
-                        if (task.result) {
-                            resultMessage += `<strong>Resultado:</strong>\n${task.result.output}\n\n`;
+                        if (task.result?.output) {
+                            resultMessage += `${task.result.output}\n\n`;
                         }
 
                         if (task.result?.reasoning) {
-                            resultMessage += `<strong>Razonamiento:</strong>\n${task.result.reasoning}\n\n`;
+                            resultMessage += `💭 REASONING: ${task.result.reasoning}\n\n`;
                         }
 
-                        // Add agentic visualization
                         const vizHtml = buildAgenticViz(task);
                         resultMessage += vizHtml;
 
                         addMessage(resultMessage, 'jarvis', null, true);
                     } else if (task.status === 'processing') {
-                        // Continue polling
                         await new Promise(r => setTimeout(r, 1000));
                         await pollTaskResult(taskId, originalQuery, attempts + 1);
                     } else if (task.status === 'failed') {
-                        addMessage(
-                            `Error ejecutando tarea: ${task.error || 'Error desconocido'}`,
-                            'jarvis'
-                        );
+                        addMessage(`ERROR: ${task.error || 'UNKNOWN'}`, 'jarvis');
                     }
                 }
             } catch (error) {
-                console.error('Error polling:', error);
                 await new Promise(r => setTimeout(r, 1000));
                 await pollTaskResult(taskId, originalQuery, attempts + 1);
             }
         }
 
-        // Build agentic visualization
         function buildAgenticViz(task) {
             const result = task.result || {};
             const iterations = result.iterations || 0;
-            const approved = result.constitutionalValidation?.approved ? 'approved' : 'pending';
+            const approved = result.constitutionalValidation?.approved ? 'APPROVED' : 'PENDING';
 
             return `
                 <div class="agentic-viz">
-                    <div class="phase-label">⚡ Agentic Loop Execution</div>
-                    <div class="phase-stages">
-                        <div class="phase-stage completed"></div>
-                        <div class="phase-stage completed"></div>
-                        <div class="phase-stage completed"></div>
-                        <div class="phase-stage completed"></div>
+                    ⚡ AGENTIC LOOP EXECUTION ⚡
+                    <div class="phase-bar">
+                        <div class="phase completed"></div>
+                        <div class="phase completed"></div>
+                        <div class="phase completed"></div>
+                        <div class="phase active"></div>
                     </div>
-                    <div class="iteration-info">✓ ${iterations} iteraciones completadas</div>
-                    <div class="constitution-badge ${approved}">
-                        ${approved === 'approved' ? '✅ Constitutional AI Aprobado' : '⏳ Validando Constitución'}
+                    ✓ ${iterations} ITERATIONS COMPLETE
+                    <div class="constitution-status">
+                        ⚖️ CONSTITUTION: ${approved}
                     </div>
                 </div>
             `;
         }
 
-        // Add message to chat
         function addMessage(text, sender, id = null, isHtml = false) {
             const messagesDiv = document.getElementById('messages');
 
-            // Remove empty state if exists
             const emptyState = messagesDiv.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
+            if (emptyState) emptyState.remove();
 
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}`;
             messageDiv.id = id;
 
-            const avatar = sender === 'jarvis' ? '🧠' : '👤';
+            const avatar = sender === 'jarvis' ? '⚡' : '►';
             const avatarClass = sender === 'jarvis' ? 'jarvis' : 'user';
 
             messageDiv.innerHTML = `
                 <div class="message-avatar ${avatarClass}">${avatar}</div>
                 <div class="message-content">
                     <div class="message-bubble">${isHtml ? text : escapeHtml(text)}</div>
-                    <div class="message-meta">${new Date().toLocaleTimeString()}</div>
+                    <div class="message-time">${new Date().toLocaleTimeString()}</div>
                 </div>
             `;
 
@@ -684,26 +739,19 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
-        // Update message
         function updateMessage(id, text) {
             const el = document.getElementById(id);
             if (el) {
                 const bubble = el.querySelector('.message-bubble');
-                if (bubble) {
-                    bubble.textContent = text;
-                }
+                if (bubble) bubble.textContent = text;
             }
         }
 
-        // Remove message
         function removeMessage(id) {
             const el = document.getElementById(id);
-            if (el) {
-                el.remove();
-            }
+            if (el) el.remove();
         }
 
-        // Escape HTML
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
