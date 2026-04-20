@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS IA - PROFESSIONAL MILITARY INTERFACE</title>
+    <title>JARVIS IA - Agentic System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,184 +15,181 @@
         }
 
         :root {
-            --color-primary: #2c3e50;
-            --color-secondary: #34495e;
-            --color-accent: #3498db;
-            --color-success: #27ae60;
-            --color-warning: #e74c3c;
-            --color-text: #ecf0f1;
-            --color-text-secondary: #bdc3c7;
-            --color-bg-dark: #1a1f2e;
-            --color-bg-darker: #0f1219;
-            --color-border: #2c3e50;
-            --color-border-light: #34495e;
+            --bg-primary: #0a0e27;
+            --bg-secondary: #0f1419;
+            --bg-tertiary: #14192e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #9a9a9a;
+            --accent-primary: #00d4ff;
+            --accent-secondary: #10b981;
+            --accent-danger: #ef4444;
+            --border-color: #1e2841;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
         }
 
         body {
             font-family: 'Inter', 'Roboto Mono', monospace;
-            background-color: var(--color-bg-dark);
-            color: var(--color-text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
         }
 
         .container {
             display: flex;
             height: 100vh;
-            position: relative;
         }
 
         /* SIDEBAR */
         .sidebar {
-            width: 300px;
-            background-color: var(--color-bg-darker);
-            border-right: 1px solid var(--color-border);
+            width: 280px;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            padding: 20px;
+            padding: 24px 16px;
             overflow-y: auto;
+            box-shadow: inset 8px 0 16px rgba(0, 0, 0, 0.3);
         }
 
         .logo {
             font-family: 'Roboto Mono', monospace;
-            font-size: 1.1em;
-            color: var(--color-accent);
-            margin-bottom: 25px;
+            font-size: 14px;
+            color: var(--accent-primary);
+            margin-bottom: 32px;
             text-align: center;
             font-weight: 700;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
             text-transform: uppercase;
+            opacity: 0.95;
         }
 
-        .system-info {
-            background-color: var(--color-bg-dark);
-            border: 1px solid var(--color-border);
+        .system-status {
+            background-color: rgba(10, 14, 39, 0.6);
+            border: 1px solid var(--border-color);
             padding: 12px;
             margin-bottom: 20px;
-            font-size: 0.75em;
-            line-height: 1.8;
-            color: var(--color-text-secondary);
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            border-radius: 4px;
         }
 
-        .system-info div {
+        .status-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
+            align-items: center;
         }
 
-        .system-info-label {
-            color: var(--color-accent);
+        .status-label {
+            color: var(--accent-primary);
             font-weight: 600;
+            font-size: 11px;
+        }
+
+        .status-value {
+            color: var(--text-primary);
+            font-family: 'Roboto Mono';
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .new-chat-btn {
             width: 100%;
-            padding: 12px;
-            background-color: var(--color-accent);
-            color: var(--color-bg-darker);
-            border: 1px solid var(--color-accent);
+            padding: 10px 12px;
+            background-color: transparent;
+            color: var(--accent-primary);
+            border: 1px solid var(--accent-primary);
+            border-radius: 4px;
             cursor: pointer;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.75em;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 12px;
             font-weight: 600;
-            margin-bottom: 20px;
-            transition: all 0.2s ease;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
         }
 
         .new-chat-btn:hover {
-            background-color: #2980b9;
-            border-color: #2980b9;
+            background-color: rgba(0, 212, 255, 0.1);
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
         }
 
-        .new-chat-btn:active {
-            transform: scale(0.98);
-        }
-
-        .conversation-history {
+        /* MAIN CONTENT */
+        .main-content {
             flex: 1;
-            overflow-y: auto;
-            border: 1px solid var(--color-border);
-            padding: 10px;
-            background-color: var(--color-bg-dark);
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-primary);
         }
 
-        .conversation-item {
-            padding: 10px;
-            margin-bottom: 6px;
-            background-color: var(--color-bg-darker);
-            border: 1px solid var(--color-border);
-            cursor: pointer;
-            font-size: 0.7em;
-            color: var(--color-text-secondary);
-            transition: all 0.2s ease;
+        /* HEADER */
+        .header {
+            background: linear-gradient(90deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            color: var(--text-primary);
         }
 
-        .conversation-item:hover {
-            background-color: var(--color-bg-dark);
-            border-color: var(--color-accent);
-            color: var(--color-accent);
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
         }
 
-        /* MAIN CHAT */
+        .status-badge {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-secondary);
+        }
+
+        /* CHAT AREA */
         .chat-container {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background-color: var(--color-bg-dark);
+            overflow: hidden;
         }
 
-        .chat-header {
-            background-color: var(--color-bg-darker);
-            border-bottom: 1px solid var(--color-border);
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .chat-header-title {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.9em;
-            color: var(--color-accent);
-            letter-spacing: 1px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .chat-header-status {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            font-size: 0.65em;
-            color: var(--color-text-secondary);
-            font-family: 'Inter', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--color-success);
-            flex-shrink: 0;
-        }
-
-        /* MESSAGES */
         .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 16px;
         }
 
         .message {
@@ -212,206 +209,110 @@
             }
         }
 
-        .message.user {
-            flex-direction: row-reverse;
-        }
-
-        .message-avatar {
-            width: 36px;
-            height: 36px;
-            border: 1px solid var(--color-border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1em;
-            flex-shrink: 0;
-            font-family: 'Roboto Mono', monospace;
-            background-color: var(--color-bg-darker);
-            font-weight: 600;
-        }
-
-        .message-avatar.jarvis {
-            border-color: var(--color-accent);
-            color: var(--color-accent);
-        }
-
-        .message-avatar.user {
-            border-color: var(--color-success);
-            color: var(--color-success);
+        .message-icon {
+            font-size: 14px;
+            min-width: 20px;
+            text-align: center;
         }
 
         .message-content {
-            max-width: 60%;
             flex: 1;
-        }
-
-        .message-bubble {
-            padding: 12px;
-            border: 1px solid;
-            line-height: 1.5;
-            word-wrap: break-word;
-            font-size: 0.8em;
-            font-family: 'Roboto Mono', monospace;
-        }
-
-        .message.user .message-bubble {
-            border-color: var(--color-success);
-            background-color: rgba(39, 174, 96, 0.08);
-            color: var(--color-text);
-            border-left: 3px solid var(--color-success);
-        }
-
-        .message.jarvis .message-bubble {
-            border-color: var(--color-accent);
-            background-color: rgba(52, 152, 219, 0.08);
-            color: var(--color-text);
-            border-left: 3px solid var(--color-accent);
         }
 
         .message-time {
-            font-size: 0.65em;
-            color: var(--color-text-secondary);
-            margin-top: 4px;
-            font-family: 'Roboto Mono', monospace;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            font-family: 'Roboto Mono';
         }
 
-        /* AGENTIC VIZ */
-        .agentic-viz {
-            background-color: rgba(52, 152, 219, 0.08);
-            border: 1px solid var(--color-accent);
-            padding: 10px;
-            margin-top: 8px;
-            font-size: 0.7em;
-            color: var(--color-text-secondary);
-            font-family: 'Roboto Mono', monospace;
-            line-height: 1.6;
+        .message-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            word-wrap: break-word;
         }
 
-        .phase-bar {
-            display: flex;
-            gap: 2px;
-            margin: 6px 0;
-            height: 4px;
+        .message.user .message-text {
+            color: var(--accent-primary);
         }
 
-        .phase {
-            flex: 1;
-            background-color: var(--color-border);
-            border: none;
+        .message.system .message-text {
+            color: var(--accent-secondary);
         }
 
-        .phase.active {
-            background-color: var(--color-accent);
+        .message.error .message-text {
+            color: var(--accent-danger);
         }
 
-        .phase.completed {
-            background-color: var(--color-success);
-        }
-
-        .constitution-status {
-            margin-top: 6px;
-            padding: 6px;
-            border: 1px solid var(--color-accent);
-            color: var(--color-accent);
-            text-align: center;
-            font-weight: 600;
-            font-size: 0.75em;
+        .message.loading .message-text {
+            color: var(--text-secondary);
+            font-style: italic;
         }
 
         /* INPUT AREA */
-        .input-area {
-            background-color: var(--color-bg-darker);
-            border-top: 1px solid var(--color-border);
-            padding: 15px;
+        .input-container {
+            border-top: 1px solid var(--border-color);
+            padding: 16px 24px;
+            background-color: var(--bg-secondary);
             display: flex;
-            gap: 8px;
+            gap: 12px;
         }
 
-        .input-form {
-            display: flex;
-            gap: 8px;
-            width: 100%;
-        }
-
-        .input-field {
+        .input-wrapper {
             flex: 1;
-            background-color: var(--color-bg-dark);
-            border: 1px solid var(--color-border);
-            color: var(--color-text);
-            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            background-color: rgba(10, 14, 39, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0 12px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
+        }
+
+        #query-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
             font-family: 'Roboto Mono', monospace;
-            font-size: 0.8em;
-            resize: none;
-            max-height: 100px;
-            transition: all 0.2s ease;
-        }
-
-        .input-field:focus {
+            font-size: 13px;
+            padding: 10px 0;
             outline: none;
-            border-color: var(--color-accent);
-            background-color: var(--color-bg-dark);
         }
 
-        .input-field::placeholder {
-            color: var(--color-text-secondary);
+        #query-input::placeholder {
+            color: var(--text-secondary);
         }
 
         .send-btn {
-            background-color: var(--color-accent);
-            color: var(--color-bg-darker);
-            border: 1px solid var(--color-accent);
-            width: 44px;
-            height: 44px;
+            padding: 10px 14px;
+            background-color: transparent;
+            color: var(--accent-primary);
+            border: 1px solid var(--accent-primary);
+            border-radius: 4px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1em;
-            transition: all 0.2s ease;
             font-family: 'Roboto Mono', monospace;
-            flex-shrink: 0;
+            font-size: 12px;
             font-weight: 600;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
         }
 
         .send-btn:hover:not(:disabled) {
-            background-color: #2980b9;
-            border-color: #2980b9;
-        }
-
-        .send-btn:active {
-            transform: scale(0.95);
+            background-color: rgba(0, 212, 255, 0.15);
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
         }
 
         .send-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-        }
-
-        .empty-state {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            flex-direction: column;
-            color: var(--color-text-secondary);
-            text-align: center;
-            font-family: 'Roboto Mono', monospace;
-        }
-
-        .empty-state-title {
-            font-size: 1.2em;
-            margin-bottom: 15px;
-            color: var(--color-accent);
-            letter-spacing: 1px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .empty-state p {
-            color: var(--color-text-secondary);
-            font-size: 0.8em;
-            letter-spacing: 0.5px;
-            line-height: 1.6;
         }
 
         /* SCROLLBAR */
@@ -420,23 +321,35 @@
         }
 
         ::-webkit-scrollbar-track {
-            background-color: var(--color-bg-dark);
-            border: 1px solid var(--color-border);
+            background: var(--bg-primary);
         }
 
         ::-webkit-scrollbar-thumb {
-            background-color: var(--color-border);
-            border: 1px solid var(--color-border-light);
+            background: var(--border-color);
+            border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background-color: var(--color-accent);
+            background: var(--text-secondary);
         }
 
         /* RESPONSIVE */
         @media (max-width: 768px) {
-            .sidebar { width: 0; position: absolute; z-index: 100; height: 100%; }
-            .message-content { max-width: 90%; }
+            .sidebar {
+                display: none;
+            }
+
+            .header {
+                padding: 12px 16px;
+            }
+
+            .messages {
+                padding: 16px;
+            }
+
+            .input-container {
+                padding: 12px 16px;
+            }
         }
     </style>
 </head>
@@ -446,225 +359,121 @@
         <div class="sidebar">
             <div class="logo">◆ JARVIS IA</div>
 
-            <div class="system-info">
-                <div><span class="system-info-label">STATUS</span> ONLINE</div>
-                <div><span class="system-info-label">CPU</span> 45%</div>
-                <div><span class="system-info-label">RAM</span> 512MB</div>
-                <div><span class="system-info-label">NETWORK</span> ACTIVE</div>
+            <div class="system-status">
+                <div class="status-item">
+                    <span class="status-label">STATUS</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <div class="status-indicator"></div>
+                        <span class="status-value">OPERATIONAL</span>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">VERSION</span>
+                    <span class="status-value">2.0.0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">MODE</span>
+                    <span class="status-value">AGENTIC</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">PHASE</span>
+                    <span class="status-value">2</span>
+                </div>
             </div>
 
-            <button class="new-chat-btn" onclick="newChat()">+ NEW SESSION</button>
+            <button class="new-chat-btn">+ New Session</button>
 
-            <div class="conversation-history" id="conversationHistory"></div>
+            <div style="flex: 1; overflow-y: auto;">
+                <div style="font-size: 11px; color: var(--text-secondary); padding: 8px 0;">
+                    <p style="margin-bottom: 12px;">Recent Operations:</p>
+                    <div id="recent-ops" style="max-height: 200px; overflow-y: auto;">
+                        <p style="font-style: italic; opacity: 0.7;">None yet</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- MAIN CHAT -->
-        <div class="chat-container">
-            <div class="chat-header">
-                <div class="chat-header-title">JARVIS AGENTIC SYSTEM</div>
-                <div class="chat-header-status">
-                    <span class="status-dot"></span>
-                    <span>OPERATIONAL</span>
+        <!-- MAIN CONTENT -->
+        <div class="main-content">
+            <!-- HEADER -->
+            <div class="header">
+                <div class="header-title">Jarvis Agentic System</div>
+                <div class="header-status">
+                    <div class="status-badge"></div>
+                    <span>Online</span>
                 </div>
             </div>
 
-            <div class="messages" id="messages">
-                <div class="empty-state">
-                    <div class="empty-state-title">SYSTEM READY</div>
-                    <p>AGENTIC AI INTERFACE - OPERATIONAL MODE</p>
-                    <p style="margin-top: 20px;">INITIALIZE CONVERSATION...</p>
+            <!-- CHAT CONTAINER -->
+            <div class="chat-container">
+                <div class="messages" id="messages">
+                    <div class="message system">
+                        <div class="message-icon">◆</div>
+                        <div class="message-content">
+                            <div class="message-time" id="init-time"></div>
+                            <div class="message-text">
+                                JARVIS AGENTIC SYSTEM INITIALIZED<br>
+                                Constitutional AI: ACTIVE<br>
+                                Agentic Loop: READY<br>
+                                Memory Systems: CONSOLIDATED
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="input-area">
-                <form class="input-form" onsubmit="sendMessage(event)">
-                    <textarea
-                        class="input-field"
-                        id="messageInput"
-                        placeholder="Enter command..."
-                        rows="1"
-                    ></textarea>
-                    <button type="submit" class="send-btn" id="sendBtn">→</button>
-                </form>
+                <!-- INPUT -->
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <input
+                            id="query-input"
+                            type="text"
+                            placeholder="Send command..."
+                            autocomplete="off"
+                        >
+                    </div>
+                    <button id="send-btn" class="send-btn">SEND</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API = window.location.origin;
-        let currentConversationId = null;
+        const messagesContainer = document.getElementById('messages');
+        const queryInput = document.getElementById('query-input');
+        const sendBtn = document.getElementById('send-btn');
+        const recentOpsContainer = document.getElementById('recent-ops');
 
-        document.addEventListener('DOMContentLoaded', () => {
-            startNewConversation();
-            setupInputHandlers();
+        // Initialize time
+        document.getElementById('init-time').textContent = new Date().toLocaleTimeString('es-MX', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
         });
 
-        function setupInputHandlers() {
-            const input = document.getElementById('messageInput');
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage(e);
-                }
+        function addMessage(text, type = 'system', showTime = true) {
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+
+            const timeStr = new Date().toLocaleTimeString('es-MX', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
             });
 
-            input.addEventListener('input', () => {
-                input.style.height = 'auto';
-                input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-            });
-        }
+            const icon = type === 'user' ? '▸' : type === 'error' ? '✗' : type === 'loading' ? '⟳' : '◆';
 
-        function newChat() {
-            startNewConversation();
-        }
-
-        function startNewConversation() {
-            currentConversationId = `conv-${Date.now()}`;
-            document.getElementById('messages').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-title">SESSION INITIALIZED</div>
-                    <p>AGENTIC CORE ACTIVATED</p>
-                    <p style="margin-top: 20px;">AWAITING INPUT...</p>
-                </div>
-            `;
-            document.getElementById('messageInput').focus();
-        }
-
-        async function sendMessage(e) {
-            e.preventDefault();
-
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-
-            if (!message) return;
-
-            input.value = '';
-            input.style.height = 'auto';
-
-            addMessage(message, 'user');
-
-            const loadingId = `loading-${Date.now()}`;
-            addMessage(`PROCESSING AGENTIC LOOP...`, 'jarvis', loadingId);
-
-            try {
-                const response = await fetch(`${API}/api/tasks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: message, priority: 'medium' }),
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    removeMessage(loadingId);
-                    await pollTaskResult(data.data.id, message);
-                } else {
-                    updateMessage(loadingId, `ERROR: ${data.error}`);
-                }
-            } catch (error) {
-                updateMessage(loadingId, `ERROR: CONNECTION FAILED`);
-            }
-        }
-
-        async function pollTaskResult(taskId, originalQuery, attempts = 0) {
-            if (attempts > 30) {
-                addMessage(`ERROR: TIMEOUT - PROCESSING EXCEEDED`, 'jarvis');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API}/api/tasks/${taskId}`);
-                const data = await response.json();
-
-                if (data.success && data.data) {
-                    const task = data.data;
-
-                    if (task.status === 'completed') {
-                        let resultMessage = '';
-
-                        if (task.result?.output) {
-                            resultMessage += `${task.result.output}\n\n`;
-                        }
-
-                        if (task.result?.reasoning) {
-                            resultMessage += `REASONING: ${task.result.reasoning}\n\n`;
-                        }
-
-                        const vizHtml = buildAgenticViz(task);
-                        resultMessage += vizHtml;
-
-                        addMessage(resultMessage, 'jarvis', null, true);
-                    } else if (task.status === 'processing') {
-                        await new Promise(r => setTimeout(r, 1000));
-                        await pollTaskResult(taskId, originalQuery, attempts + 1);
-                    } else if (task.status === 'failed') {
-                        addMessage(`ERROR: ${task.error || 'UNKNOWN'}`, 'jarvis');
-                    }
-                }
-            } catch (error) {
-                await new Promise(r => setTimeout(r, 1000));
-                await pollTaskResult(taskId, originalQuery, attempts + 1);
-            }
-        }
-
-        function buildAgenticViz(task) {
-            const result = task.result || {};
-            const iterations = result.iterations || 0;
-            const approved = result.constitutionalValidation?.approved ? 'APPROVED' : 'PENDING';
-
-            return `
-                <div class="agentic-viz">
-                    AGENTIC LOOP EXECUTION
-                    <div class="phase-bar">
-                        <div class="phase completed"></div>
-                        <div class="phase completed"></div>
-                        <div class="phase completed"></div>
-                        <div class="phase active"></div>
-                    </div>
-                    ${iterations} ITERATIONS COMPLETE
-                    <div class="constitution-status">
-                        CONSTITUTION: ${approved}
-                    </div>
-                </div>
-            `;
-        }
-
-        function addMessage(text, sender, id = null, isHtml = false) {
-            const messagesDiv = document.getElementById('messages');
-
-            const emptyState = messagesDiv.querySelector('.empty-state');
-            if (emptyState) emptyState.remove();
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}`;
-            messageDiv.id = id;
-
-            const avatar = sender === 'jarvis' ? '◆' : '▸';
-            const avatarClass = sender === 'jarvis' ? 'jarvis' : 'user';
-
-            messageDiv.innerHTML = `
-                <div class="message-avatar ${avatarClass}">${avatar}</div>
+            message.innerHTML = `
+                <div class="message-icon">${icon}</div>
                 <div class="message-content">
-                    <div class="message-bubble">${isHtml ? text : escapeHtml(text)}</div>
-                    <div class="message-time">${new Date().toLocaleTimeString()}</div>
+                    ${showTime ? `<div class="message-time">${timeStr}</div>` : ''}
+                    <div class="message-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
                 </div>
             `;
 
-            messagesDiv.appendChild(messageDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
+            messagesContainer.appendChild(message);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        function updateMessage(id, text) {
-            const el = document.getElementById(id);
-            if (el) {
-                const bubble = el.querySelector('.message-bubble');
-                if (bubble) bubble.textContent = text;
-            }
-        }
-
-        function removeMessage(id) {
-            const el = document.getElementById(id);
-            if (el) el.remove();
+            return message;
         }
 
         function escapeHtml(text) {
@@ -672,6 +481,104 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        async function sendMessage() {
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            // Add user message
+            addMessage(query, 'user');
+            queryInput.value = '';
+            sendBtn.disabled = true;
+
+            try {
+                // Create task
+                const createResponse = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, priority: 'medium' })
+                });
+
+                const createData = await createResponse.json();
+                if (!createData.success) {
+                    addMessage(`ERROR: ${createData.error}`, 'error');
+                    sendBtn.disabled = false;
+                    return;
+                }
+
+                const taskId = createData.data.id;
+                const loadingMsg = addMessage('Processing...', 'loading');
+
+                // Poll for result
+                let attempts = 0;
+                const maxAttempts = 60; // 60 seconds max
+
+                const pollResult = async () => {
+                    const getResponse = await fetch(`/api/tasks/${taskId}`);
+                    const getData = await getResponse.json();
+
+                    if (!getData.success) {
+                        loadingMsg.remove();
+                        addMessage(`ERROR: Task not found`, 'error');
+                        sendBtn.disabled = false;
+                        return;
+                    }
+
+                    const task = getData.data;
+
+                    if (task.status === 'completed') {
+                        loadingMsg.remove();
+                        const result = task.result;
+
+                        if (result.success) {
+                            addMessage(`✓ Task completed (${result.iterations} iterations, ${result.executionTime}ms)\n\n${result.output}\n\nConstitutional Validation: ${result.constitutionalValidation.approved ? 'APPROVED' : 'REJECTED'}`, 'system');
+
+                            // Update recent ops
+                            const op = document.createElement('div');
+                            op.style.padding = '4px 0';
+                            op.style.borderBottom = '1px solid rgba(0, 212, 255, 0.1)';
+                            op.style.fontSize = '10px';
+                            op.innerHTML = `✓ ${query.substring(0, 30)}...`;
+                            recentOpsContainer.insertBefore(op, recentOpsContainer.firstChild);
+                            if (recentOpsContainer.children.length > 5) {
+                                recentOpsContainer.removeChild(recentOpsContainer.lastChild);
+                            }
+                        } else {
+                            addMessage(`✗ Task failed: ${result.output}`, 'error');
+                        }
+                        sendBtn.disabled = false;
+                    } else if (task.status === 'failed') {
+                        loadingMsg.remove();
+                        addMessage(`ERROR: ${task.error || 'Task failed'}`, 'error');
+                        sendBtn.disabled = false;
+                    } else {
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(pollResult, 1000);
+                        } else {
+                            loadingMsg.remove();
+                            addMessage('ERROR: TIMEOUT - PROCESSING EXCEEDED', 'error');
+                            sendBtn.disabled = false;
+                        }
+                    }
+                };
+
+                pollResult();
+
+            } catch (error) {
+                addMessage(`ERROR: ${error.message}`, 'error');
+                sendBtn.disabled = false;
+            }
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) {
+                sendMessage();
+            }
+        });
+        queryInput.focus();
     </script>
 </body>
 </html>
