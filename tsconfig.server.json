@@ -8,14 +8,18 @@
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "skipDefaultLibCheck": true,
+    "forceConsistentCasingInFileNames": false,
     "resolveJsonModule": true,
     "moduleResolution": "node",
     "noImplicitAny": false,
+    "noImplicitThis": false,
     "allowJs": true,
     "declaration": false,
     "allowSyntheticDefaultImports": true,
-    "ignoreDeprecations": "5.0"
+    "ignoreDeprecations": "5.0",
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"]
   },
   "include": [
     "src/server.ts",
