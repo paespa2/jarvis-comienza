@@ -3,7 +3,55 @@
  *
  * Integración con Google Gemini API
  * Con manejo graceful de dependencias opcionales
+ * ✨ OPTIMIZACIÓN PHASE 3a: LRU Cache + Request Deduplication + Reduced Retry Delay
  */
+
+// ============================================
+// LRU CACHE IMPLEMENTATION
+// ============================================
+
+class LRUCache<K, V> {
+  private cache: Map<K, V>;
+  private maxSize: number;
+
+  constructor(maxSize: number = 100) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+  }
+
+  get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+
+    // Move to end (most recently used)
+    const value = this.cache.get(key)!;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      // Remove least recently used (first entry)
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  size(): number {
+    return this.cache.size;
+  }
+}
+
+// ============================================
+// GEMINI SERVICE INITIALIZATION
+// ============================================
 
 let ai: any = null;
 let googleGenAI: any = null;
@@ -295,8 +343,35 @@ export const JARVIS_TOOLS = [
   }
 ];
 
+// ============================================
+// CACHING & DEDUPLICATION
+// ============================================
+
+const responseCache = new LRUCache<string, any>(100);
+const pendingRequests = new Map<string, Promise<any>>();
+
+function getCacheKey(input: string, systemInstruction: string, useSearch: boolean, model: string): string {
+  // Create deterministic cache key from inputs
+  return `${model}|${useSearch}|${systemInstruction.substring(0, 100)}|${input.substring(0, 200)}`;
+}
+
+// ============================================
+// GEMINI SERVICE
+// ============================================
+
 export const geminiService = {
-  async withRetry<T>(fn: () => Promise<T>, maxRetries = 5, initialDelay = 4000): Promise<T> {
+  // Clear cache (useful for testing)
+  clearCache(): void {
+    responseCache.clear();
+    console.log("[Gemini Service] ✨ Cache cleared");
+  },
+
+  // Get cache stats
+  getCacheStats(): { size: number; maxSize: number } {
+    return { size: responseCache.size(), maxSize: 100 };
+  },
+
+  async withRetry<T>(fn: () => Promise<T>, maxRetries = 5, initialDelay = 500): Promise<T> {
     let lastError: any;
     for (let i = 0; i < maxRetries; i++) {
       try {
@@ -305,14 +380,14 @@ export const geminiService = {
         lastError = error;
         const errorMessage = error.message || JSON.stringify(error);
         if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          // Exponencial ampliado: 4s, 8s, 16s, 32s, 64s
+          // OPTIMIZACIÓN: Exponencial reducido: 0.5s, 1s, 2s, 4s, 8s (en lugar de 4s, 8s, 16s, 32s, 64s)
           const delay = initialDelay * Math.pow(2, i);
-          
-          // Agregamos un jitter (ruido aleatorio) para evitar el problema de thundering herd 
+
+          // Agregamos un jitter (ruido aleatorio) para evitar el problema de thundering herd
           // cuando multiples llamados de fondo caen al mismo tiempo
-          const jitter = Math.random() * 1000;
+          const jitter = Math.random() * 500;
           const finalDelay = delay + jitter;
-          
+
           console.warn(`[Gemini Service] 🔋 Quota Rate Limit (429). Retrasando ejecución por ${Math.round(finalDelay/1000)}s... (Intento ${i + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, finalDelay));
           continue;
@@ -327,31 +402,63 @@ export const geminiService = {
 
   async generateResponse(input: string, systemInstruction: string, useSearch = false, model = "gemini-3.1-pro-preview", skipTools = false) {
     try {
-      return await this.withRetry(async () => {
-        const tools: any[] = [];
-        if (!skipTools) {
-          tools.push({ functionDeclarations: JARVIS_TOOLS });
-        }
-        if (useSearch) {
-          tools.push({ googleSearch: {} });
-        }
+      // OPTIMIZACIÓN: Cache hit detection
+      const cacheKey = getCacheKey(input, systemInstruction, useSearch, model);
+      const cached = responseCache.get(cacheKey);
 
-        const response = await ai.models.generateContent({
-          model: model,
-          contents: [{ role: "user", parts: [{ text: input }] }],
-          config: {
-            systemInstruction: systemInstruction,
-            tools: tools.length > 0 ? tools : undefined,
-            toolConfig: (tools.length > 0 && useSearch) ? { includeServerSideToolInvocations: true } : undefined
-          },
-        });
+      if (cached) {
+        console.log(`[Gemini Service] ✨ Cache HIT (${responseCache.size()}/${100})`);
+        return cached;
+      }
 
-        return {
-          text: response.text || "Operación procesada con éxito. (Respuesta en blanco)",
-          functionCalls: response.functionCalls,
-          groundingMetadata: (response.candidates?.[0] as any)?.groundingMetadata
-        };
-      });
+      // OPTIMIZACIÓN: Request deduplication - if same request is in flight, wait for it
+      if (pendingRequests.has(cacheKey)) {
+        console.log(`[Gemini Service] 🔄 Deduplicating request (awaiting in-flight request)`);
+        return await pendingRequests.get(cacheKey)!;
+      }
+
+      // Mark this request as pending
+      const requestPromise = (async () => {
+        try {
+          return await this.withRetry(async () => {
+            const tools: any[] = [];
+            if (!skipTools) {
+              tools.push({ functionDeclarations: JARVIS_TOOLS });
+            }
+            if (useSearch) {
+              tools.push({ googleSearch: {} });
+            }
+
+            const response = await ai.models.generateContent({
+              model: model,
+              contents: [{ role: "user", parts: [{ text: input }] }],
+              config: {
+                systemInstruction: systemInstruction,
+                tools: tools.length > 0 ? tools : undefined,
+                toolConfig: (tools.length > 0 && useSearch) ? { includeServerSideToolInvocations: true } : undefined
+              },
+            });
+
+            const result = {
+              text: response.text || "Operación procesada con éxito. (Respuesta en blanco)",
+              functionCalls: response.functionCalls,
+              groundingMetadata: (response.candidates?.[0] as any)?.groundingMetadata
+            };
+
+            // Cache the result before returning
+            responseCache.set(cacheKey, result);
+            console.log(`[Gemini Service] 💾 Cached response (${responseCache.size()}/${100})`);
+
+            return result;
+          });
+        } finally {
+          // Remove from pending
+          pendingRequests.delete(cacheKey);
+        }
+      })();
+
+      pendingRequests.set(cacheKey, requestPromise);
+      return await requestPromise;
     } catch (error: any) {
       // Fallback automático a Flash si Pro falla por cuota (429) excesiva o límite 0
       const errMsg = error.message || "";

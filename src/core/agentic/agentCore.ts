@@ -46,13 +46,15 @@ export interface AgentResult {
  * AGENT CORE
  *
  * El motor que orquesta la ejecución agentica.
+ * ✨ OPTIMIZACIÓN PHASE 3a: Reduced iterations (8→3) + Early exit logic
  */
 export class AgentCore {
   private taskId: string;
   private iterations: AgentIteration[] = [];
-  private maxIterations: number = 8;
+  private maxIterations: number = 3; // OPTIMIZACIÓN: Reducido de 8 a 3
   private reasoning: ReasoningEngine;
   private tools: ToolExecutor;
+  private confidenceScores: number[] = []; // Track confidence for early exit
 
   constructor() {
     this.taskId = `task-${Date.now()}`;
@@ -74,7 +76,7 @@ export class AgentCore {
     console.log(`   Contexto: ${task.context}\n`);
 
     this.taskId = task.id;
-    this.maxIterations = task.maxIterations || 8;
+    this.maxIterations = task.maxIterations || 3; // OPTIMIZACIÓN: Default reducido de 8 a 3
     this.iterations = [];
 
     try {
@@ -109,6 +111,7 @@ export class AgentCore {
       // ==============
       let iterationCount = 0;
       let lastPhaseOutput = '';
+      this.confidenceScores = [];
 
       while (iterationCount < this.maxIterations) {
         iterationCount++;
@@ -150,6 +153,20 @@ export class AgentCore {
         );
         this.iterations.push(reflectionIteration);
         lastPhaseOutput = reflectionIteration.result;
+
+        // OPTIMIZACIÓN PHASE 3a: Evaluar confianza para early exit
+        // Extraer puntuación de confianza si está disponible
+        const confidenceMatch = reflectionIteration.result.match(/confidence[:\s]+([0-9.]+)/i);
+        if (confidenceMatch) {
+          const confidence = parseFloat(confidenceMatch[1]);
+          this.confidenceScores.push(confidence);
+
+          // Early exit si confianza > 0.85 después de 2 iteraciones
+          if (iterationCount >= 2 && confidence > 0.85) {
+            console.log(`\n⚡ EARLY EXIT: Confianza ${confidence} > 0.85 después de ${iterationCount} iteraciones`);
+            break;
+          }
+        }
 
         // Evaluar si reflejamos que estamos completos
         if (reflectionIteration.result.includes('TASK_COMPLETE')) {

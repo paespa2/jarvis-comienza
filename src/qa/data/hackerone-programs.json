@@ -1,0 +1,537 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2026-04-20",
+    "total_programs": 25,
+    "source": "HackerOne Public Programs"
+  },
+  "programs": [
+    {
+      "program_id": "h1_meta",
+      "name": "Meta",
+      "slug": "meta",
+      "specialization": "Social Networks, Cloud Infrastructure",
+      "response_target_time": "7 days",
+      "scope": {
+        "domains": [
+          "facebook.com",
+          "instagram.com",
+          "whatsapp.com",
+          "threads.net"
+        ],
+        "in_scope_vulnerabilities": [
+          "SQL Injection",
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Logic Flaws"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Social Engineering",
+          "Brute Force",
+          "Physical Security"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 50000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "sqli",
+        "xss",
+        "authentication-bypass",
+        "information-disclosure"
+      ],
+      "average_payout": 5000,
+      "recent_acceptance_rate": 0.85
+    },
+    {
+      "program_id": "h1_google",
+      "name": "Google",
+      "slug": "google",
+      "specialization": "Search, Cloud Platform, Android",
+      "response_target_time": "7 days",
+      "scope": {
+        "domains": [
+          "google.com",
+          "cloud.google.com",
+          "android.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Privilege Escalation",
+          "Logic Flaws"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "CSRF (if no interaction)",
+          "Clickjacking",
+          "Physical Security"
+        ]
+      },
+      "bounty_range": { "min": 1000, "max": 75000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 8000,
+      "recent_acceptance_rate": 0.78
+    },
+    {
+      "program_id": "h1_apple",
+      "name": "Apple",
+      "slug": "apple",
+      "specialization": "Operating Systems, Cloud Services",
+      "response_target_time": "7 days",
+      "scope": {
+        "domains": [
+          "apple.com",
+          "icloud.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Memory Corruption",
+          "Information Disclosure",
+          "Logic Flaws"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Phishing",
+          "Physical Security",
+          "Social Engineering"
+        ]
+      },
+      "bounty_range": { "min": 1000, "max": 100000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "memory-corruption",
+        "authentication-bypass",
+        "information-disclosure"
+      ],
+      "average_payout": 12000,
+      "recent_acceptance_rate": 0.72
+    },
+    {
+      "program_id": "h1_microsoft",
+      "name": "Microsoft",
+      "slug": "microsoft",
+      "specialization": "Operating Systems, Cloud Services, Enterprise",
+      "response_target_time": "5 days",
+      "scope": {
+        "domains": [
+          "microsoft.com",
+          "azure.microsoft.com",
+          "office.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Privilege Escalation",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Elevation of Privilege"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Configuration Issues"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 100000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "privilege-escalation",
+        "authentication-bypass",
+        "information-disclosure"
+      ],
+      "average_payout": 10000,
+      "recent_acceptance_rate": 0.82
+    },
+    {
+      "program_id": "h1_aws",
+      "name": "Amazon Web Services (AWS)",
+      "slug": "aws",
+      "specialization": "Cloud Infrastructure, AWS Services",
+      "response_target_time": "10 days",
+      "scope": {
+        "domains": [
+          "aws.amazon.com",
+          "*.amazonaws.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Privilege Escalation",
+          "Configuration Issues"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Social Engineering",
+          "Physical Security",
+          "Denial of Service"
+        ]
+      },
+      "bounty_range": { "min": 1000, "max": 50000 },
+      "minimum_severity": "medium",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 8000,
+      "recent_acceptance_rate": 0.76
+    },
+    {
+      "program_id": "h1_github",
+      "name": "GitHub",
+      "slug": "github",
+      "specialization": "Code Hosting, Collaboration, DevOps",
+      "response_target_time": "5 days",
+      "scope": {
+        "domains": [
+          "github.com",
+          "github.io"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Logic Flaws",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Social Engineering",
+          "Physical Security",
+          "Rate Limiting Bypass"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 30000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 4000,
+      "recent_acceptance_rate": 0.80
+    },
+    {
+      "program_id": "h1_dropbox",
+      "name": "Dropbox",
+      "slug": "dropbox",
+      "specialization": "Cloud Storage, File Sync",
+      "response_target_time": "10 days",
+      "scope": {
+        "domains": [
+          "dropbox.com",
+          "dropboxusercontent.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Logic Flaws",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Clickjacking"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 25000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 3500,
+      "recent_acceptance_rate": 0.74
+    },
+    {
+      "program_id": "h1_stripe",
+      "name": "Stripe",
+      "slug": "stripe",
+      "specialization": "Payment Processing, Financial Services",
+      "response_target_time": "5 days",
+      "scope": {
+        "domains": [
+          "stripe.com",
+          "stripe.com/en-au",
+          "stripe.com/en-gb"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Payment Processing Bypass",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Configuration Issues"
+        ]
+      },
+      "bounty_range": { "min": 1000, "max": 40000 },
+      "minimum_severity": "medium",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 6000,
+      "recent_acceptance_rate": 0.79
+    },
+    {
+      "program_id": "h1_uber",
+      "name": "Uber",
+      "slug": "uber",
+      "specialization": "Transportation, Logistics, Food Delivery",
+      "response_target_time": "7 days",
+      "scope": {
+        "domains": [
+          "uber.com",
+          "uberintern.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Logic Flaws",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Rate Limiting"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 50000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "logic-flaws"
+      ],
+      "average_payout": 7000,
+      "recent_acceptance_rate": 0.73
+    },
+    {
+      "program_id": "h1_adobe",
+      "name": "Adobe",
+      "slug": "adobe",
+      "specialization": "Creative Cloud, Enterprise Software",
+      "response_target_time": "10 days",
+      "scope": {
+        "domains": [
+          "adobe.com",
+          "adobe.io"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Privilege Escalation",
+          "Logic Flaws"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Unsupported Products"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 35000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 5000,
+      "recent_acceptance_rate": 0.71
+    },
+    {
+      "program_id": "h1_slack",
+      "name": "Slack",
+      "slug": "slack",
+      "specialization": "Communication, Collaboration, Workspace",
+      "response_target_time": "5 days",
+      "scope": {
+        "domains": [
+          "slack.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Privilege Escalation",
+          "Logic Flaws"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "DoS Attacks"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 30000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 4500,
+      "recent_acceptance_rate": 0.77
+    },
+    {
+      "program_id": "h1_twitch",
+      "name": "Twitch",
+      "slug": "twitch",
+      "specialization": "Live Streaming, Gaming",
+      "response_target_time": "7 days",
+      "scope": {
+        "domains": [
+          "twitch.tv"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Account Takeover",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Streaming Quality Issues"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 25000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "account-takeover"
+      ],
+      "average_payout": 3500,
+      "recent_acceptance_rate": 0.75
+    },
+    {
+      "program_id": "h1_hackerone",
+      "name": "HackerOne",
+      "slug": "hackerone",
+      "specialization": "Bug Bounty Platform",
+      "response_target_time": "3 days",
+      "scope": {
+        "domains": [
+          "hackerone.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Privilege Escalation",
+          "Logic Flaws"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Configuration Issues"
+        ]
+      },
+      "bounty_range": { "min": 100, "max": 50000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 5000,
+      "recent_acceptance_rate": 0.88
+    },
+    {
+      "program_id": "h1_paypal",
+      "name": "PayPal",
+      "slug": "paypal",
+      "specialization": "Digital Payments, Financial Services",
+      "response_target_time": "7 days",
+      "scope": {
+        "domains": [
+          "paypal.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Payment Processing Bypass",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Configuration Issues"
+        ]
+      },
+      "bounty_range": { "min": 1000, "max": 75000 },
+      "minimum_severity": "medium",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "privilege-escalation"
+      ],
+      "average_payout": 12000,
+      "recent_acceptance_rate": 0.81
+    },
+    {
+      "program_id": "h1_twitter",
+      "name": "Twitter (X)",
+      "slug": "twitter",
+      "specialization": "Social Media, Real-time Communications",
+      "response_target_time": "5 days",
+      "scope": {
+        "domains": [
+          "twitter.com",
+          "x.com"
+        ],
+        "in_scope_vulnerabilities": [
+          "Remote Code Execution",
+          "Authentication Bypass",
+          "Information Disclosure",
+          "Account Takeover",
+          "Privilege Escalation"
+        ],
+        "out_of_scope_vulnerabilities": [
+          "Physical Security",
+          "Social Engineering",
+          "Spam Accounts"
+        ]
+      },
+      "bounty_range": { "min": 500, "max": 50000 },
+      "minimum_severity": "low",
+      "accepts_vulnerability_types": [
+        "rce",
+        "authentication-bypass",
+        "information-disclosure",
+        "account-takeover"
+      ],
+      "average_payout": 6000,
+      "recent_acceptance_rate": 0.76
+    }
+  ]
+}
