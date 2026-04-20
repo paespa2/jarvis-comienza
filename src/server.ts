@@ -33,11 +33,13 @@ const requests: Map<string, JarvisRequest> = new Map();
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use(express.static(path.join(__dirname, '../public')));
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();
 });
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, '../public')));
 
 /**
  * INICIALIZAR JARVIS
@@ -356,12 +358,11 @@ app.get('/api/docs', (req: Request, res: Response) => {
 
 /**
  * =====================================
- * ROOT - SERVE DASHBOARD
+ * ROOT - SERVED BY EXPRESS.STATIC AS index.html
  * =====================================
+ * The professional dashboard (index.html) is automatically served
+ * by express.static middleware when accessing /
  */
-app.get('/', (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '../public/dashboard.html'));
-});
 
 /**
  * =====================================
