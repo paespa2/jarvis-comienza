@@ -218,6 +218,7 @@ export class JarvisAgenticBridge {
 
     const taskId = `task-${uuidv4()}`;
     const startTime = Date.now();
+    const timestamps: { [key: string]: number } = { 'START': startTime };
 
     console.log(`\n${'='.repeat(70)}`);
     console.log(`🚀 EJECUTANDO TAREA AGENTICA`);
@@ -230,7 +231,8 @@ export class JarvisAgenticBridge {
     try {
       // PASO 1: VALIDACIÓN CONSTITUCIONAL
       // ==================================
-      console.log(`⚖️  PASO 1: VALIDACIÓN CONSTITUCIONAL\n`);
+      const paso1Start = Date.now();
+      console.log(`⚖️  PASO 1: VALIDACIÓN CONSTITUCIONAL [${new Date(paso1Start).toISOString()}]\n`);
 
       const constValidation = await validateBeforeExecution(
         request.query,
@@ -238,6 +240,10 @@ export class JarvisAgenticBridge {
         request.priority === 'high' ? 'high' : 'medium',
         true
       );
+
+      const paso1End = Date.now();
+      timestamps['PASO_1'] = paso1End - paso1Start;
+      console.log(`   ✅ Tiempo: ${paso1End - paso1Start}ms\n`);
 
       if (!constValidation.valid) {
         console.log(`❌ TAREA RECHAZADA POR VALIDACIÓN CONSTITUCIONAL`);
@@ -267,22 +273,26 @@ export class JarvisAgenticBridge {
 
       // PASO 2: SELECIÓN DE EQUIPO DE AGENTES
       // ======================================
-      console.log(`🤖 PASO 2: SELECCIÓN DE EQUIPO DE AGENTES\n`);
+      const paso2Start = Date.now();
+      console.log(`🤖 PASO 2: SELECCIÓN DE EQUIPO DE AGENTES [${new Date(paso2Start).toISOString()}]\n`);
 
       const agentTeam = await this.agentOrchestrator.selectTeamForTask(
         request.query,
         constValidation.validation
       );
 
+      const paso2End = Date.now();
+      timestamps['PASO_2'] = paso2End - paso2Start;
       console.log(`   Agentes seleccionados: ${agentTeam.agents.length}`);
       agentTeam.agents.forEach((agent, i) => {
         console.log(`      ${i + 1}. ${agent.name} (${agent.role})`);
       });
-      console.log(``);
+      console.log(`   ✅ Tiempo: ${paso2End - paso2Start}ms\n`);
 
       // PASO 3: EJECUCIÓN A TRAVÉS DEL AGENTIC LOOP
       // ============================================
-      console.log(`🔄 PASO 3: EJECUCIÓN DEL AGENTIC LOOP\n`);
+      const paso3Start = Date.now();
+      console.log(`🔄 PASO 3: EJECUCIÓN DEL AGENTIC LOOP [${new Date(paso3Start).toISOString()}]\n`);
 
       const agentTask: AgentTask = {
         id: taskId,
@@ -294,15 +304,20 @@ export class JarvisAgenticBridge {
         maxIterations: request.priority === 'high' ? 10 : 6,
       };
 
+      console.log(`   ⏱️  Iniciando agentCore.execute() ...`);
       const agentResult = await this.agentCore.execute(agentTask);
 
+      const paso3End = Date.now();
+      timestamps['PASO_3'] = paso3End - paso3Start;
       console.log(`\n✅ AGENTIC LOOP COMPLETADO`);
       console.log(`   Iteraciones: ${agentResult.iterations.length}`);
       console.log(`   Éxito: ${agentResult.success ? '✅ Sí' : '❌ No'}`);
+      console.log(`   ✅ Tiempo: ${paso3End - paso3Start}ms\n`);
 
       // PASO 4: CONSOLIDACIÓN DE MEMORIA
       // =================================
-      console.log(`\n💾 PASO 4: CONSOLIDACIÓN DE MEMORIA\n`);
+      const paso4Start = Date.now();
+      console.log(`💾 PASO 4: CONSOLIDACIÓN DE MEMORIA [${new Date(paso4Start).toISOString()}]\n`);
 
       const memoryConsolidation = await this.memoryManager.consolidateExperience({
         taskId,
@@ -312,13 +327,17 @@ export class JarvisAgenticBridge {
         lessonLearned: agentResult.lessonLearned,
       });
 
+      const paso4End = Date.now();
+      timestamps['PASO_4'] = paso4End - paso4Start;
       console.log(`   Experiencias consolidadas`);
-      console.log(`   Lección aprendida: ${agentResult.lessonLearned}\n`);
+      console.log(`   Lección aprendida: ${agentResult.lessonLearned}`);
+      console.log(`   ✅ Tiempo: ${paso4End - paso4Start}ms\n`);
 
       // PASO 5: EVOLUCIÓN DEL MODELO
       // =============================
       if (agentResult.success && agentResult.iterations.length > 3) {
-        console.log(`🧬 PASO 5: EVOLUCIÓN DEL MODELO\n`);
+        const paso5Start = Date.now();
+        console.log(`🧬 PASO 5: EVOLUCIÓN DEL MODELO [${new Date(paso5Start).toISOString()}]\n`);
 
         const evolutionUpdate = await this.evolutionOrchestrator.recordSuccess({
           taskId,
@@ -326,8 +345,11 @@ export class JarvisAgenticBridge {
           lessonLearned: agentResult.lessonLearned,
         });
 
+        const paso5End = Date.now();
+        timestamps['PASO_5'] = paso5End - paso5Start;
         console.log(`   Genoma actualizado`);
-        console.log(`   Generación: ${evolutionUpdate.generation}\n`);
+        console.log(`   Generación: ${evolutionUpdate.generation}`);
+        console.log(`   ✅ Tiempo: ${paso5End - paso5Start}ms\n`);
       }
 
       // PASO 6: UTILIZAR CAPACIDADES FASE 2 (si están habilitadas)
@@ -339,6 +361,19 @@ export class JarvisAgenticBridge {
         console.log(`   ✅ Dynamic Tooling: activa`);
         console.log(`   ✅ Autonomous Operation: activa\n`);
       }
+
+      // RESUMEN DE TIEMPOS
+      const totalTime = Date.now() - startTime;
+      console.log(`${'='.repeat(70)}`);
+      console.log(`⏱️  RESUMEN DE EJECUCIÓN`);
+      console.log(`${'='.repeat(70)}`);
+      Object.entries(timestamps).forEach(([phase, time]) => {
+        if (phase !== 'START') {
+          console.log(`   ${phase}: ${time}ms`);
+        }
+      });
+      console.log(`   TOTAL: ${totalTime}ms`);
+      console.log(`${'='.repeat(70)}\n`);
 
       // CONSTRUIR RESULTADO FINAL
       const result: TaskExecutionResult = {
