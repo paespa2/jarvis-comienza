@@ -35,7 +35,7 @@ interface JarvisRequest {
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
-const TASK_TIMEOUT = parseInt(process.env.TASK_TIMEOUT || '30000', 10); // 30 segundos
+const TASK_TIMEOUT = parseInt(process.env.TASK_TIMEOUT || '60000', 10); // 60 segundos
 
 let orchestrator: IntegrationOrchestrator;
 const requests: Map<string, JarvisRequest> = new Map();
