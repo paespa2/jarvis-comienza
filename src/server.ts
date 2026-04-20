@@ -356,16 +356,11 @@ app.get('/api/docs', (req: Request, res: Response) => {
 
 /**
  * =====================================
- * ROOT
+ * ROOT - SERVE DASHBOARD
  * =====================================
  */
 app.get('/', (req: Request, res: Response) => {
-  res.json({
-    message: '🚀 Jarvis IA - Sistema de IA Completamente Agentico',
-    status: 'running',
-    documentation: '/api/docs',
-    api_version: '1.0.0',
-  });
+  res.sendFile(path.join(__dirname, '../public/dashboard.html'));
 });
 
 /**
