@@ -430,4 +430,48 @@ export class ModelEvolutionOrchestrator {
       averageTrainingTime: this.fineTuner.getTrainingStatistics().totalTrainingTime,
     };
   }
+
+  /**
+   * REGISTRAR ÉXITO DE TAREA
+   *
+   * Método simplificado para registrar una ejecución exitosa
+   * y alimentar el pipeline de evolución.
+   */
+  async recordSuccess(data: {
+    taskId: string;
+    iterationsRequired: number;
+    lessonLearned?: string;
+  }): Promise<any> {
+    console.log(`\n🧬 REGISTRANDO ÉXITO PARA EVOLUCIÓN`);
+    console.log(`   Tarea: ${data.taskId}`);
+    console.log(`   Iteraciones: ${data.iterationsRequired}`);
+
+    // Capturar como interacción exitosa
+    const trainingDataPoint = this.captureSuccessfulInteraction(
+      data.taskId,
+      { taskId: data.taskId, lessonLearned: data.lessonLearned },
+      'orchestrator',
+      ['constitutional_ai', 'agent_selection', 'tool_execution'],
+      data.lessonLearned || 'Tarea completada exitosamente',
+      data.iterationsRequired * 100, // Estimado: ~100ms por iteración
+      data.iterationsRequired
+    );
+
+    // Actualizar generación si tenemos suficientes datos
+    if (this.trainingData.length >= 5) {
+      this.generation++;
+      console.log(`   🧬 Generación actualizada: ${this.generation}`);
+    }
+
+    console.log(`   ✅ Éxito registrado en evolución\n`);
+
+    return {
+      recordId: `record-${uuidv4()}`,
+      taskId: data.taskId,
+      trainingDataCaptured: trainingDataPoint ? true : false,
+      currentGeneration: this.generation,
+      totalTrainingData: this.trainingData.length,
+      timestamp: Date.now(),
+    };
+  }
 }
