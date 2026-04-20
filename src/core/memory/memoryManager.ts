@@ -403,6 +403,84 @@ export class MemoryManager {
   getTrustedKnowledge(domain?: string): SemanticMemory[] {
     return this.semantic.getMostConfidentKnowledge(domain);
   }
+
+  /**
+   * CONSOLIDAR EXPERIENCIA
+   *
+   * Procesa una experiencia completada, registra episodio,
+   * y consolida aprendizajes en memoria semántica/procedural.
+   */
+  async consolidateExperience(data: {
+    taskId: string;
+    query: string;
+    success: boolean;
+    iterations: any[];
+    lessonLearned?: string;
+  }): Promise<any> {
+    console.log(`\n📚 CONSOLIDANDO EXPERIENCIA`);
+    console.log(`   Tarea: ${data.taskId}`);
+    console.log(`   Éxito: ${data.success ? '✅' : '❌'}`);
+    console.log(`   Iteraciones: ${data.iterations.length}`);
+
+    // Registrar episodio
+    const outcome = data.success ? 'success' : 'failure';
+    this.recordEpisode(
+      'task_execution',
+      `Ejecutada tarea: ${data.query.substring(0, 50)}...`,
+      {
+        taskId: data.taskId,
+        query: data.query,
+        iterationCount: data.iterations.length,
+      },
+      outcome
+    );
+
+    // Registrar lección aprendida como conocimiento
+    if (data.lessonLearned) {
+      this.addKnowledge(
+        'lesson',
+        `Lección de ${data.taskId}`,
+        data.lessonLearned,
+        ['learning', 'improvement'],
+        []
+      );
+    }
+
+    // Actualizar métrica de tiempo de ejecución
+    if (data.iterations.length > 0) {
+      const avgTime = data.iterations.reduce((sum: number, it: any) => sum + (it.executionTime || 0), 0) / data.iterations.length;
+      this.currentGenome.metrics.averageExecutionTime = avgTime;
+    }
+
+    // Si hay suficientes iteraciones exitosas, considerar crear skill
+    if (data.success && data.iterations.length >= 2) {
+      const skillName = `Execute: ${data.query.substring(0, 30)}`;
+      this.addSkill(
+        skillName,
+        `Habilidad para ejecutar: ${data.query.substring(0, 50)}...`,
+        data.iterations.map((it, idx) => ({
+          order: idx + 1,
+          description: it.phase || `Paso ${idx + 1}`,
+          expectedOutcome: 'Completado'
+        })),
+        'task_execution',
+        []
+      );
+    }
+
+    console.log(`   ✅ Experiencia consolidada`);
+    console.log(`   📊 Genoma: ${this.currentGenome.generationId}\n`);
+
+    return {
+      consolidationId: `cons-${uuidv4()}`,
+      taskId: data.taskId,
+      episodesRecorded: 1,
+      knowledgeCreated: data.lessonLearned ? 1 : 0,
+      skillsCreated: data.success && data.iterations.length >= 2 ? 1 : 0,
+      timestamp: Date.now(),
+      currentGenome: this.currentGenome.generationId,
+    };
+  }
 }
 
 /**
