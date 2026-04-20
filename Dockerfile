@@ -9,30 +9,26 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# Invalidar caché anterior
-ARG CACHEBUST=1
-RUN echo "Building at $(date)"
-
-# Copiar package files
+# Copiar package files FIRST
 COPY package.json ./
 
-# Instalar todas las dependencias (necesarias para build)
-RUN npm install --legacy-peer-deps
+# Instalar todas las dependencias
+RUN npm install --no-optional --legacy-peer-deps && \
+    npm list typescript && \
+    npm cache clean --force
 
 # Copiar código fuente
 COPY . .
 
-# Compilar TypeScript - use npx to ensure it runs from node_modules
-RUN npx tsc -p tsconfig.server.json
+# Compilar TypeScript usando ruta directa a binario
+RUN ./node_modules/.bin/tsc -p tsconfig.server.json || \
+    (echo "Compilation failed" && npm list typescript && exit 1)
 
 # Verificar que build fue exitoso
 RUN test -f /app/dist/server.js || (echo "Build failed: dist/server.js not found" && exit 1)
 
 # Eliminar devDependencies después del build
 RUN npm prune --omit=dev
-
-# Clean npm cache
-RUN npm cache clean --force
 
 # Exponer puerto
 EXPOSE 3000
