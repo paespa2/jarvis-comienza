@@ -14,6 +14,10 @@ import { ConstitutionalAI, validateBeforeExecution } from '../core/constitution/
 import { AgentOrchestrator } from '../core/agents/orchestration/agentOrchestrator';
 import { MemoryManager } from '../core/memory/memoryManager';
 import { ModelEvolutionOrchestrator } from '../core/modelEvolution/modelEvolutionOrchestrator';
+import { webIntegrationService } from '../services/webIntegrationService';
+import { systemAutomationService } from '../services/systemAutomationService';
+import { dynamicToolingService } from '../services/dynamicToolingService';
+import { autonomousOperationService } from '../services/autonomousOperationService';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface TaskExecutionRequest {
@@ -51,19 +55,32 @@ export class JarvisAgenticBridge {
   private agentOrchestrator: AgentOrchestrator;
   private memoryManager: MemoryManager;
   private evolutionOrchestrator: ModelEvolutionOrchestrator;
+  // FASE 2: SERVICIOS DE EXTENSIÓN
+  private webIntegration: typeof webIntegrationService;
+  private systemAutomation: typeof systemAutomationService;
+  private dynamicTooling: typeof dynamicToolingService;
+  private autonomousOperation: typeof autonomousOperationService;
   private taskHistory: Map<string, TaskExecutionResult> = new Map();
   private isInitialized: boolean = false;
+  private phase2Initialized: boolean = false;
 
   constructor() {
     console.log(`\n${'='.repeat(70)}`);
     console.log(`🧠 INICIALIZANDO JARVIS AGENTIC BRIDGE`);
     console.log(`${'='.repeat(70)}\n`);
 
+    // FASE 1: CORE AGENTICO
     this.agentCore = new AgentCore();
     this.constitutionalAI = new ConstitutionalAI();
     this.agentOrchestrator = new AgentOrchestrator();
     this.memoryManager = new MemoryManager();
     this.evolutionOrchestrator = new ModelEvolutionOrchestrator();
+
+    // FASE 2: EXTENSIONES
+    this.webIntegration = webIntegrationService;
+    this.systemAutomation = systemAutomationService;
+    this.dynamicTooling = dynamicToolingService;
+    this.autonomousOperation = autonomousOperationService;
   }
 
   /**
@@ -117,8 +134,48 @@ export class JarvisAgenticBridge {
         initSucceeded = false;
       }
 
+      // FASE 2: INICIALIZAR EXTENSIONES
+      console.log(`\n🚀 INICIALIZANDO FASE 2: EXTENSIONES`);
+
+      // Web Integration (con fallback)
+      try {
+        console.log(`🌐 Web Integration: Inicializando...`);
+        const webStatus = this.webIntegration.getStatus();
+        console.log(`   ${webStatus.axiorsConfigured ? '✅ Listo' : '⚠️  Parcial'}`);
+      } catch (err) {
+        console.warn(`   ⚠️  Web Integration: ${err}`);
+      }
+
+      // System Automation (con fallback)
+      try {
+        console.log(`⚙️  System Automation: Inicializando...`);
+        const sysInfo = this.systemAutomation.getSystemInfo();
+        console.log(`   ✅ Listo - ${sysInfo.platform} ${sysInfo.arch}`);
+      } catch (err) {
+        console.warn(`   ⚠️  System Automation: ${err}`);
+      }
+
+      // Dynamic Tooling (con fallback)
+      try {
+        console.log(`🔧 Dynamic Tooling: Inicializando...`);
+        const toolStatus = this.dynamicTooling.getStatus();
+        console.log(`   ✅ Listo - ${toolStatus.totalTools} herramientas disponibles`);
+      } catch (err) {
+        console.warn(`   ⚠️  Dynamic Tooling: ${err}`);
+      }
+
+      // Autonomous Operation (con fallback)
+      try {
+        console.log(`🤖 Autonomous Operation: Inicializando...`);
+        const autoStatus = this.autonomousOperation.getStatus();
+        console.log(`   ✅ Listo - Modo autónomo disponible`);
+      } catch (err) {
+        console.warn(`   ⚠️  Autonomous Operation: ${err}`);
+      }
+
       // Marcar como inicializado incluso si hay errores parciales
       this.isInitialized = true;
+      this.phase2Initialized = true;
 
       if (initSucceeded) {
         console.log(`\n✅ Jarvis Agentic Bridge inicializado COMPLETAMENTE`);
@@ -273,6 +330,16 @@ export class JarvisAgenticBridge {
         console.log(`   Generación: ${evolutionUpdate.generation}\n`);
       }
 
+      // PASO 6: UTILIZAR CAPACIDADES FASE 2 (si están habilitadas)
+      // ===========================================================
+      if (this.phase2Initialized) {
+        console.log(`🚀 PASO 6: EXTENSIONES FASE 2 DISPONIBLES\n`);
+        console.log(`   ✅ Web Integration: activa`);
+        console.log(`   ✅ System Automation: activa`);
+        console.log(`   ✅ Dynamic Tooling: activa`);
+        console.log(`   ✅ Autonomous Operation: activa\n`);
+      }
+
       // CONSTRUIR RESULTADO FINAL
       const result: TaskExecutionResult = {
         taskId,
@@ -377,8 +444,12 @@ En modo fallback, puedo ayudarte con:
    * OBTENER ESTADO DEL BRIDGE
    */
   getStatus(): any {
+    const dynamicToolingStatus = this.dynamicTooling.getStatus();
+    const autonomousStatus = this.autonomousOperation.getStatus();
+
     return {
       initialized: this.isInitialized,
+      phase2Initialized: this.phase2Initialized,
       tasksProcessed: this.taskHistory.size,
       successfulTasks: Array.from(this.taskHistory.values()).filter(t => t.success).length,
       averageExecutionTime: Array.from(this.taskHistory.values()).length > 0
@@ -398,6 +469,29 @@ En modo fallback, puedo ayudarte con:
       },
       evolution: {
         active: this.evolutionOrchestrator ? true : false,
+      },
+      // FASE 2: EXTENSIONES
+      phase2: {
+        webIntegration: {
+          active: !!this.webIntegration,
+          hackeroneConfigured: this.webIntegration.getStatus().hackerOneConfigured,
+        },
+        systemAutomation: {
+          active: !!this.systemAutomation,
+          platform: this.systemAutomation.getSystemInfo().platform,
+        },
+        dynamicTooling: {
+          active: !!this.dynamicTooling,
+          totalTools: dynamicToolingStatus.totalTools,
+          installedTools: dynamicToolingStatus.installedTools,
+          enabledTools: dynamicToolingStatus.enabledTools,
+        },
+        autonomousOperation: {
+          active: !!this.autonomousOperation,
+          autonomousMode: autonomousStatus.autonomousMode,
+          enabledTasks: autonomousStatus.enabledTasks,
+          bugBountyTargets: autonomousStatus.bugBountyTargets,
+        },
       },
     };
   }

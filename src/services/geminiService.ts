@@ -30,9 +30,10 @@ export interface ToolCall {
 }
 
 export const JARVIS_TOOLS = [
+  // FASE 1: BASIC TOOLS
   {
     name: "ejecutar_comando_kali",
-    description: "Ejecuta un comando en la terminal local (Windows) para tareas de pentesting o sistema.",
+    description: "Ejecuta un comando en la terminal local para tareas de pentesting o sistema.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -54,41 +55,6 @@ export const JARVIS_TOOLS = [
     }
   },
   {
-    name: "editar_archivo_quirurgico",
-    description: "Edita un archivo reemplazando una cadena exacta por otra.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        filename: { type: Type.STRING, description: "Nombre del archivo" },
-        old_content: { type: Type.STRING, description: "Contenido exacto a reemplazar" },
-        new_content: { type: Type.STRING, description: "Nuevo contenido" }
-      },
-      required: ["filename", "old_content", "new_content"]
-    }
-  },
-  {
-    name: "mapear_workspace_profundo",
-    description: "Realiza un listado recursivo del workspace.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        path: { type: Type.STRING, description: "Ruta relativa opcional" }
-      }
-    }
-  },
-  {
-    name: "busqueda_grep_avanzada",
-    description: "Busca patrones de texto en todo el workspace.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        pattern: { type: Type.STRING, description: "Patrón de búsqueda (regex)" },
-        include: { type: Type.STRING, description: "Filtro de archivos (ej. *.js)" }
-      },
-      required: ["pattern"]
-    }
-  },
-  {
     name: "leer_archivo",
     description: "Lee el contenido de un archivo en el workspace.",
     parameters: {
@@ -97,25 +63,6 @@ export const JARVIS_TOOLS = [
         filename: { type: Type.STRING, description: "Nombre del archivo" }
       },
       required: ["filename"]
-    }
-  },
-  {
-    name: "ajustar_prioridades_soberanas",
-    description: "Ajusta la matriz de prioridades de Jarvis.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        categoria: { type: Type.STRING, description: "Categoría a ajustar (ej. hacking, personal)" },
-        ajuste: { 
-          type: Type.OBJECT, 
-          properties: {
-            priority: { type: Type.NUMBER },
-            focus: { type: Type.STRING },
-            principles: { type: Type.ARRAY, items: { type: Type.STRING } }
-          }
-        }
-      },
-      required: ["categoria", "ajuste"]
     }
   },
   {
@@ -130,15 +77,220 @@ export const JARVIS_TOOLS = [
       required: ["filename", "content"]
     }
   },
+
+  // FASE 2: WEB INTEGRATION TOOLS
   {
-    name: "consultar_estrategia_paperclip",
-    description: "Consulta al servidor Paperclip para obtener una evaluación estratégica o la hoja de ruta de la compañía.",
+    name: "raspar_pagina_web",
+    description: "Obtiene contenido de una página web para análisis.",
     parameters: {
       type: Type.OBJECT,
       properties: {
-        consulta: { type: Type.STRING, description: "La duda estratégica o el objetivo a evaluar por el CEO Paperclip." }
+        url: { type: Type.STRING, description: "URL de la página a raspar (https://...)" }
       },
-      required: ["consulta"]
+      required: ["url"]
+    }
+  },
+  {
+    name: "llamar_api_externa",
+    description: "Realiza llamadas a APIs externas (GET, POST, PUT, DELETE).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        url: { type: Type.STRING, description: "URL del endpoint API" },
+        metodo: { type: Type.STRING, description: "HTTP method: GET, POST, PUT, DELETE" },
+        datos: { type: Type.STRING, description: "JSON data para POST/PUT (opcional)" },
+        encabezados: { type: Type.STRING, description: "JSON headers personalizados (opcional)" }
+      },
+      required: ["url", "metodo"]
+    }
+  },
+  {
+    name: "buscar_cves",
+    description: "Busca vulnerabilidades (CVEs) en la base de datos NVD.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        query: { type: Type.STRING, description: "Término de búsqueda (software, librería, versión)" },
+        limite: { type: Type.NUMBER, description: "Máximo de resultados (default: 10)" }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "buscar_programas_hackerone",
+    description: "Busca programas activos de bug bounty en HackerOne.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        filtro_bounty: { type: "boolean", description: "Solo programas que ofrecen bounties" },
+        bounty_minimo: { type: Type.NUMBER, description: "Bounty mínimo en USD" }
+      }
+    }
+  },
+  {
+    name: "realizar_osint",
+    description: "Realiza Open Source Intelligence en un dominio/target.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        target: { type: Type.STRING, description: "Dominio o IP a investigar" }
+      },
+      required: ["target"]
+    }
+  },
+  {
+    name: "buscar_exploits",
+    description: "Busca exploits públicos en ExploitDB u otras fuentes.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        keyword: { type: Type.STRING, description: "Término de búsqueda (ej. SQL injection, RCE)" },
+        limite: { type: Type.NUMBER, description: "Máximo de resultados" }
+      },
+      required: ["keyword"]
+    }
+  },
+
+  // FASE 2: SYSTEM AUTOMATION TOOLS
+  {
+    name: "crear_y_ejecutar_script",
+    description: "Crea un archivo script y lo ejecuta automáticamente.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        contenido: { type: Type.STRING, description: "Código del script" },
+        nombre_archivo: { type: Type.STRING, description: "Nombre del archivo (sin extensión)" },
+        lenguaje: { type: Type.STRING, description: "Lenguaje: python, javascript, bash, powershell" }
+      },
+      required: ["contenido", "nombre_archivo", "lenguaje"]
+    }
+  },
+  {
+    name: "instalar_paquete",
+    description: "Instala paquetes de software usando npm, pip, apt, etc.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        nombre_paquete: { type: Type.STRING, description: "Nombre del paquete" },
+        gestor: { type: Type.STRING, description: "npm, pip, apt, brew" }
+      },
+      required: ["nombre_paquete", "gestor"]
+    }
+  },
+  {
+    name: "listar_procesos",
+    description: "Lista los procesos del sistema actualmente ejecutándose.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {}
+    }
+  },
+  {
+    name: "analizar_codigo_seguridad",
+    description: "Analiza código para encontrar patrones inseguros.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        archivo: { type: Type.STRING, description: "Ruta del archivo a analizar" }
+      },
+      required: ["archivo"]
+    }
+  },
+
+  // FASE 2: DYNAMIC TOOLING TOOLS
+  {
+    name: "instalar_herramienta_hacking",
+    description: "Instala herramientas de seguridad (nmap, sqlmap, metasploit, etc).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        herramienta_id: { type: Type.STRING, description: "ID de herramienta: nmap, metasploit, burpsuite, sqlmap, wireshark, aircrack-ng, john, ghidra" }
+      },
+      required: ["herramienta_id"]
+    }
+  },
+  {
+    name: "habilitar_herramienta",
+    description: "Habilita una herramienta instalada para usar.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        herramienta_id: { type: Type.STRING, description: "ID de la herramienta" }
+      },
+      required: ["herramienta_id"]
+    }
+  },
+  {
+    name: "registrar_api_personalizada",
+    description: "Registra una API personalizada para acceso futuro.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        nombre_api: { type: Type.STRING, description: "Nombre descriptivo" },
+        url_base: { type: Type.STRING, description: "URL base de la API" },
+        autenticada: { type: "boolean", description: "Requiere autenticación" }
+      },
+      required: ["nombre_api", "url_base"]
+    }
+  },
+
+  // FASE 2: AUTONOMOUS OPERATION TOOLS
+  {
+    name: "activar_modo_autonomo",
+    description: "Activa el modo de operación autónoma de Jarvis.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {}
+    }
+  },
+  {
+    name: "registrar_objetivo_bug_bounty",
+    description: "Registra un programa de bug bounty para automatización.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        plataforma: { type: Type.STRING, description: "hackerone, bugcrowd, intigriti" },
+        programa: { type: Type.STRING, description: "Handle del programa" },
+        bounty_maximo: { type: Type.NUMBER, description: "Target de bounty máximo" }
+      },
+      required: ["plataforma", "programa"]
+    }
+  },
+  {
+    name: "generar_poc",
+    description: "Genera automáticamente Proof-of-Concept code para vulnerabilidades.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        tipo_vulnerabilidad: { type: Type.STRING, description: "sql-injection, xss, csrf, rce, etc" },
+        descripcion: { type: Type.STRING, description: "Descripción de la vulnerabilidad" },
+        url_target: { type: Type.STRING, description: "URL objetivo (opcional)" },
+        severidad: { type: Type.STRING, description: "critical, high, medium, low" }
+      },
+      required: ["tipo_vulnerabilidad"]
+    }
+  },
+  {
+    name: "habilitar_tarea_autonoma",
+    description: "Habilita una tarea de operación autónoma.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        tarea_id: { type: Type.STRING, description: "ID: scan-vulnerabilities, monitor-cves, code-generation, self-improvement, security-audit" }
+      },
+      required: ["tarea_id"]
+    }
+  },
+  {
+    name: "registrar_metrica_aprendizaje",
+    description: "Registra una métrica de aprendizaje para auto-mejora.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        metrica: { type: Type.STRING, description: "Nombre de la métrica" },
+        valor: { type: Type.NUMBER, description: "Valor numérico" }
+      },
+      required: ["metrica", "valor"]
     }
   }
 ];
