@@ -252,7 +252,7 @@ export class JarvisAgenticBridge {
           executionTime: Date.now() - startTime,
           constitutionalValidation: {
             approved: false,
-            riskLevel: constValidation.validation.riskAssessment.riskLevel,
+            riskLevel: constValidation.validation.severity,
             reasoning: constValidation.validation.overallReasoning,
           },
         };
@@ -262,7 +262,7 @@ export class JarvisAgenticBridge {
       }
 
       console.log(`✅ APROBADA POR CONSTITUTIONAL AI`);
-      console.log(`   Risk Level: ${constValidation.validation.riskAssessment.riskLevel}`);
+      console.log(`   Severity: ${constValidation.validation.severity}`);
       console.log(`   Reasoning: ${constValidation.validation.overallReasoning}\n`);
 
       // PASO 2: SELECIÓN DE EQUIPO DE AGENTES
@@ -350,7 +350,7 @@ export class JarvisAgenticBridge {
         executionTime: Date.now() - startTime,
         constitutionalValidation: {
           approved: true,
-          riskLevel: constValidation.validation.riskAssessment.riskLevel,
+          riskLevel: constValidation.validation.severity,
           reasoning: constValidation.validation.overallReasoning,
         },
         lessonsLearned: agentResult.lessonLearned,
