@@ -3,7 +3,11 @@
  *
  * Expone Jarvis como un servicio HTTP con endpoints RESTful
  * para ejecutar tareas, obtener estado, y monitorear evolución.
+ *
+ * AHORA CON MOTOR AGENTICO REAL (JarvisAgenticBridge)
  */
+
+import { JarvisAgenticBridge, TaskExecutionRequest } from '../JarvisAgenticBridge';
 
 export interface ApiTask {
   id: string;
@@ -42,9 +46,16 @@ export class RestApiServer {
   private completedTasks: number = 0;
   private failedTasks: number = 0;
   private totalExecutionTime: number = 0;
+  private agenticBridge: JarvisAgenticBridge;
 
-  constructor(port: number = 3000) {
+  constructor(port: number = 3000, agenticBridge?: JarvisAgenticBridge) {
     this.port = port;
+    if (agenticBridge) {
+      this.agenticBridge = agenticBridge;
+    } else {
+      // Fallback si no se proporciona
+      this.agenticBridge = new JarvisAgenticBridge();
+    }
   }
 
   /**
@@ -128,32 +139,50 @@ export class RestApiServer {
   }
 
   /**
-   * PROCESAR TAREA ASINCRONAMENTE
+   * PROCESAR TAREA A TRAVÉS DEL MOTOR AGENTICO REAL
+   *
+   * Ahora ejecuta la tarea a través del verdadero loop agentico
+   * con Constitutional AI validation.
    */
   private async processTaskAsync(taskId: string): Promise<void> {
     const task = this.tasksQueue.get(taskId);
     if (!task) return;
 
     task.status = 'processing';
-
-    // Simular procesamiento
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 2000));
-
     const startTime = Date.now();
 
-    // Determinar resultado (80% éxito)
-    const success = Math.random() > 0.2;
+    try {
+      // USAR EL VERDADERO MOTOR AGENTICO
+      const result = await this.agenticBridge.executeTask({
+        query: task.query,
+        context: task.context,
+        priority: 'medium',
+        deadline: task.deadline,
+        requester: 'rest-api',
+      });
 
-    if (success) {
-      task.status = 'completed';
-      task.result = {
-        output: `Procesó correctamente: ${task.query}`,
-        executionTime: Date.now() - startTime,
-      };
-      this.completedTasks++;
-    } else {
+      // Actualizar tarea con resultado real
+      if (result.success) {
+        task.status = 'completed';
+        task.result = {
+          output: result.output,
+          reasoning: result.reasoning,
+          iterations: result.iterations,
+          executionTime: Date.now() - startTime,
+          constitutionalValidation: result.constitutionalValidation,
+        };
+        this.completedTasks++;
+      } else {
+        task.status = 'failed';
+        task.error = result.output;
+        task.result = {
+          constitutionalValidation: result.constitutionalValidation,
+        };
+        this.failedTasks++;
+      }
+    } catch (error) {
       task.status = 'failed';
-      task.error = 'Error durante procesamiento';
+      task.error = error instanceof Error ? error.message : 'Unknown error';
       this.failedTasks++;
     }
 
@@ -161,7 +190,9 @@ export class RestApiServer {
     const executionTime = task.completedAt - task.createdAt;
     this.totalExecutionTime += executionTime;
 
-    console.log(`   ✅ Tarea ${taskId.slice(0, 12)}... completada en ${executionTime}ms`);
+    console.log(
+      `   ${task.status === 'completed' ? '✅' : '❌'} Tarea ${taskId.slice(0, 12)}... ${task.status} en ${executionTime}ms`
+    );
   }
 
   /**

@@ -2,13 +2,17 @@
  * INTEGRATION ORCHESTRATOR
  *
  * Orquestador central de integraciones.
- * Coordina GitHub, REST API, Webhooks y Base de datos.
+ * Coordina GitHub, REST API, Webhooks, Base de datos y MOTOR AGENTICO REAL.
+ *
+ * ⚠️  CRÍTICO: Este orquestador usa el verdadero motor agentico con Constitutional AI.
+ * Todas las tareas pasan por validación constitucional. Jarvis NUNCA viola su constitución.
  */
 
 import { GitHubIntegration } from './github/githubIntegration';
 import { RestApiServer } from './api/restApiServer';
 import { WebhookManager } from './webhooks/webhookManager';
 import { DatabaseLayer, DatabaseConfig } from './database/databaseLayer';
+import { JarvisAgenticBridge } from './JarvisAgenticBridge';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface IntegrationConfig {
@@ -26,52 +30,72 @@ export class IntegrationOrchestrator {
   private api: RestApiServer | null = null;
   private webhooks: WebhookManager;
   private database: DatabaseLayer | null = null;
+  private agenticBridge: JarvisAgenticBridge;
   private initialized: boolean = false;
   private startTime: number = 0;
 
   constructor() {
     console.log(`\n${'='.repeat(70)}`);
     console.log(`🔗 INICIALIZANDO INTEGRATION ORCHESTRATOR`);
+    console.log(`   Con motor agentico REAL y Constitutional AI`);
     console.log(`${'='.repeat(70)}\n`);
 
     this.webhooks = new WebhookManager();
+    this.agenticBridge = new JarvisAgenticBridge();
   }
 
   /**
    * INICIALIZAR INTEGRACIONES
+   *
+   * Ahora incluye el motor agentico real con Constitutional AI.
    */
   async initialize(config: IntegrationConfig): Promise<boolean> {
     console.log(`\n⚙️  Inicializando integraciones...\n`);
 
     this.startTime = Date.now();
 
-    // Inicializar GitHub
-    if (config.github) {
-      console.log(`📦 GitHub Integration:`);
-      this.github = new GitHubIntegration();
-      this.github.authenticate(config.github.token);
+    try {
+      // INICIALIZAR MOTOR AGENTICO (PRIORIDAD CRÍTICA)
+      console.log(`🧠 MOTOR AGENTICO:`);
+      const agentInitSuccess = await this.agenticBridge.initialize();
+      if (!agentInitSuccess) {
+        console.warn(`\n⚠️  ADVERTENCIA: Motor agentico no inicializado completamente`);
+        console.warn(`   Algunas funcionalidades pueden estar limitadas\n`);
+      }
+
+      // Inicializar GitHub
+      if (config.github) {
+        console.log(`\n📦 GitHub Integration:`);
+        this.github = new GitHubIntegration();
+        this.github.authenticate(config.github.token);
+      }
+
+      // Inicializar REST API
+      if (config.api) {
+        console.log(`\n🌐 REST API Server:`);
+        this.api = new RestApiServer(config.api.port, this.agenticBridge);
+        this.api.start();
+      }
+
+      // Inicializar Base de datos
+      if (config.database) {
+        console.log(`\n🗄️  Database Layer:`);
+        this.database = new DatabaseLayer(config.database);
+        await this.database.connect();
+      }
+
+      this.initialized = true;
+
+      console.log(`\n✅ Todas las integraciones inicializadas`);
+      console.log(`   Uptime: ${Date.now() - this.startTime}ms`);
+      console.log(`   ⚠️  MOTOR AGENTICO REAL ACTIVADO`);
+      console.log(`   ⚠️  CONSTITUTIONAL AI EN VIGOR\n`);
+
+      return true;
+    } catch (error) {
+      console.error(`\n❌ Error durante inicialización:`, error);
+      return false;
     }
-
-    // Inicializar REST API
-    if (config.api) {
-      console.log(`\n🌐 REST API Server:`);
-      this.api = new RestApiServer(config.api.port);
-      this.api.start();
-    }
-
-    // Inicializar Base de datos
-    if (config.database) {
-      console.log(`\n🗄️  Database Layer:`);
-      this.database = new DatabaseLayer(config.database);
-      await this.database.connect();
-    }
-
-    this.initialized = true;
-
-    console.log(`\n✅ Todas las integraciones inicializadas`);
-    console.log(`   Uptime: ${Date.now() - this.startTime}ms\n`);
-
-    return true;
   }
 
   /**
@@ -103,43 +127,71 @@ export class IntegrationOrchestrator {
   /**
    * EJECUTAR TAREA COMPLETA
    */
+  /**
+   * EJECUTAR TAREA A TRAVÉS DEL MOTOR AGENTICO REAL
+   *
+   * Ejecuta la tarea con:
+   * - Validación Constitucional
+   * - Agentic Loop real
+   * - Consolidación de memoria
+   * - Evolución del modelo
+   */
   async executeTask(query: string, context?: any): Promise<any> {
-    if (!this.api) {
-      throw new Error('REST API no inicializado');
-    }
+    console.log(`\n📋 Ejecutando tarea a través de motor agentico real...`);
 
-    console.log(`\n📋 Ejecutando tarea: "${query}"`);
-
-    const taskResponse = await this.api.createTask(query, context);
-
-    if (taskResponse.success && taskResponse.data) {
-      console.log(`   Task ID: ${taskResponse.data.id}`);
-
-      // Disparar evento
-      await this.webhooks.triggerEvent('task_completed', {
-        taskId: taskResponse.data.id,
+    try {
+      // USAR EL VERDADERO MOTOR AGENTICO
+      const result = await this.agenticBridge.executeTask({
         query,
-        result: { success: true },
-        executionTime: 1200,
+        context,
+        priority: 'medium',
+        requester: 'api-request',
       });
+
+      // Disparar evento WebHook
+      await this.webhooks.triggerEvent(
+        result.success ? 'task_completed' : 'task_failed',
+        {
+          taskId: result.taskId,
+          query,
+          success: result.success,
+          executionTime: result.executionTime,
+          iterations: result.iterations,
+          constitutionallyApproved: result.constitutionalValidation.approved,
+        }
+      );
 
       // Guardar en base de datos
       if (this.database) {
         await this.database.saveTask({
-          id: taskResponse.data.id,
+          id: result.taskId,
           query,
-          status: 'completed',
-          result: { success: true },
-          executionTime: 1200,
+          status: result.success ? 'completed' : 'failed',
+          result: {
+            output: result.output,
+            reasoning: result.reasoning,
+            iterations: result.iterations,
+            constitutionalValidation: result.constitutionalValidation,
+          },
+          executionTime: result.executionTime,
           createdAt: Date.now(),
           completedAt: Date.now(),
         });
       }
 
-      return taskResponse.data;
+      return {
+        id: result.taskId,
+        success: result.success,
+        output: result.output,
+        reasoning: result.reasoning,
+        iterations: result.iterations,
+        executionTime: result.executionTime,
+        constitutionalValidation: result.constitutionalValidation,
+      };
+    } catch (error) {
+      console.error(`❌ Error ejecutando tarea:`, error);
+      throw error;
     }
-
-    return null;
   }
 
   /**
