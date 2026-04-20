@@ -337,6 +337,124 @@ export class AgentOrchestrator {
   }
 
   /**
+   * SELECCIONAR EQUIPO PARA TAREA
+   *
+   * Selecciona un equipo de agentes especializados para una tarea específica.
+   */
+  async selectTeamForTask(
+    query: string,
+    validation?: any
+  ): Promise<{ agents: Array<{ name: string; role: string }> }> {
+    const queryLower = query.toLowerCase();
+
+    // Seleccionar agentes basado en keywords de la tarea
+    const selectedAgents: Array<{ name: string; role: string }> = [];
+
+    // Orquestador siempre participa
+    selectedAgents.push({
+      name: 'Orchestrator',
+      role: 'Coordinador',
+    });
+
+    // Seleccionar agentes especializados
+    if (
+      queryLower.includes('security') ||
+      queryLower.includes('vuln') ||
+      queryLower.includes('exploit') ||
+      queryLower.includes('pentest')
+    ) {
+      selectedAgents.push({
+        name: 'SecurityAuditor',
+        role: 'Seguridad',
+      });
+    }
+
+    if (
+      queryLower.includes('code') ||
+      queryLower.includes('develop') ||
+      queryLower.includes('program') ||
+      queryLower.includes('refactor')
+    ) {
+      selectedAgents.push({
+        name: 'Developer',
+        role: 'Desarrollo',
+      });
+    }
+
+    if (
+      queryLower.includes('research') ||
+      queryLower.includes('analyze') ||
+      queryLower.includes('investigate') ||
+      queryLower.includes('cve') ||
+      queryLower.includes('vulnerab')
+    ) {
+      selectedAgents.push({
+        name: 'Researcher',
+        role: 'Investigación',
+      });
+    }
+
+    if (
+      queryLower.includes('deploy') ||
+      queryLower.includes('infrastructure') ||
+      queryLower.includes('devops') ||
+      queryLower.includes('docker') ||
+      queryLower.includes('kubernetes')
+    ) {
+      selectedAgents.push({
+        name: 'DevOps',
+        role: 'Infraestructura',
+      });
+    }
+
+    if (
+      queryLower.includes('document') ||
+      queryLower.includes('doc') ||
+      queryLower.includes('write') ||
+      queryLower.includes('report')
+    ) {
+      selectedAgents.push({
+        name: 'DocumentationWriter',
+        role: 'Documentación',
+      });
+    }
+
+    if (
+      queryLower.includes('test') ||
+      queryLower.includes('validate') ||
+      queryLower.includes('verify') ||
+      queryLower.includes('qa')
+    ) {
+      selectedAgents.push({
+        name: 'QAValidator',
+        role: 'Testing',
+      });
+    }
+
+    if (
+      queryLower.includes('plan') ||
+      queryLower.includes('strategy') ||
+      queryLower.includes('optimize') ||
+      queryLower.includes('improve')
+    ) {
+      selectedAgents.push({
+        name: 'StrategicPlanner',
+        role: 'Estrategia',
+      });
+    }
+
+    // Si no se seleccionó ningún agente especializado, agregar Developer por defecto
+    if (selectedAgents.length === 1) {
+      selectedAgents.push({
+        name: 'Developer',
+        role: 'General',
+      });
+    }
+
+    return { agents: selectedAgents };
+  }
+
+  /**
    * OBTENER STATUS DEL POOL DE AGENTES
    */
   getAgentPoolStatus() {
