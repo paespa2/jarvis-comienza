@@ -110,19 +110,32 @@ async function processTaskWithTimeout(
     task.startedAt = Date.now();
 
     console.log(`⏱️  Procesando tarea ${taskId}: "${query.substring(0, 50)}..."`);
+    console.log(`   Iniciando agentic bridge execution...`);
 
-    // Ejecutar con timeout
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Task timeout after ${TASK_TIMEOUT}ms`)),
-        TASK_TIMEOUT
-      )
-    );
+    // Ejecutar con timeout mejorado
+    let result: any = null;
+    let timedOut = false;
 
-    const result = await Promise.race([
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        timedOut = true;
+        console.warn(`⚠️  Task timeout después de ${TASK_TIMEOUT}ms`);
+        resolve({
+          success: false,
+          output: `Task execution exceeded ${TASK_TIMEOUT}ms limit`,
+          error: `Timeout after ${TASK_TIMEOUT}ms`,
+        });
+      }, TASK_TIMEOUT);
+    });
+
+    result = await Promise.race([
       orchestrator.executeTask(query, context),
       timeoutPromise,
-    ]);
+    ]) || {
+      success: false,
+      output: 'Unknown error during execution',
+      error: 'No response from executor',
+    };
 
     task.status = 'completed';
     task.result = result;
