@@ -7,6 +7,7 @@
 
 import express, { Request, Response } from 'express';
 import cors from 'cors';
+import path from 'path';
 import { IntegrationOrchestrator } from './integrations/IntegrationOrchestrator';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,6 +33,7 @@ const requests: Map<string, JarvisRequest> = new Map();
 // Middleware
 app.use(express.json());
 app.use(cors());
+app.use(express.static(path.join(__dirname, '../public')));
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();

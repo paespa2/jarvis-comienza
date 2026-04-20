@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis IA - Sistema Agentico</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #667eea;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .status-badge.healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h2 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-icon {
+            font-size: 1.3em;
+        }
+
+        .stat {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .tasks-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .task-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .task-item.completed {
+            border-left-color: #28a745;
+            background: #f0f8f4;
+        }
+
+        .task-item.failed {
+            border-left-color: #dc3545;
+            background: #fef5f5;
+        }
+
+        .task-id {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #999;
+            word-break: break-all;
+        }
+
+        .task-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .task-status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .task-status.processing {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .task-status.completed {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .task-status.failed {
+            background: #f8d7da;
+            color: #842029;
+        }
+
+        .endpoints {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .endpoint-method {
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .endpoint-path {
+            color: #333;
+            word-break: break-all;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #667eea;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .subtitle {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Jarvis IA</h1>
+            <p class="subtitle">Sistema de IA Completamente Agentico con Constitutional AI</p>
+            <div id="statusContainer"></div>
+        </header>
+
+        <div class="grid">
+            <!-- Status Card -->
+            <div class="card">
+                <h2><span class="card-icon">📊</span> Estado del Sistema</h2>
+                <div id="statusContent">
+                    <div class="stat">
+                        <div class="stat-label">Estado General</div>
+                        <div class="stat-value" id="overallStatus">Cargando...</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Versión</div>
+                        <div class="stat-value" id="versionInfo">1.0.0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Entorno</div>
+                        <div class="stat-value" id="environmentInfo">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Card -->
+            <div class="card">
+                <h2><span class="card-icon">📈</span> Métricas</h2>
+                <div id="metricsContent">
+                    <div class="stat">
+                        <div class="stat-label">Tareas Procesadas</div>
+                        <div class="stat-value" id="totalRequests">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Completadas</div>
+                        <div class="stat-value" id="completedRequests">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Fallidas</div>
+                        <div class="stat-value" id="failedRequests">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Task Card -->
+            <div class="card">
+                <h2><span class="card-icon">✏️</span> Nueva Tarea</h2>
+                <div id="createTaskAlert"></div>
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="query">Consulta</label>
+                        <textarea id="query" name="query" placeholder="Describe tu tarea aquí..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="context">Contexto (JSON opcional)</label>
+                        <textarea id="context" name="context" placeholder='{"clave": "valor"}'></textarea>
+                    </div>
+                    <button type="submit">
+                        <span id="submitText">Crear Tarea</span>
+                        <span id="submitLoading" class="hidden"><span class="loading"></span> Procesando...</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tasks List -->
+        <div class="card">
+            <h2><span class="card-icon">📋</span> Tareas Recientes</h2>
+            <div id="tasksAlert"></div>
+            <div class="tasks-list" id="tasksList">
+                <p style="color: #999; text-align: center; padding: 20px;">No hay tareas creadas aún</p>
+            </div>
+            <div style="margin-top: 15px;">
+                <button onclick="loadTasks()">Actualizar Tareas</button>
+            </div>
+        </div>
+
+        <!-- API Endpoints -->
+        <div class="card">
+            <h2><span class="card-icon">🔌</span> Endpoints de API</h2>
+            <div class="endpoints">
+                <div class="endpoint">
+                    <div class="endpoint-method">GET</div>
+                    <div class="endpoint-path">/health</div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-method">GET</div>
+                    <div class="endpoint-path">/api/status</div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-method">POST</div>
+                    <div class="endpoint-path">/api/tasks</div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-method">GET</div>
+                    <div class="endpoint-path">/api/tasks/:id</div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-method">GET</div>
+                    <div class="endpoint-path">/api/metrics</div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-method">POST</div>
+                    <div class="endpoint-path">/api/evolution/trigger</div>
+                </div>
+                <div class="endpoint">
+                    <div class="endpoint-method">GET</div>
+                    <div class="endpoint-path">/api/docs</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Load initial data
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSystemStatus();
+            loadMetrics();
+            loadTasks();
+
+            // Refresh every 5 seconds
+            setInterval(() => {
+                loadSystemStatus();
+                loadMetrics();
+                loadTasks();
+            }, 5000);
+        });
+
+        // Load system status
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/status`);
+                const data = await response.json();
+
+                document.getElementById('overallStatus').textContent = data.data.status || 'Activo';
+
+                if (data.data.environment) {
+                    document.getElementById('environmentInfo').textContent = data.data.environment;
+                }
+
+                // Update header status
+                const statusContainer = document.getElementById('statusContainer');
+                const badge = document.createElement('div');
+                badge.className = 'status-badge healthy';
+                badge.innerHTML = '✅ Sistema Operativo';
+                statusContainer.innerHTML = '';
+                statusContainer.appendChild(badge);
+            } catch (error) {
+                console.error('Error loading status:', error);
+                const statusContainer = document.getElementById('statusContainer');
+                const badge = document.createElement('div');
+                badge.className = 'status-badge error';
+                badge.innerHTML = '❌ Error de Conexión';
+                statusContainer.innerHTML = '';
+                statusContainer.appendChild(badge);
+            }
+        }
+
+        // Load metrics
+        async function loadMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/api/metrics`);
+                const data = await response.json();
+
+                document.getElementById('totalRequests').textContent = data.data.requestsProcessed || 0;
+                document.getElementById('completedRequests').textContent = data.data.completedRequests || 0;
+                document.getElementById('failedRequests').textContent = data.data.failedRequests || 0;
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+            }
+        }
+
+        // Load tasks
+        async function loadTasks() {
+            try {
+                const response = await fetch(`${API_BASE}/api/tasks`);
+                const data = await response.json();
+
+                const tasksList = document.getElementById('tasksList');
+                const tasks = data.data.tasks || [];
+
+                if (tasks.length === 0) {
+                    tasksList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No hay tareas creadas aún</p>';
+                    return;
+                }
+
+                tasksList.innerHTML = tasks.map(task => `
+                    <div class="task-item ${task.status}">
+                        <div class="task-id">ID: ${task.id}</div>
+                        <div style="margin-top: 8px; color: #333;">
+                            <strong>Consulta:</strong> ${escapeHtml(task.query.substring(0, 100))}${task.query.length > 100 ? '...' : ''}
+                        </div>
+                        ${task.result ? `
+                            <div style="margin-top: 8px; color: #333;">
+                                <strong>Resultado:</strong> ${escapeHtml(JSON.stringify(task.result).substring(0, 100))}...
+                            </div>
+                        ` : ''}
+                        ${task.error ? `
+                            <div style="margin-top: 8px; color: #dc3545;">
+                                <strong>Error:</strong> ${escapeHtml(task.error)}
+                            </div>
+                        ` : ''}
+                        <span class="task-status ${task.status}">${capitalizeFirst(task.status)}</span>
+                        <div style="font-size: 0.85em; color: #999; margin-top: 8px;">
+                            ${new Date(task.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+
+        // Create task
+        document.getElementById('taskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const query = document.getElementById('query').value;
+            const contextStr = document.getElementById('context').value;
+
+            let context = undefined;
+            if (contextStr.trim()) {
+                try {
+                    context = JSON.parse(contextStr);
+                } catch (error) {
+                    showAlert('createTaskAlert', 'Contexto JSON inválido', 'error');
+                    return;
+                }
+            }
+
+            const submitBtn = e.target.querySelector('button');
+            const submitText = document.getElementById('submitText');
+            const submitLoading = document.getElementById('submitLoading');
+
+            submitBtn.disabled = true;
+            submitText.classList.add('hidden');
+            submitLoading.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/tasks`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query, context }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('createTaskAlert', `Tarea creada: ${data.data.id}`, 'success');
+                    document.getElementById('taskForm').reset();
+                    loadTasks();
+                } else {
+                    showAlert('createTaskAlert', data.error || 'Error al crear tarea', 'error');
+                }
+            } catch (error) {
+                showAlert('createTaskAlert', 'Error de conexión: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitText.classList.remove('hidden');
+                submitLoading.classList.add('hidden');
+            }
+        });
+
+        // Helper functions
+        function showAlert(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="alert ${type}">${message}</div>`;
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.innerHTML = '';
+                }, 4000);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+    </script>
+</body>
+</html>
