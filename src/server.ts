@@ -3,6 +3,12 @@
  *
  * Servidor Express que expone Jarvis IA como servicio HTTP
  * Desplegable en Railway, Vercel, Heroku, etc.
+ *
+ * MEJORADO CON:
+ * - Task queue processing
+ * - Proper timeout handling
+ * - Error tracking
+ * - Background workers
  */
 
 import express, { Request, Response } from 'express';
@@ -20,15 +26,28 @@ interface JarvisRequest {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   result?: any;
   error?: string;
+  startedAt?: number;
+  completedAt?: number;
+  duration?: number;
 }
 
 // Variables globales
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
+const TASK_TIMEOUT = parseInt(process.env.TASK_TIMEOUT || '30000', 10); // 30 segundos
 
 let orchestrator: IntegrationOrchestrator;
 const requests: Map<string, JarvisRequest> = new Map();
+const processingTasks: Set<string> = new Set();
+
+// Task processing stats
+const stats = {
+  totalTasksCreated: 0,
+  completedTasks: 0,
+  failedTasks: 0,
+  averageExecutionTime: 0,
+};
 
 // Middleware
 app.use(express.json());
@@ -74,6 +93,65 @@ async function initializeJarvis() {
 }
 
 /**
+ * PROCESAR TAREA CON TIMEOUT
+ *
+ * Ejecuta una tarea con manejo robusto de errores y timeout
+ */
+async function processTaskWithTimeout(
+  taskId: string,
+  query: string,
+  context?: any
+): Promise<void> {
+  const task = requests.get(taskId);
+  if (!task) return;
+
+  try {
+    task.status = 'processing';
+    task.startedAt = Date.now();
+
+    console.log(`⏱️  Procesando tarea ${taskId}: "${query.substring(0, 50)}..."`);
+
+    // Ejecutar con timeout
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Task timeout after ${TASK_TIMEOUT}ms`)),
+        TASK_TIMEOUT
+      )
+    );
+
+    const result = await Promise.race([
+      orchestrator.executeTask(query, context),
+      timeoutPromise,
+    ]);
+
+    task.status = 'completed';
+    task.result = result;
+    task.completedAt = Date.now();
+    task.duration = task.completedAt - (task.startedAt || Date.now());
+
+    stats.completedTasks++;
+    stats.averageExecutionTime =
+      (stats.averageExecutionTime * (stats.completedTasks - 1) + task.duration) /
+      stats.completedTasks;
+
+    console.log(
+      `✅ Tarea completada ${taskId} en ${task.duration}ms`
+    );
+  } catch (error: any) {
+    task.status = 'failed';
+    task.error = error.message || 'Error desconocido';
+    task.completedAt = Date.now();
+    task.duration = task.completedAt - (task.startedAt || Date.now());
+
+    stats.failedTasks++;
+
+    console.error(`❌ Tarea fallida ${taskId}: ${task.error}`);
+  } finally {
+    processingTasks.delete(taskId);
+  }
+}
+
+/**
  * =====================================
  * HEALTH CHECK
  * =====================================
@@ -108,7 +186,7 @@ app.get('/api/status', (req: Request, res: Response) => {
  */
 app.post('/api/tasks', async (req: Request, res: Response) => {
   try {
-    const { query, context } = req.body;
+    const { query, context, priority } = req.body;
 
     if (!query) {
       return res.status(400).json({
@@ -128,26 +206,25 @@ app.post('/api/tasks', async (req: Request, res: Response) => {
     };
 
     requests.set(requestId, jarvisRequest);
+    stats.totalTasksCreated++;
 
-    // Procesar asincronicamente
-    (async () => {
-      try {
-        jarvisRequest.status = 'processing';
-
-        // Ejecutar tarea
-        const result = await orchestrator.executeTask(query, context);
-
-        jarvisRequest.status = 'completed';
-        jarvisRequest.result = result;
-      } catch (error: any) {
-        jarvisRequest.status = 'failed';
-        jarvisRequest.error = error.message;
-      }
-    })();
+    // Procesar asincronicamente en background
+    // NO esperar a que termine
+    if (!processingTasks.has(requestId)) {
+      processingTasks.add(requestId);
+      processTaskWithTimeout(requestId, query, context).catch(err => {
+        console.error(`Unhandled error in task ${requestId}:`, err);
+      });
+    }
 
     res.json({
       success: true,
-      data: jarvisRequest,
+      data: {
+        id: jarvisRequest.id,
+        query: jarvisRequest.query,
+        timestamp: jarvisRequest.timestamp,
+        status: jarvisRequest.status,
+      },
     });
   } catch (error: any) {
     res.status(500).json({
@@ -206,19 +283,34 @@ app.get('/api/tasks', (req: Request, res: Response) => {
  * =====================================
  */
 app.get('/api/metrics', (req: Request, res: Response) => {
+  const allRequests = Array.from(requests.values());
+  const completed = allRequests.filter(r => r.status === 'completed');
+  const failed = allRequests.filter(r => r.status === 'failed');
+  const processing = allRequests.filter(r => r.status === 'processing');
+
+  const successRate =
+    stats.totalTasksCreated > 0
+      ? ((stats.completedTasks / stats.totalTasksCreated) * 100).toFixed(1)
+      : 0;
+
   const metrics = orchestrator.getGlobalMetrics();
 
   res.json({
     success: true,
     data: {
       ...metrics,
+      tasks: {
+        totalCreated: stats.totalTasksCreated,
+        completed: stats.completedTasks,
+        failed: stats.failedTasks,
+        processing: processing.length,
+        pending: allRequests.filter(r => r.status === 'pending').length,
+        successRate: `${successRate}%`,
+        averageExecutionTime: `${stats.averageExecutionTime.toFixed(0)}ms`,
+      },
       requestsProcessed: requests.size,
-      completedRequests: Array.from(requests.values()).filter(
-        r => r.status === 'completed'
-      ).length,
-      failedRequests: Array.from(requests.values()).filter(
-        r => r.status === 'failed'
-      ).length,
+      completedRequests: completed.length,
+      failedRequests: failed.length,
     },
   });
 });
