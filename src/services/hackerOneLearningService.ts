@@ -164,7 +164,6 @@ export class HackerOneLearningService {
         caseResult.reconSteps ? `Pasos de reconocimiento: ${caseResult.reconSteps}` : null,
         caseResult.notes ? `Notas: ${caseResult.notes}` : null,
       ].filter(Boolean) as string[],
-      confidence,
       SECURITY_TEACHINGS
     );
 

@@ -17,6 +17,7 @@
     "allowJs": true,
     "declaration": false,
     "allowSyntheticDefaultImports": true,
+    "noEmitOnError": false,
     "ignoreDeprecations": "5.0",
     "types": ["node"],
     "typeRoots": ["./node_modules/@types"]
@@ -30,9 +31,11 @@
     "dist",
     "**/*.tsx",
     "**/*.jsx",
-    "src/core/**/*",
-    "src/services/**/*",
     "src/components/**/*",
-    "src/brain/**/*"
+    "src/brain/**/*",
+    "src/services/jarvisService.ts",
+    "src/services/learningService.ts",
+    "src/services/memoryGraphService.ts",
+    "src/services/groqService.ts"
   ]
 }
