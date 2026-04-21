@@ -13,3 +13,4 @@ dist/
 .jarvis.db
 .jarvis-native-model/
 .jarvis-self-programming/
+/obsidian-vault/
