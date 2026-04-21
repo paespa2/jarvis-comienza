@@ -4,8 +4,12 @@ dist/
 .env
 *.log
 *.db
+*.db-shm
+*.db-wal
 .DS_Store
 .vscode/
 .idea/
 *.swp
 .jarvis.db
+.jarvis-native-model/
+.jarvis-self-programming/
