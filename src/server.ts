@@ -42,6 +42,10 @@ import { coreTeachings } from './learning/CoreTeachings';
 import { hackerOneAssistant } from './qa/HackerOneAssistant';
 import { reconEngine } from './qa/ReconEngine';
 
+// ✅ MODELO NATIVO AUTÓNOMO + AUTOPROGRAMACIÓN
+import { jarvisNativeModel } from './core/nativeModel/JarvisNativeModel';
+import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEngine';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -66,7 +70,7 @@ interface JarvisRequest {
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
-const TASK_TIMEOUT = parseInt(process.env.TASK_TIMEOUT || '60000', 10);
+const TASK_TIMEOUT = parseInt(process.env.TASK_TIMEOUT || '30000', 10);
 
 let orchestrator: IntegrationOrchestrator;
 let memoryManager: PersistentMemoryManager;
@@ -283,6 +287,23 @@ async function processTaskWithTimeout(
     console.log(`\n   ✅ Action documented in Obsidian`);
     console.log(`   ✅ Memory vault updated`);
 
+    // ✅ MODELO NATIVO: Aprender del resultado de la tarea
+    const domain = jarvisNativeModel.detectDomain(query);
+    jarvisNativeModel.learn(
+      query,
+      result.output || result.error || '',
+      result.success || false,
+      domain
+    );
+
+    // ✅ SELF-PROGRAMMING: Registrar métricas para auto-optimización
+    selfProgrammingEngine.learnFromExecution({
+      query,
+      success: result.success || false,
+      executionTime: totalTime,
+      iterations: result.iterations || 1,
+    });
+
     task.status = 'completed';
     task.result = {
       ...result,
@@ -294,7 +315,11 @@ async function processTaskWithTimeout(
       metrics: {
         reasoningTime,
         totalTime,
-      }
+      },
+      nativeModel: {
+        domain,
+        version: jarvisNativeModel.getStats().version,
+      },
     };
     task.completedAt = Date.now();
     task.duration = task.completedAt - (task.startedAt || Date.now());
@@ -1418,6 +1443,191 @@ app.get('/api/docs', (req: Request, res: Response) => {
         },
       },
     },
+  });
+});
+
+// ============================================
+// MODELO NATIVO & AUTOPROGRAMACIÓN
+// ============================================
+
+/**
+ * GET /api/native-model/stats
+ * Estado y estadísticas del modelo nativo de Jarvis
+ */
+app.get('/api/native-model/stats', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: jarvisNativeModel.getStats(),
+    timestamp: Date.now(),
+  });
+});
+
+/**
+ * POST /api/native-model/generate
+ * Generar respuesta usando solo el modelo nativo (sin APIs externas)
+ */
+app.post('/api/native-model/generate', (req: Request, res: Response) => {
+  try {
+    const { query, mode = 'synthesize', context, iteration } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ success: false, error: 'query es requerido' });
+    }
+
+    const output = jarvisNativeModel.generate({
+      query,
+      context,
+      iteration: iteration || 1,
+      mode: mode as any,
+    });
+
+    res.json({
+      success: true,
+      data: output,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/self-programming/report
+ * Reporte completo del motor de autoprogramación
+ */
+app.get('/api/self-programming/report', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: selfProgrammingEngine.getReport(),
+    timestamp: Date.now(),
+  });
+});
+
+/**
+ * POST /api/self-programming/modify
+ * Modificar un parámetro de comportamiento de Jarvis
+ */
+app.post('/api/self-programming/modify', (req: Request, res: Response) => {
+  try {
+    const { parameter, value, reason } = req.body;
+
+    if (!parameter || value === undefined || !reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'parameter, value y reason son requeridos',
+      });
+    }
+
+    const result = selfProgrammingEngine.modifyParameter(parameter, value, reason);
+
+    res.json({
+      success: result.success,
+      data: result,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/self-programming/add-knowledge
+ * Agregar conocimiento al sistema de Jarvis
+ */
+app.post('/api/self-programming/add-knowledge', (req: Request, res: Response) => {
+  try {
+    const { category, topic, content, confidence } = req.body;
+
+    if (!category || !topic || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'category, topic y content son requeridos',
+      });
+    }
+
+    const entry = selfProgrammingEngine.addKnowledge({
+      category,
+      topic,
+      content,
+      confidence: confidence || 0.7,
+    });
+
+    res.json({
+      success: true,
+      data: entry,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/self-programming/add-pattern
+ * Agregar nuevo patrón de razonamiento
+ */
+app.post('/api/self-programming/add-pattern', (req: Request, res: Response) => {
+  try {
+    const { name, trigger, steps } = req.body;
+
+    if (!name || !trigger || !steps) {
+      return res.status(400).json({
+        success: false,
+        error: 'name, trigger y steps son requeridos',
+      });
+    }
+
+    const pattern = selfProgrammingEngine.addReasoningPattern({ name, trigger, steps });
+
+    res.json({
+      success: true,
+      data: pattern,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/self-programming/analyze
+ * Ejecutar análisis y auto-optimización completa
+ */
+app.post('/api/self-programming/analyze', async (req: Request, res: Response) => {
+  try {
+    const result = await selfProgrammingEngine.analyzeAndOptimize();
+    res.json({
+      success: true,
+      data: result,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/self-programming/revert
+ * Revertir última auto-modificación
+ */
+app.post('/api/self-programming/revert', (req: Request, res: Response) => {
+  const result = selfProgrammingEngine.revertLastModification();
+  res.json({
+    success: result.success,
+    data: result,
+    timestamp: Date.now(),
+  });
+});
+
+/**
+ * GET /api/self-programming/parameters
+ * Parámetros actuales de comportamiento
+ */
+app.get('/api/self-programming/parameters', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: selfProgrammingEngine.getParameters(),
+    timestamp: Date.now(),
   });
 });
 

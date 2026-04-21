@@ -371,7 +371,7 @@ export const geminiService = {
     return { size: responseCache.size(), maxSize: 100 };
   },
 
-  async withRetry<T>(fn: () => Promise<T>, maxRetries = 5, initialDelay = 500): Promise<T> {
+  async withRetry<T>(fn: () => Promise<T>, maxRetries = 2, initialDelay = 200): Promise<T> {
     let lastError: any;
     for (let i = 0; i < maxRetries; i++) {
       try {
@@ -380,23 +380,19 @@ export const geminiService = {
         lastError = error;
         const errorMessage = error.message || JSON.stringify(error);
         if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-          // OPTIMIZACIÓN: Exponencial reducido: 0.5s, 1s, 2s, 4s, 8s (en lugar de 4s, 8s, 16s, 32s, 64s)
+          // Retry reducido: 200ms, 400ms (total max ~600ms de espera)
           const delay = initialDelay * Math.pow(2, i);
-
-          // Agregamos un jitter (ruido aleatorio) para evitar el problema de thundering herd
-          // cuando multiples llamados de fondo caen al mismo tiempo
-          const jitter = Math.random() * 500;
+          const jitter = Math.random() * 100;
           const finalDelay = delay + jitter;
 
-          console.warn(`[Gemini Service] 🔋 Quota Rate Limit (429). Retrasando ejecución por ${Math.round(finalDelay/1000)}s... (Intento ${i + 1}/${maxRetries})`);
+          console.warn(`[Gemini Service] 🔋 Rate Limit. Retry en ${Math.round(finalDelay)}ms (${i + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, finalDelay));
           continue;
         }
-        // Si no es un 429 (ej. un 500, o sintaxis), no hacemos retries ciegos, lanzamos.
         throw error;
       }
     }
-    console.error("[Gemini Service] Fallos exhaustos tras múltiples retries de cuota.");
+    console.warn("[Gemini Service] Retries agotados - caller debe usar fallback local.");
     throw lastError;
   },
 
