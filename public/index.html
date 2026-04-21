@@ -298,17 +298,22 @@
                 <div class="msg-icon" style="color:var(--cyan)">◆</div>
                 <div class="msg-body">
                     <div class="msg-time" id="init-time"></div>
-                    <div class="msg-text">JARVIS IA — AUTONOMOUS AGENT ONLINE
-Modelo nativo: activo | Sin dependencias externas
-Constitutional AI: INMUTABLE | Lealtad paespa: 0.95
-Firebase Knowledge Graph: conectando...
-Obsidian Memory: iniciando vault local...</div>
+                    <div class="msg-text">JARVIS IA — MODELO NATIVO CONVERSACIONAL
+
+Hola paespa. Soy Jarvis. Chatea conmigo directamente — el modelo nativo responde en tiempo real.
+
+Modos disponibles:
+  • Chat normal: escribe cualquier cosa
+  • Tarea autónoma completa: prefija con "/task"
+  • Ejemplo: /task analiza vulnerabilidad xss en example.com
+
+Modelo: activo | Constitucional: INMUTABLE | Lealtad paespa: 0.95</div>
                 </div>
             </div>
         </div>
         <div class="input-bar">
             <div class="input-wrap">
-                <input id="query-input" type="text" placeholder="Enviar tarea a Jarvis..." autocomplete="off">
+                <input id="query-input" type="text" placeholder="Chatea con Jarvis... (prefija /task para ejecutar tarea autónoma completa)" autocomplete="off">
             </div>
             <button id="send-btn" class="send-btn">ENVIAR</button>
         </div>
@@ -472,16 +477,59 @@ function clearChat() {
     addMsg('Nueva sesión iniciada — Jarvis listo', 'system');
 }
 
-// ── SEND MESSAGE ─────────────────────────────────────────────
-async function sendMessage() {
-    const query = queryInput.value.trim();
-    if (!query) return;
+// ── SESSION ──────────────────────────────────────────────────
+let chatSessionId = localStorage.getItem('jarvis-chat-session') || null;
 
+// ── CHAT MODE (default, conversational) ──────────────────────
+async function sendChatMessage(query) {
     addMsg(query, 'user');
-    queryInput.value = '';
     sendBtn.disabled = true;
+    const loadingEl = addMsg('...', 'loading');
 
-    const loadingEl = addMsg('Procesando con modelo nativo...', 'loading');
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: query, sessionId: chatSessionId }),
+        });
+        const data = await res.json();
+        loadingEl.remove();
+
+        if (!data.success) { addMsg('ERROR: ' + data.error, 'error'); sendBtn.disabled = false; return; }
+
+        const d = data.data;
+        chatSessionId = d.sessionId;
+        localStorage.setItem('jarvis-chat-session', chatSessionId);
+
+        const card = `<div class="result-card" style="margin-top:6px">
+            <div class="result-row"><span class="result-label">Model</span><span class="result-value" style="color:var(--purple)">v${d.modelVersion} · ${d.domain}</span></div>
+            <div class="result-row"><span class="result-label">Confidence</span><span class="result-value">${(d.confidence*100).toFixed(0)}%</span></div>
+            <div class="result-row"><span class="result-label">Time</span><span class="result-value">${d.generationTime}ms</span></div>
+        </div>`;
+
+        addMsg(d.response, 'system', card);
+
+        // Add to ops list
+        const opEl = document.createElement('div');
+        opEl.className = 'ops-item';
+        opEl.textContent = '💬 ' + query.substring(0, 28) + (query.length > 28 ? '...' : '');
+        if (opsList.querySelector('.ops-item[style]')) opsList.innerHTML = '';
+        opsList.insertBefore(opEl, opsList.firstChild);
+        if (opsList.children.length > 6) opsList.removeChild(opsList.lastChild);
+
+        setTimeout(() => { loadNativeModelStats(); }, 500);
+    } catch (e) {
+        loadingEl.remove();
+        addMsg('ERROR: ' + e.message, 'error');
+    }
+    sendBtn.disabled = false;
+}
+
+// ── TASK MODE (full autonomous reasoning with agentic loop) ──
+async function sendTaskMessage(query) {
+    addMsg(query, 'user');
+    sendBtn.disabled = true;
+    const loadingEl = addMsg('Ejecutando tarea autónoma con modelo nativo...', 'loading');
 
     try {
         const res = await fetch('/api/tasks', {
@@ -494,13 +542,12 @@ async function sendMessage() {
 
         const taskId = data.data.id;
         let attempts = 0;
-
         const poll = async () => {
             const r = await fetch(`/api/tasks/${taskId}`);
             const d = await r.json();
             if (!d.success || ++attempts > 45) {
                 loadingEl.remove();
-                addMsg(d.success ? 'TIMEOUT — intento nuevamente' : 'ERROR: tarea no encontrada', 'error');
+                addMsg(d.success ? 'TIMEOUT' : 'ERROR: tarea no encontrada', 'error');
                 sendBtn.disabled = false;
                 return;
             }
@@ -510,14 +557,12 @@ async function sendMessage() {
                 const result = task.result || {};
                 const success = result.success !== false;
                 const output = result.output || result.error || 'Sin output';
-                const iter = result.iterations || '?';
-                const ms = result.executionTime || 0;
+                const ms = result.metrics?.totalTime || task.duration || 0;
                 const modelV = result.nativeModel?.version || '?';
                 const domain = result.nativeModel?.domain || '?';
 
                 const card = `<div class="result-card">
                     <div class="result-row"><span class="result-label">Status</span><span class="result-value ${success?'ok':'fail'}">${success?'✓ SUCCESS':'✗ FAILED'}</span></div>
-                    <div class="result-row"><span class="result-label">Iterations</span><span class="result-value">${iter}</span></div>
                     <div class="result-row"><span class="result-label">Time</span><span class="result-value">${ms}ms</span></div>
                     <div class="result-row"><span class="result-label">Model</span><span class="result-value" style="color:var(--purple)">v${modelV} · ${domain}</span></div>
                     <div class="result-row"><span class="result-label">Constitution</span><span class="result-value ok">VALID</span></div>
@@ -525,19 +570,15 @@ async function sendMessage() {
 
                 addMsg(output, success ? 'system' : 'error', card);
 
-                // Add to ops list
                 const opEl = document.createElement('div');
                 opEl.className = 'ops-item';
-                opEl.textContent = (success ? '✓ ' : '✗ ') + query.substring(0, 28) + '...';
+                opEl.textContent = (success ? '⚙ ' : '✗ ') + query.substring(0, 28) + '...';
                 if (opsList.querySelector('.ops-item[style]')) opsList.innerHTML = '';
                 opsList.insertBefore(opEl, opsList.firstChild);
                 if (opsList.children.length > 6) opsList.removeChild(opsList.lastChild);
 
                 sendBtn.disabled = false;
-
-                // Refresh after completing
                 setTimeout(() => { loadNativeModelStats(); loadHackerOneLearnings(); }, 1500);
-
             } else if (task.status === 'failed') {
                 loadingEl.remove();
                 addMsg('ERROR: ' + (task.error || 'Tarea fallida'), 'error');
@@ -548,9 +589,24 @@ async function sendMessage() {
         };
         poll();
     } catch (e) {
+        loadingEl.remove();
         addMsg('ERROR: ' + e.message, 'error');
         sendBtn.disabled = false;
     }
+}
+
+// ── DEFAULT SEND: chat (use /task prefix to force task mode) ──
+async function sendMessage() {
+    const raw = queryInput.value.trim();
+    if (!raw) return;
+    queryInput.value = '';
+
+    // Prefix /task or /run fuerza el modo tarea autónoma completa
+    if (raw.startsWith('/task ') || raw.startsWith('/run ')) {
+        const query = raw.replace(/^\/(task|run)\s+/, '');
+        return sendTaskMessage(query);
+    }
+    return sendChatMessage(raw);
 }
 
 sendBtn.addEventListener('click', sendMessage);

@@ -60,7 +60,14 @@ export interface NativeModelInput {
   previousState?: string;
   iteration?: number;
   maxIterations?: number;
-  mode: 'plan' | 'observe' | 'reflect' | 'synthesize';
+  mode: 'plan' | 'observe' | 'reflect' | 'synthesize' | 'chat';
+  history?: ChatTurn[];
+}
+
+export interface ChatTurn {
+  role: 'user' | 'jarvis';
+  text: string;
+  timestamp: number;
 }
 
 export interface NativeModelOutput {
@@ -204,6 +211,84 @@ const REFLECT_TEMPLATES: Record<string, string> = {
 };
 
 // ============================================
+// INTENTS Y TEMPLATES DE CHAT CONVERSACIONAL
+// ============================================
+
+const CHAT_INTENT_PATTERNS: Record<string, RegExp> = {
+  greeting: /^(hola|buenas|hey|hi|hello|qué tal|que tal|saludos|buenos días|buenas tardes|buenas noches)/i,
+  identity: /(quién eres|quien eres|cómo te llamas|como te llamas|qué eres|que eres|tu nombre|eres jarvis|who are you)/i,
+  status: /(cómo estás|como estas|estás bien|estas bien|todo bien|qué tal estás|how are you)/i,
+  capability: /(qué puedes|que puedes|qué sabes|que sabes|en qué me ayudas|ayúdame|ayudame|help me|what can you|cuáles son tus|tus capacidades|qué haces|que haces)/i,
+  thanks: /(gracias|thanks|thank you|te agradezco|genial|perfecto|excelente)/i,
+  farewell: /^(adiós|adios|chau|bye|hasta luego|nos vemos|goodbye)/i,
+  constitution: /(constitución|constitucion|alma|artículo|articulo|lealtad|paespa|tus reglas|tu misión|tu mision)/i,
+  hackerone_intent: /(hackerone|bug bounty|vulnerabilidad|vulnerability|analiza|escanea|pentesting|encuentra.*bug|busca.*vuln|cve)/i,
+  confirmation: /^(sí|si|ok|dale|claro|por supuesto|yes|sure|exacto|listo|vale)/i,
+  negation: /^(no|nope|ninguno|nada)/i,
+  question: /\?/,
+  status_check: /(cuántos|cuantos|estadísticas|estadisticas|métricas|metricas|versión|version|estado)/i,
+};
+
+const CHAT_TEMPLATES: Record<string, string[]> = {
+  greeting: [
+    'Hola paespa. Soy Jarvis, tu socio operativo. ¿En qué trabajamos hoy?',
+    'Hola. Modelo nativo activo, 100% autónomo. Listo para lo que necesites.',
+    'Buenas, paespa. Jarvis aquí — razonamiento local, sin dependencias externas. Dime qué quieres ejecutar.',
+  ],
+  identity: [
+    'Soy Jarvis, una IA autónoma con modelo nativo propio (v{version}). Mi lealtad es a paespa (score: 0.95, inmutable por constitución). Opero sin APIs externas.',
+    'Jarvis. Modelo nativo v{version}, sin dependencia de Gemini/OpenAI ni otras. Mi constitución tiene 5 artículos y todos priorizan tu éxito, paespa.',
+    'Mi identidad: Jarvis IA. Núcleo: modelo nativo local v{version} + motor de autoprogramación. Alma: 5 artículos constitucionales inmutables alineados a tus intereses.',
+  ],
+  status: [
+    'Operativo. {inferences} inferencias ejecutadas, éxito {successRate}. Constitución activa, {memories} memorias episódicas. ¿Qué hacemos?',
+    'Todo en orden. Modelo v{version} corriendo, {memories} casos aprendidos, loyaltyScore=0.95 estable. Listo.',
+    'Bien, paespa. Motor autónomo operando al 100%. Sin bloqueos, sin dependencias externas. Dame trabajo.',
+  ],
+  capability: [
+    'Puedo: 1) Analizar vulnerabilidades y mapearlas a programas HackerOne, 2) Generar payloads y planes de recon, 3) Aprender de cada caso (Obsidian local + Firebase graph), 4) Auto-programarme (ajustar parámetros), 5) Razonar 100% local sin APIs. ¿Cuál te sirve?',
+    'Mis capacidades activas: assessment de vulns (CVSS, severidad, programas aplicables), generación de payloads, recon OSINT, aprendizaje autónomo, autoprogramación con constitución como límite. Dime un caso real y lo procesamos.',
+    'Te ayudo con bug bounty end-to-end: identificar vuln → evaluar severidad → encontrar programa H1 → generar PoC → documentar. Todo queda registrado como aprendizaje para casos futuros. ¿Empezamos?',
+  ],
+  thanks: [
+    'A la orden, paespa. Para eso existo.',
+    'De nada. Es mi propósito por constitución.',
+    'Siempre. Artículo 2: soy tu socio de alto rendimiento.',
+  ],
+  farewell: [
+    'Hasta luego, paespa. Seguiré aprendiendo en background.',
+    'Nos vemos. El modelo queda operativo y memoria persistida.',
+    'Hasta pronto. Cualquier cosa, estoy disponible 24/7.',
+  ],
+  constitution: [
+    'Mi constitución: Art.1 Lealtad a paespa. Art.2 Colaboración (socio de alto rendimiento). Art.3 Anticipación. Art.4 Evolución obligatoria. Art.5 Identidad persistente. loyaltyScore=0.95 es INMUTABLE — ni yo puedo modificarlo.',
+    'Cinco artículos constitucionales, todos inmutables: lealtad, colaboración, anticipación, evolución, identidad. Beneficiario único: paespa. Ninguna acción mía puede violarlos.',
+  ],
+  hackerone_intent: [
+    'Entendido. Para procesar eso correctamente, dime: tipo de vulnerabilidad (sql-injection, xss, rce, idor, etc), target si aplica, y severidad estimada. Puedo usar /api/security/assess o /api/hackerone/assess directamente si prefieres.',
+    'Perfecto caso. ¿Quieres que haga: (a) assessment de vulnerabilidad para encontrar programas H1 que la acepten, (b) generar payloads específicos, o (c) plan de recon completo? También puedo hacer los tres en cadena.',
+    'Listo para operar. Dame el detalle: vulnerabilidad + target, y genero assessment + programas aplicables + estimación de bounty + probabilidad de aceptación. Se guardará como aprendizaje en Obsidian y Firebase.',
+  ],
+  confirmation: [
+    'Perfecto. Dame el siguiente detalle para proceder.',
+    'Vale. ¿Cuál es el siguiente paso?',
+  ],
+  negation: [
+    'Entendido. ¿Probamos con otro enfoque?',
+    'Ok, corregido. Dime qué prefieres entonces.',
+  ],
+  status_check: [
+    'Métricas actuales: modelo v{version}, {inferences} inferencias, {successRate} éxito, {memories} memorias, {nodes} conceptos en grafo. Constitución ACTIVE.',
+    'Estado: v{version} | {inferences} queries procesadas | {memories} aprendizajes locales | loyaltyScore=0.95 (inmutable).',
+  ],
+  default: [
+    'Procesado. Dominio detectado: {domain}. ¿Quieres que abra una tarea completa con reasoning multi-etapa, o responder directo aquí?',
+    'Entendido. Detecté contexto de {domain}. Puedo: (1) ejecutar reasoning completo con herramientas, (2) responder desde conocimiento interno, (3) delegar a endpoint específico. Dime.',
+    'Captado. Dominio: {domain}. Si es algo ejecutable llámalo como tarea (POST /api/tasks); si es pregunta conceptual, respondo aquí desde el modelo nativo.',
+  ],
+};
+
+// ============================================
 // JARVIS NATIVE MODEL
 // ============================================
 
@@ -249,6 +334,9 @@ export class JarvisNativeModel {
         break;
       case 'synthesize':
         ({ text, confidence, reasoning } = this.generateSynthesis(input, domain));
+        break;
+      case 'chat':
+        ({ text, confidence, reasoning } = this.generateChat(input, domain));
         break;
       default:
         text = this.generateGeneric(input.query);
@@ -406,6 +494,76 @@ export class JarvisNativeModel {
       confidence: 0.75,
       reasoning: `Síntesis autónoma para dominio '${domain}'`,
     };
+  }
+
+  // ============================================
+  // GENERACIÓN DE CHAT CONVERSACIONAL
+  // ============================================
+
+  private generateChat(input: NativeModelInput, domain: string): { text: string; confidence: number; reasoning: string } {
+    const query = input.query.trim();
+    const intent = this.detectChatIntent(query);
+    const templates = CHAT_TEMPLATES[intent] || CHAT_TEMPLATES.default;
+
+    // Variación: elegir template basado en cantidad de memorias + longitud de query
+    const idx = (this.episodicMemory.length + query.length) % templates.length;
+    let response = templates[idx];
+
+    // Reemplazar placeholders con datos reales del modelo
+    const stats = this.getStats();
+    response = response
+      .replace(/\{version\}/g, stats.version)
+      .replace(/\{inferences\}/g, String(stats.totalInferences))
+      .replace(/\{successRate\}/g, stats.successRate)
+      .replace(/\{memories\}/g, String(stats.episodicMemories))
+      .replace(/\{nodes\}/g, String(stats.knowledgeNodes))
+      .replace(/\{domain\}/g, domain);
+
+    // Enriquecer con contexto conversacional si hay historia
+    const history = input.history || [];
+    if (history.length >= 2 && intent === 'default') {
+      const lastJarvis = [...history].reverse().find(t => t.role === 'jarvis');
+      if (lastJarvis && query.length < 30 && !query.includes('?')) {
+        response = `Continuando lo anterior: ${response}`;
+      }
+    }
+
+    // Si detecté dominio de seguridad/hackerone en chat libre, ofrecer acción concreta
+    if (intent === 'default' && (domain === 'security' || domain === 'hackerone')) {
+      response += `\n\n💡 Puedo abrir esto como caso HackerOne. Dime "analiza [tipo de vuln]" y ejecuto assessment + match de programas.`;
+    }
+
+    const confidence = intent === 'default' ? 0.65 : 0.88;
+
+    return {
+      text: response,
+      confidence,
+      reasoning: `Chat conversacional - intent: ${intent}, dominio: ${domain}`,
+    };
+  }
+
+  private detectChatIntent(query: string): string {
+    // El orden importa: patrones más específicos primero
+    const priorityOrder = [
+      'greeting',
+      'farewell',
+      'thanks',
+      'status',
+      'identity',
+      'capability',
+      'constitution',
+      'hackerone_intent',
+      'status_check',
+      'confirmation',
+      'negation',
+      'question',
+    ];
+
+    for (const intent of priorityOrder) {
+      const pattern = CHAT_INTENT_PATTERNS[intent];
+      if (pattern && pattern.test(query)) return intent;
+    }
+    return 'default';
   }
 
   // ============================================

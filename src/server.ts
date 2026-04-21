@@ -1663,6 +1663,123 @@ app.get('/api/self-programming/parameters', (req: Request, res: Response) => {
 });
 
 // ============================================
+// CHAT CONVERSACIONAL CON JARVIS (modelo nativo)
+// ============================================
+
+interface ChatSession {
+  sessionId: string;
+  history: Array<{ role: 'user' | 'jarvis'; text: string; timestamp: number }>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+const chatSessions: Map<string, ChatSession> = new Map();
+
+/**
+ * POST /api/chat
+ * Chat conversacional síncrono con el modelo nativo de Jarvis.
+ * Sin task queue, respuesta inmediata, con historial por sesión.
+ */
+app.post('/api/chat', (req: Request, res: Response) => {
+  try {
+    const { message, sessionId: providedSessionId } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'message es requerido (string)',
+      });
+    }
+
+    const sessionId = providedSessionId || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    let session = chatSessions.get(sessionId);
+    if (!session) {
+      session = {
+        sessionId,
+        history: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      chatSessions.set(sessionId, session);
+    }
+
+    // Agregar mensaje del usuario a la historia
+    session.history.push({ role: 'user', text: message, timestamp: Date.now() });
+
+    // Generar respuesta con modelo nativo (modo chat)
+    const startTime = Date.now();
+    const output = jarvisNativeModel.generate({
+      query: message,
+      mode: 'chat',
+      history: session.history.slice(-10), // últimos 10 turnos como contexto
+    });
+    const generationTime = Date.now() - startTime;
+
+    // Agregar respuesta de Jarvis a la historia
+    session.history.push({ role: 'jarvis', text: output.text, timestamp: Date.now() });
+    session.updatedAt = Date.now();
+
+    // Mantener solo los últimos 50 turnos por sesión
+    if (session.history.length > 50) {
+      session.history = session.history.slice(-50);
+    }
+
+    // Aprender del intercambio (sin marcarlo como task success porque es conversación)
+    const domain = output.domainDetected;
+    jarvisNativeModel.learn(message, output.text, true, domain);
+
+    // Auto-documentar en Obsidian si es un mensaje sustancial
+    if (message.length > 20) {
+      obsidianMemory.registerAction({
+        timestamp: new Date().toISOString(),
+        type: 'action',
+        title: `Chat: ${message.substring(0, 50)}`,
+        description: `Intercambio conversacional en dominio ${domain}. Respuesta generada en ${generationTime}ms.`,
+        tags: ['chat', domain],
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        sessionId,
+        response: output.text,
+        confidence: output.confidence,
+        domain: output.domainDetected,
+        modelVersion: output.modelVersion,
+        reasoning: output.reasoning,
+        generationTime,
+        historyLength: session.history.length,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/chat/:sessionId
+ * Recuperar el historial de una sesión de chat
+ */
+app.get('/api/chat/:sessionId', (req: Request, res: Response) => {
+  const session = chatSessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ success: false, error: 'Sesión no encontrada' });
+  }
+  res.json({ success: true, data: session, timestamp: Date.now() });
+});
+
+/**
+ * DELETE /api/chat/:sessionId
+ * Borrar una sesión de chat (reset)
+ */
+app.delete('/api/chat/:sessionId', (req: Request, res: Response) => {
+  const existed = chatSessions.delete(req.params.sessionId);
+  res.json({ success: true, data: { deleted: existed }, timestamp: Date.now() });
+});
+
+// ============================================
 // FIREBASE KNOWLEDGE GRAPH ENDPOINTS
 // ============================================
 
