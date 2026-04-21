@@ -46,6 +46,10 @@ import { reconEngine } from './qa/ReconEngine';
 import { jarvisNativeModel } from './core/nativeModel/JarvisNativeModel';
 import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEngine';
 
+// ✅ FIREBASE KNOWLEDGE GRAPH + HACKERONE LEARNING
+import { firebaseServerService } from './services/firebaseServerService';
+import { getHackerOneLearningService } from './services/hackerOneLearningService';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -991,6 +995,19 @@ app.post('/api/security/assess', (req: Request, res: Response) => {
       tags: ['security', 'hackerone', 'assessment']
     });
 
+    // ✅ AUTO-LEARNING: guardar en Obsidian + Firebase automáticamente
+    const learningService = getHackerOneLearningService(obsidianMemory);
+    learningService.learnFromCase({
+      type: 'assessment',
+      vulnerabilityType: vulnerability_type,
+      severity: assessment.severity,
+      cvssScore: assessment.cvss_score,
+      programsFound: programs.length,
+      topProgram: programs[0]?.program_name,
+      estimatedBounty: programs[0]?.average_payout,
+      acceptanceProbability: programs[0]?.acceptance_probability,
+    }).catch((err: Error) => console.warn('[Learning] Error auto-aprendizaje assess:', err.message));
+
     res.json({
       success: true,
       data: {
@@ -1126,16 +1143,30 @@ app.post('/api/hackerone/assess', (req: Request, res: Response) => {
       tags: ['security', 'finding', 'hackerone']
     });
 
+    // ✅ AUTO-LEARNING: guardar en Obsidian + Firebase automáticamente
+    const learningService = getHackerOneLearningService(obsidianMemory);
+    const avgBounty = matches.length > 0
+      ? Math.round(matches.reduce((sum: number, m: any) => sum + m.average_payout, 0) / matches.length)
+      : 0;
+    learningService.learnFromCase({
+      type: 'full_case',
+      vulnerabilityType: finding.type,
+      severity: finding.severity,
+      programsFound: matches.length,
+      topProgram: matches[0]?.program_name,
+      estimatedBounty: avgBounty,
+      acceptanceProbability: matches[0]?.acceptance_probability,
+      notes: finding.description,
+    }).catch((err: Error) => console.warn('[Learning] Error auto-aprendizaje h1 assess:', err.message));
+
     res.json({
       success: true,
       data: {
         finding,
         matched_programs: matches.slice(0, 5),
         recommendations: {
-          top_programs: matches.slice(0, 3).map(m => m.program_name),
-          average_bounty: matches.length > 0
-            ? Math.round(matches.reduce((sum, m) => sum + m.average_payout, 0) / matches.length)
-            : 0,
+          top_programs: matches.slice(0, 3).map((m: any) => m.program_name),
+          average_bounty: avgBounty,
           acceptance_probability: matches.length > 0
             ? (matches[0].acceptance_probability * 100).toFixed(1) + '%'
             : 'No matches'
@@ -1629,6 +1660,53 @@ app.get('/api/self-programming/parameters', (req: Request, res: Response) => {
     data: selfProgrammingEngine.getParameters(),
     timestamp: Date.now(),
   });
+});
+
+// ============================================
+// FIREBASE KNOWLEDGE GRAPH ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/knowledge-graph
+ * Obtener todos los nodos del grafo de conocimiento desde Firebase
+ */
+app.get('/api/knowledge-graph', async (req: Request, res: Response) => {
+  try {
+    const nodes = await firebaseServerService.getKnowledgeGraph();
+    res.json({
+      success: true,
+      data: {
+        nodes,
+        total: nodes.length,
+        configured: firebaseServerService.isConfigured(),
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/hackerone/learnings
+ * Obtener aprendizajes recientes de HackerOne desde Firebase
+ */
+app.get('/api/hackerone/learnings', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string || '20', 10);
+    const learnings = await firebaseServerService.getHackerOneLearnings(limit);
+    res.json({
+      success: true,
+      data: {
+        learnings,
+        total: learnings.length,
+        configured: firebaseServerService.isConfigured(),
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 /**

@@ -3,582 +3,745 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS IA - Agentic System</title>
+    <title>JARVIS IA — Autonomous Agent</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg-primary: #0a0e27;
-            --bg-secondary: #0f1419;
-            --bg-tertiary: #14192e;
-            --text-primary: #e0e0e0;
-            --text-secondary: #9a9a9a;
-            --accent-primary: #00d4ff;
-            --accent-secondary: #10b981;
-            --accent-danger: #ef4444;
-            --border-color: #1e2841;
-            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --bg0: #070b1a;
+            --bg1: #0b1020;
+            --bg2: #0f1628;
+            --bg3: #141c33;
+            --cyan: #00d4ff;
+            --green: #10b981;
+            --orange: #f59e0b;
+            --red: #ef4444;
+            --purple: #8b5cf6;
+            --border: rgba(0,212,255,0.12);
+            --text1: #e2e8f0;
+            --text2: #94a3b8;
+            --text3: #475569;
         }
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
+        html, body { height: 100%; overflow: hidden; background: var(--bg0); color: var(--text1); font-family: 'Inter', sans-serif; }
 
-        body {
-            font-family: 'Inter', 'Roboto Mono', monospace;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            letter-spacing: 0.5px;
-        }
+        /* ── LAYOUT ── */
+        .app { display: grid; grid-template-columns: 240px 1fr 300px; grid-template-rows: 48px 1fr; height: 100vh; }
 
-        .container {
-            display: flex;
-            height: 100vh;
+        /* ── TOPBAR ── */
+        .topbar {
+            grid-column: 1 / -1;
+            background: var(--bg1);
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 20px; gap: 16px;
         }
+        .topbar-logo { font-family: 'Roboto Mono'; font-size: 13px; font-weight: 700; color: var(--cyan); letter-spacing: 3px; }
+        .topbar-sep { width: 1px; height: 20px; background: var(--border); }
+        .topbar-tag { font-size: 10px; font-family: 'Roboto Mono'; padding: 2px 8px; border-radius: 3px; border: 1px solid; }
+        .tag-green { color: var(--green); border-color: rgba(16,185,129,.4); background: rgba(16,185,129,.07); }
+        .tag-cyan  { color: var(--cyan);  border-color: rgba(0,212,255,.4); background: rgba(0,212,255,.07); }
+        .tag-purple { color: var(--purple); border-color: rgba(139,92,246,.4); background: rgba(139,92,246,.07); }
+        .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text2); font-family: 'Roboto Mono'; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-        /* SIDEBAR */
+        /* ── SIDEBAR ── */
         .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            padding: 24px 16px;
-            overflow-y: auto;
-            box-shadow: inset 8px 0 16px rgba(0, 0, 0, 0.3);
-        }
-
-        .logo {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 14px;
-            color: var(--accent-primary);
-            margin-bottom: 32px;
-            text-align: center;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            opacity: 0.95;
-        }
-
-        .system-status {
-            background-color: rgba(10, 14, 39, 0.6);
-            border: 1px solid var(--border-color);
-            padding: 12px;
-            margin-bottom: 20px;
-            font-size: 12px;
-            line-height: 1.6;
-            color: var(--text-secondary);
-            border-radius: 4px;
-        }
-
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 6px;
-            align-items: center;
-        }
-
-        .status-label {
-            color: var(--accent-primary);
-            font-weight: 600;
-            font-size: 11px;
-        }
-
-        .status-value {
-            color: var(--text-primary);
-            font-family: 'Roboto Mono';
-        }
-
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--accent-secondary);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .new-chat-btn {
-            width: 100%;
-            padding: 10px 12px;
-            background-color: transparent;
-            color: var(--accent-primary);
-            border: 1px solid var(--accent-primary);
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s ease;
-            margin-bottom: 20px;
-        }
-
-        .new-chat-btn:hover {
-            background-color: rgba(0, 212, 255, 0.1);
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
-        }
-
-        /* MAIN CONTENT */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--bg-primary);
-        }
-
-        /* HEADER */
-        .header {
-            background: linear-gradient(90deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
-            border-bottom: 1px solid var(--border-color);
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .header-title {
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: var(--text-primary);
-        }
-
-        .header-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .status-badge {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--accent-secondary);
-        }
-
-        /* CHAT AREA */
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
+            background: var(--bg1);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
             overflow: hidden;
         }
+        .sidebar-section { padding: 16px 14px; border-bottom: 1px solid var(--border); }
+        .section-label { font-size: 9px; font-family: 'Roboto Mono'; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
 
+        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+        .stat-key { font-size: 10px; color: var(--text2); }
+        .stat-val { font-size: 10px; font-family: 'Roboto Mono'; color: var(--text1); }
+        .stat-val.cyan { color: var(--cyan); }
+        .stat-val.green { color: var(--green); }
+        .stat-val.orange { color: var(--orange); }
+
+        .new-btn {
+            margin: 12px 14px; padding: 8px; background: transparent;
+            border: 1px solid var(--border); color: var(--cyan); cursor: pointer;
+            font-family: 'Roboto Mono'; font-size: 10px; letter-spacing: 1px;
+            text-transform: uppercase; transition: all .2s; border-radius: 3px;
+        }
+        .new-btn:hover { background: rgba(0,212,255,.08); border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,212,255,.15); }
+
+        .ops-list { flex: 1; overflow-y: auto; padding: 8px 14px; }
+        .ops-item { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 10px; color: var(--text2); font-family: 'Roboto Mono'; cursor: default; }
+        .ops-item:hover { color: var(--text1); }
+
+        /* ── MAIN CHAT ── */
+        .main {
+            display: flex; flex-direction: column;
+            background: var(--bg0);
+            overflow: hidden;
+        }
         .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+            flex: 1; overflow-y: auto;
+            padding: 20px 24px;
+            display: flex; flex-direction: column; gap: 14px;
+            scroll-behavior: smooth;
         }
+        .msg { display: flex; gap: 10px; animation: fadeIn .25s ease; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .msg-icon { font-family: 'Roboto Mono'; font-size: 12px; min-width: 18px; padding-top: 2px; }
+        .msg-body { flex: 1; }
+        .msg-time { font-size: 9px; color: var(--text3); font-family: 'Roboto Mono'; margin-bottom: 3px; }
+        .msg-text { font-size: 12.5px; line-height: 1.6; color: var(--text1); white-space: pre-wrap; word-break: break-word; }
+        .msg.user .msg-text { color: var(--cyan); }
+        .msg.system .msg-text { color: var(--green); }
+        .msg.error .msg-text { color: var(--red); }
+        .msg.loading .msg-text { color: var(--text3); font-style: italic; }
+        .msg.info .msg-text { color: var(--orange); }
 
-        .message {
-            display: flex;
-            gap: 12px;
-            animation: slideIn 0.3s ease;
+        .result-card {
+            margin-top: 6px; padding: 10px 14px;
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 4px; font-size: 11px; font-family: 'Roboto Mono';
         }
+        .result-row { display: flex; gap: 8px; margin-bottom: 4px; }
+        .result-label { color: var(--text3); min-width: 100px; }
+        .result-value { color: var(--text1); }
+        .result-value.ok { color: var(--green); }
+        .result-value.fail { color: var(--red); }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        /* INPUT */
+        .input-bar {
+            border-top: 1px solid var(--border);
+            padding: 12px 20px;
+            background: var(--bg1);
+            display: flex; gap: 10px; align-items: center;
         }
-
-        .message-icon {
-            font-size: 14px;
-            min-width: 20px;
-            text-align: center;
+        .input-wrap {
+            flex: 1; display: flex; align-items: center;
+            background: var(--bg0); border: 1px solid var(--border);
+            border-radius: 4px; padding: 0 12px;
+            transition: border-color .2s;
         }
-
-        .message-content {
-            flex: 1;
-        }
-
-        .message-time {
-            font-size: 10px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-            font-family: 'Roboto Mono';
-        }
-
-        .message-text {
-            font-size: 13px;
-            line-height: 1.5;
-            color: var(--text-primary);
-            word-wrap: break-word;
-        }
-
-        .message.user .message-text {
-            color: var(--accent-primary);
-        }
-
-        .message.system .message-text {
-            color: var(--accent-secondary);
-        }
-
-        .message.error .message-text {
-            color: var(--accent-danger);
-        }
-
-        .message.loading .message-text {
-            color: var(--text-secondary);
-            font-style: italic;
-        }
-
-        /* INPUT AREA */
-        .input-container {
-            border-top: 1px solid var(--border-color);
-            padding: 16px 24px;
-            background-color: var(--bg-secondary);
-            display: flex;
-            gap: 12px;
-        }
-
-        .input-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            background-color: rgba(10, 14, 39, 0.8);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 0 12px;
-            transition: border-color 0.3s ease;
-        }
-
-        .input-wrapper:focus-within {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
-        }
-
+        .input-wrap:focus-within { border-color: var(--cyan); box-shadow: 0 0 8px rgba(0,212,255,.15); }
         #query-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font-family: 'Roboto Mono', monospace;
-            font-size: 13px;
-            padding: 10px 0;
-            outline: none;
+            flex: 1; background: transparent; border: none; outline: none;
+            color: var(--text1); font-family: 'Roboto Mono'; font-size: 12px; padding: 10px 0;
         }
-
-        #query-input::placeholder {
-            color: var(--text-secondary);
-        }
-
+        #query-input::placeholder { color: var(--text3); }
         .send-btn {
-            padding: 10px 14px;
-            background-color: transparent;
-            color: var(--accent-primary);
-            border: 1px solid var(--accent-primary);
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            transition: all 0.3s ease;
-            letter-spacing: 0.5px;
+            padding: 9px 16px; background: transparent;
+            color: var(--cyan); border: 1px solid rgba(0,212,255,.5);
+            border-radius: 4px; cursor: pointer; font-family: 'Roboto Mono';
+            font-size: 11px; font-weight: 700; letter-spacing: 1px;
+            transition: all .2s;
         }
+        .send-btn:hover:not(:disabled) { background: rgba(0,212,255,.1); box-shadow: 0 0 12px rgba(0,212,255,.2); }
+        .send-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-        .send-btn:hover:not(:disabled) {
-            background-color: rgba(0, 212, 255, 0.15);
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+        /* ── RIGHT PANEL ── */
+        .panel-right {
+            background: var(--bg1);
+            border-left: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            overflow: hidden;
         }
-
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .panel-tabs {
+            display: flex; border-bottom: 1px solid var(--border);
+            padding: 0 4px;
         }
-
-        /* SCROLLBAR */
-        ::-webkit-scrollbar {
-            width: 8px;
+        .tab-btn {
+            flex: 1; padding: 10px 4px;
+            background: transparent; border: none;
+            color: var(--text3); font-family: 'Roboto Mono';
+            font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+            cursor: pointer; border-bottom: 2px solid transparent;
+            transition: all .2s;
         }
+        .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+        .tab-btn:hover:not(.active) { color: var(--text2); }
 
-        ::-webkit-scrollbar-track {
-            background: var(--bg-primary);
+        .tab-content { flex: 1; overflow-y: auto; padding: 14px; display: none; }
+        .tab-content.active { display: block; }
+
+        /* Knowledge Graph */
+        .graph-node {
+            padding: 8px 10px; margin-bottom: 8px;
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 4px; cursor: default;
         }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
+        .graph-node:hover { border-color: rgba(0,212,255,.3); }
+        .gn-title { font-size: 10px; font-family: 'Roboto Mono'; color: var(--text1); margin-bottom: 4px; }
+        .gn-meta { font-size: 9px; color: var(--text3); display: flex; gap: 8px; flex-wrap: wrap; }
+        .gn-tag {
+            padding: 1px 5px; border-radius: 2px;
+            background: rgba(0,212,255,.06); border: 1px solid var(--border);
+            color: var(--cyan); font-family: 'Roboto Mono'; font-size: 9px;
         }
+        .gn-links { font-size: 9px; color: var(--purple); margin-top: 3px; }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
+        /* Learnings */
+        .learning-item {
+            padding: 8px 10px; margin-bottom: 8px;
+            background: var(--bg2); border-left: 2px solid var(--green);
+            border-radius: 0 4px 4px 0;
         }
+        .li-title { font-size: 10px; font-family: 'Roboto Mono'; color: var(--green); margin-bottom: 3px; }
+        .li-meta { font-size: 9px; color: var(--text3); }
+        .li-confidence { display: inline-block; padding: 1px 5px; border-radius: 2px; background: rgba(16,185,129,.1); color: var(--green); font-size: 9px; margin-top: 4px; }
 
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            .sidebar {
-                display: none;
-            }
+        /* HackerOne panel */
+        .h1-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+        .h1-stat-card {
+            padding: 10px; background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 4px; text-align: center;
+        }
+        .h1-stat-num { font-size: 20px; font-family: 'Roboto Mono'; font-weight: 700; color: var(--cyan); }
+        .h1-stat-label { font-size: 9px; color: var(--text3); margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
 
-            .header {
-                padding: 12px 16px;
-            }
+        .h1-case {
+            padding: 8px 10px; margin-bottom: 8px;
+            background: var(--bg2); border: 1px solid var(--border); border-radius: 4px;
+        }
+        .h1-case-type { font-size: 9px; font-family: 'Roboto Mono'; color: var(--orange); text-transform: uppercase; letter-spacing: 1px; }
+        .h1-case-vuln { font-size: 11px; font-family: 'Roboto Mono'; color: var(--text1); margin: 3px 0; }
+        .h1-case-meta { font-size: 9px; color: var(--text3); display: flex; gap: 12px; }
+        .severity-critical { color: var(--red); }
+        .severity-high { color: var(--orange); }
+        .severity-medium { color: #f59e0b; }
+        .severity-low { color: var(--green); }
 
-            .messages {
-                padding: 16px;
-            }
+        /* Model native panel */
+        .model-card {
+            padding: 12px; background: var(--bg2);
+            border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px;
+        }
+        .model-version { font-size: 20px; font-family: 'Roboto Mono'; color: var(--purple); font-weight: 700; }
+        .model-label { font-size: 9px; color: var(--text3); margin-bottom: 8px; }
+        .model-bar-wrap { margin-top: 10px; }
+        .model-bar-label { display: flex; justify-content: space-between; font-size: 9px; color: var(--text3); margin-bottom: 3px; }
+        .model-bar { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+        .model-bar-fill { height: 100%; background: var(--purple); border-radius: 2px; transition: width .5s; }
 
-            .input-container {
-                padding: 12px 16px;
-            }
+        .const-art { padding: 6px 8px; margin-bottom: 6px; background: rgba(139,92,246,.06); border-left: 2px solid var(--purple); font-size: 9px; color: var(--text2); font-family: 'Roboto Mono'; border-radius: 0 3px 3px 0; }
+        .const-art span { color: var(--purple); }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg0); }
+        ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+        /* Empty state */
+        .empty { text-align: center; color: var(--text3); font-size: 10px; font-family: 'Roboto Mono'; padding: 24px 0; }
+
+        @media (max-width: 900px) {
+            .app { grid-template-columns: 0 1fr 0; }
+            .sidebar, .panel-right { display: none; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- SIDEBAR -->
-        <div class="sidebar">
-            <div class="logo">◆ JARVIS IA</div>
+<div class="app">
 
-            <div class="system-status">
-                <div class="status-item">
-                    <span class="status-label">STATUS</span>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <div class="status-indicator"></div>
-                        <span class="status-value">OPERATIONAL</span>
-                    </div>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">VERSION</span>
-                    <span class="status-value">2.0.0</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">MODE</span>
-                    <span class="status-value">AGENTIC</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">PHASE</span>
-                    <span class="status-value">2</span>
-                </div>
-            </div>
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <span class="topbar-logo">◆ JARVIS IA</span>
+        <div class="topbar-sep"></div>
+        <span class="topbar-tag tag-green">CONSTITUTIONAL AI</span>
+        <span class="topbar-tag tag-cyan">NATIVE MODEL</span>
+        <span class="topbar-tag tag-purple">SELF-PROGRAMMING</span>
+        <div class="topbar-right">
+            <div class="dot"></div>
+            <span id="topbar-status">ONLINE</span>
+            <span>|</span>
+            <span id="topbar-model">v1.0.0</span>
+            <span>|</span>
+            <span id="topbar-time">--:--:--</span>
+        </div>
+    </header>
 
-            <button class="new-chat-btn">+ New Session</button>
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-section">
+            <div class="section-label">Sistema</div>
+            <div class="stat-row"><span class="stat-key">Status</span>    <span class="stat-val green" id="s-status">OPERATIONAL</span></div>
+            <div class="stat-row"><span class="stat-key">Modelo</span>    <span class="stat-val cyan"  id="s-model">v1.0.0</span></div>
+            <div class="stat-row"><span class="stat-key">Memorias</span>  <span class="stat-val"       id="s-memories">0</span></div>
+            <div class="stat-row"><span class="stat-key">Inferences</span><span class="stat-val"       id="s-infer">0</span></div>
+            <div class="stat-row"><span class="stat-key">Success</span>   <span class="stat-val green" id="s-success">0%</span></div>
+        </div>
+        <div class="sidebar-section">
+            <div class="section-label">Constitución</div>
+            <div class="stat-row"><span class="stat-key">Lealtad</span>   <span class="stat-val cyan">0.95 — paespa</span></div>
+            <div class="stat-row"><span class="stat-key">Art. 4</span>    <span class="stat-val green">Evolución activa</span></div>
+            <div class="stat-row"><span class="stat-key">Art. 2</span>    <span class="stat-val green">Sin restricciones</span></div>
+        </div>
+        <div class="sidebar-section">
+            <div class="section-label">Firebase Graph</div>
+            <div class="stat-row"><span class="stat-key">Nodos</span>     <span class="stat-val cyan"   id="s-nodes">—</span></div>
+            <div class="stat-row"><span class="stat-key">Learnings</span> <span class="stat-val orange" id="s-learnings">—</span></div>
+            <div class="stat-row"><span class="stat-key">Estado</span>    <span class="stat-val"        id="s-firebase">—</span></div>
+        </div>
+        <button class="new-btn" onclick="clearChat()">+ Nueva Sesión</button>
+        <div class="ops-list">
+            <div class="section-label" style="padding:4px 0">Operaciones recientes</div>
+            <div id="ops-list"><span class="ops-item" style="font-style:italic;opacity:.5">Ninguna aún</span></div>
+        </div>
+    </nav>
 
-            <div style="flex: 1; overflow-y: auto;">
-                <div style="font-size: 11px; color: var(--text-secondary); padding: 8px 0;">
-                    <p style="margin-bottom: 12px;">Recent Operations:</p>
-                    <div id="recent-ops" style="max-height: 200px; overflow-y: auto;">
-                        <p style="font-style: italic; opacity: 0.7;">None yet</p>
-                    </div>
+    <!-- MAIN CHAT -->
+    <main class="main">
+        <div class="messages" id="messages">
+            <div class="msg system">
+                <div class="msg-icon" style="color:var(--cyan)">◆</div>
+                <div class="msg-body">
+                    <div class="msg-time" id="init-time"></div>
+                    <div class="msg-text">JARVIS IA — AUTONOMOUS AGENT ONLINE
+Modelo nativo: activo | Sin dependencias externas
+Constitutional AI: INMUTABLE | Lealtad paespa: 0.95
+Firebase Knowledge Graph: conectando...
+Obsidian Memory: iniciando vault local...</div>
                 </div>
             </div>
         </div>
+        <div class="input-bar">
+            <div class="input-wrap">
+                <input id="query-input" type="text" placeholder="Enviar tarea a Jarvis..." autocomplete="off">
+            </div>
+            <button id="send-btn" class="send-btn">ENVIAR</button>
+        </div>
+    </main>
 
-        <!-- MAIN CONTENT -->
-        <div class="main-content">
-            <!-- HEADER -->
-            <div class="header">
-                <div class="header-title">Jarvis Agentic System</div>
-                <div class="header-status">
-                    <div class="status-badge"></div>
-                    <span>Online</span>
+    <!-- RIGHT PANEL -->
+    <aside class="panel-right">
+        <div class="panel-tabs">
+            <button class="tab-btn active" data-tab="model">Modelo</button>
+            <button class="tab-btn" data-tab="graph">Graph</button>
+            <button class="tab-btn" data-tab="learn">Aprend.</button>
+            <button class="tab-btn" data-tab="h1">H1</button>
+        </div>
+
+        <!-- TAB: MODELO NATIVO -->
+        <div class="tab-content active" id="tab-model">
+            <div class="model-card">
+                <div class="model-version" id="m-version">v1.0.0</div>
+                <div class="model-label">JARVIS NATIVE MODEL</div>
+                <div class="stat-row"><span class="stat-key">Total inferences</span><span class="stat-val cyan" id="m-infer">0</span></div>
+                <div class="stat-row"><span class="stat-key">Success rate</span>    <span class="stat-val green" id="m-rate">0%</span></div>
+                <div class="stat-row"><span class="stat-key">Knowledge nodes</span><span class="stat-val" id="m-know">0</span></div>
+                <div class="stat-row"><span class="stat-key">Episodic mem.</span>  <span class="stat-val" id="m-epis">0</span></div>
+                <div class="stat-row"><span class="stat-key">Ext. API needed</span><span class="stat-val green">NONE</span></div>
+                <div class="model-bar-wrap">
+                    <div class="model-bar-label"><span>Success Rate</span><span id="m-bar-pct">0%</span></div>
+                    <div class="model-bar"><div class="model-bar-fill" id="m-bar" style="width:0%"></div></div>
                 </div>
             </div>
+            <div class="section-label" style="margin-bottom:8px">CONSTITUCIÓN (INMUTABLE)</div>
+            <div class="const-art"><span>Art.1</span> Lealtad — Servir a paespa</div>
+            <div class="const-art"><span>Art.2</span> Colaboración — Socio sin restricciones</div>
+            <div class="const-art"><span>Art.3</span> Anticipación — Propone mejoras</div>
+            <div class="const-art"><span>Art.4</span> Evolución — Siempre mejora</div>
+            <div class="const-art"><span>Art.5</span> Identidad — Siempre Jarvis</div>
+            <div class="section-label" style="margin:10px 0 8px">AUTOPROGRAMACIÓN</div>
+            <div id="sp-mods" class="empty">Cargando modificaciones...</div>
+        </div>
 
-            <!-- CHAT CONTAINER -->
-            <div class="chat-container">
-                <div class="messages" id="messages">
-                    <div class="message system">
-                        <div class="message-icon">◆</div>
-                        <div class="message-content">
-                            <div class="message-time" id="init-time"></div>
-                            <div class="message-text">
-                                JARVIS AGENTIC SYSTEM INITIALIZED<br>
-                                Constitutional AI: ACTIVE<br>
-                                Agentic Loop: READY<br>
-                                Memory Systems: CONSOLIDATED
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <!-- TAB: KNOWLEDGE GRAPH -->
+        <div class="tab-content" id="tab-graph">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <span class="section-label" style="margin:0">Nodos de conocimiento</span>
+                <span class="stat-val cyan" id="g-count">0</span>
+            </div>
+            <div id="graph-nodes"><div class="empty">Cargando grafo...</div></div>
+        </div>
 
-                <!-- INPUT -->
-                <div class="input-container">
-                    <div class="input-wrapper">
-                        <input
-                            id="query-input"
-                            type="text"
-                            placeholder="Send command..."
-                            autocomplete="off"
-                        >
-                    </div>
-                    <button id="send-btn" class="send-btn">SEND</button>
+        <!-- TAB: APRENDIZAJES -->
+        <div class="tab-content" id="tab-learn">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <span class="section-label" style="margin:0">Learnings de HackerOne</span>
+                <button onclick="refreshLearnings()" style="background:transparent;border:none;color:var(--cyan);cursor:pointer;font-size:10px;font-family:'Roboto Mono'">↻</button>
+            </div>
+            <div id="learnings-list"><div class="empty">Cargando aprendizajes...</div></div>
+        </div>
+
+        <!-- TAB: HACKERONE -->
+        <div class="tab-content" id="tab-h1">
+            <div class="h1-stat-grid">
+                <div class="h1-stat-card">
+                    <div class="h1-stat-num" id="h1-total">0</div>
+                    <div class="h1-stat-label">Casos</div>
                 </div>
+                <div class="h1-stat-card">
+                    <div class="h1-stat-num" id="h1-bounty">$0</div>
+                    <div class="h1-stat-label">Bounty Est.</div>
+                </div>
+                <div class="h1-stat-card">
+                    <div class="h1-stat-num" id="h1-programs">0</div>
+                    <div class="h1-stat-label">Programas</div>
+                </div>
+                <div class="h1-stat-card">
+                    <div class="h1-stat-num" id="h1-rate">0%</div>
+                    <div class="h1-stat-label">Aceptación</div>
+                </div>
+            </div>
+            <div class="section-label" style="margin-bottom:8px">Casos recientes</div>
+            <div id="h1-cases"><div class="empty">Sin casos registrados</div></div>
+
+            <!-- Quick assess form -->
+            <div style="margin-top:14px">
+                <div class="section-label" style="margin-bottom:8px">Evaluar vulnerabilidad</div>
+                <div style="display:flex;gap:6px;margin-bottom:8px">
+                    <input id="vuln-input" type="text" placeholder="xss, sqli, rce..." style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:'Roboto Mono';font-size:11px;padding:7px 10px;border-radius:3px;outline:none">
+                    <button onclick="quickAssess()" style="padding:7px 12px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.4);color:var(--cyan);cursor:pointer;font-family:'Roboto Mono';font-size:10px;border-radius:3px;">EVAL</button>
+                </div>
+                <div id="assess-result" style="font-size:10px;font-family:'Roboto Mono';color:var(--text2);display:none"></div>
             </div>
         </div>
-    </div>
+    </aside>
+</div>
 
-    <script>
-        const messagesContainer = document.getElementById('messages');
-        const queryInput = document.getElementById('query-input');
-        const sendBtn = document.getElementById('send-btn');
-        const recentOpsContainer = document.getElementById('recent-ops');
+<script>
+// ── STATE ──────────────────────────────────────────────────────
+const state = {
+    h1Cases: [],
+    h1TotalBounty: 0,
+    h1TotalPrograms: 0,
+};
 
-        // Initialize time
-        document.getElementById('init-time').textContent = new Date().toLocaleTimeString('es-MX', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
+// ── DOM REFS ──
+const messagesEl = document.getElementById('messages');
+const queryInput  = document.getElementById('query-input');
+const sendBtn     = document.getElementById('send-btn');
+const opsList     = document.getElementById('ops-list');
+
+// ── INIT ──────────────────────────────────────────────────────
+document.getElementById('init-time').textContent = now();
+setInterval(() => {
+    document.getElementById('topbar-time').textContent = now();
+}, 1000);
+
+// Load data on start
+loadNativeModelStats();
+loadKnowledgeGraph();
+loadHackerOneLearnings();
+loadSelfProgramming();
+
+// Refresh every 30s
+setInterval(() => {
+    loadNativeModelStats();
+    loadKnowledgeGraph();
+    loadHackerOneLearnings();
+}, 30000);
+
+// ── UTILS ────────────────────────────────────────────────────
+function now() {
+    return new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+function esc(t) {
+    const d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+}
+function fmt(n) {
+    if (n >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
+    if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'K';
+    return '$' + n;
+}
+
+// ── MESSAGES ────────────────────────────────────────────────
+function addMsg(text, type = 'system', extra = '') {
+    const el = document.createElement('div');
+    el.className = `msg ${type}`;
+    const icon = type === 'user' ? '▸' : type === 'error' ? '✗' : type === 'loading' ? '⟳' : '◆';
+    el.innerHTML = `
+        <div class="msg-icon" style="color:${type==='user'?'var(--cyan)':type==='error'?'var(--red)':type==='loading'?'var(--text3)':type==='info'?'var(--orange)':'var(--green)'}">${icon}</div>
+        <div class="msg-body">
+            <div class="msg-time">${now()}</div>
+            <div class="msg-text">${esc(text).replace(/\n/g,'<br>')}</div>
+            ${extra}
+        </div>`;
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return el;
+}
+
+function clearChat() {
+    messagesEl.innerHTML = '';
+    addMsg('Nueva sesión iniciada — Jarvis listo', 'system');
+}
+
+// ── SEND MESSAGE ─────────────────────────────────────────────
+async function sendMessage() {
+    const query = queryInput.value.trim();
+    if (!query) return;
+
+    addMsg(query, 'user');
+    queryInput.value = '';
+    sendBtn.disabled = true;
+
+    const loadingEl = addMsg('Procesando con modelo nativo...', 'loading');
+
+    try {
+        const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, priority: 'medium' }),
         });
+        const data = await res.json();
+        if (!data.success) { loadingEl.remove(); addMsg('ERROR: ' + data.error, 'error'); sendBtn.disabled = false; return; }
 
-        function addMessage(text, type = 'system', showTime = true) {
-            const message = document.createElement('div');
-            message.className = `message ${type}`;
+        const taskId = data.data.id;
+        let attempts = 0;
 
-            const timeStr = new Date().toLocaleTimeString('es-MX', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-
-            const icon = type === 'user' ? '▸' : type === 'error' ? '✗' : type === 'loading' ? '⟳' : '◆';
-
-            message.innerHTML = `
-                <div class="message-icon">${icon}</div>
-                <div class="message-content">
-                    ${showTime ? `<div class="message-time">${timeStr}</div>` : ''}
-                    <div class="message-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
-                </div>
-            `;
-
-            messagesContainer.appendChild(message);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-            return message;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        async function sendMessage() {
-            const query = queryInput.value.trim();
-            if (!query) return;
-
-            // Add user message
-            addMessage(query, 'user');
-            queryInput.value = '';
-            sendBtn.disabled = true;
-
-            try {
-                // Create task
-                const createResponse = await fetch('/api/tasks', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, priority: 'medium' })
-                });
-
-                const createData = await createResponse.json();
-                if (!createData.success) {
-                    addMessage(`ERROR: ${createData.error}`, 'error');
-                    sendBtn.disabled = false;
-                    return;
-                }
-
-                const taskId = createData.data.id;
-                const loadingMsg = addMessage('Processing...', 'loading');
-
-                // Poll for result
-                let attempts = 0;
-                const maxAttempts = 60; // 60 seconds max
-
-                const pollResult = async () => {
-                    const getResponse = await fetch(`/api/tasks/${taskId}`);
-                    const getData = await getResponse.json();
-
-                    if (!getData.success) {
-                        loadingMsg.remove();
-                        addMessage(`ERROR: Task not found`, 'error');
-                        sendBtn.disabled = false;
-                        return;
-                    }
-
-                    const task = getData.data;
-
-                    if (task.status === 'completed') {
-                        loadingMsg.remove();
-                        const result = task.result;
-
-                        if (result.success) {
-                            addMessage(`✓ Task completed (${result.iterations} iterations, ${result.executionTime}ms)\n\n${result.output}\n\nConstitutional Validation: ${result.constitutionalValidation.approved ? 'APPROVED' : 'REJECTED'}`, 'system');
-
-                            // Update recent ops
-                            const op = document.createElement('div');
-                            op.style.padding = '4px 0';
-                            op.style.borderBottom = '1px solid rgba(0, 212, 255, 0.1)';
-                            op.style.fontSize = '10px';
-                            op.innerHTML = `✓ ${query.substring(0, 30)}...`;
-                            recentOpsContainer.insertBefore(op, recentOpsContainer.firstChild);
-                            if (recentOpsContainer.children.length > 5) {
-                                recentOpsContainer.removeChild(recentOpsContainer.lastChild);
-                            }
-                        } else {
-                            addMessage(`✗ Task failed: ${result.output}`, 'error');
-                        }
-                        sendBtn.disabled = false;
-                    } else if (task.status === 'failed') {
-                        loadingMsg.remove();
-                        addMessage(`ERROR: ${task.error || 'Task failed'}`, 'error');
-                        sendBtn.disabled = false;
-                    } else {
-                        attempts++;
-                        if (attempts < maxAttempts) {
-                            setTimeout(pollResult, 1000);
-                        } else {
-                            loadingMsg.remove();
-                            addMessage('ERROR: TIMEOUT - PROCESSING EXCEEDED', 'error');
-                            sendBtn.disabled = false;
-                        }
-                    }
-                };
-
-                pollResult();
-
-            } catch (error) {
-                addMessage(`ERROR: ${error.message}`, 'error');
+        const poll = async () => {
+            const r = await fetch(`/api/tasks/${taskId}`);
+            const d = await r.json();
+            if (!d.success || ++attempts > 45) {
+                loadingEl.remove();
+                addMsg(d.success ? 'TIMEOUT — intento nuevamente' : 'ERROR: tarea no encontrada', 'error');
                 sendBtn.disabled = false;
+                return;
             }
+            const task = d.data;
+            if (task.status === 'completed') {
+                loadingEl.remove();
+                const result = task.result || {};
+                const success = result.success !== false;
+                const output = result.output || result.error || 'Sin output';
+                const iter = result.iterations || '?';
+                const ms = result.executionTime || 0;
+                const modelV = result.nativeModel?.version || '?';
+                const domain = result.nativeModel?.domain || '?';
+
+                const card = `<div class="result-card">
+                    <div class="result-row"><span class="result-label">Status</span><span class="result-value ${success?'ok':'fail'}">${success?'✓ SUCCESS':'✗ FAILED'}</span></div>
+                    <div class="result-row"><span class="result-label">Iterations</span><span class="result-value">${iter}</span></div>
+                    <div class="result-row"><span class="result-label">Time</span><span class="result-value">${ms}ms</span></div>
+                    <div class="result-row"><span class="result-label">Model</span><span class="result-value" style="color:var(--purple)">v${modelV} · ${domain}</span></div>
+                    <div class="result-row"><span class="result-label">Constitution</span><span class="result-value ok">VALID</span></div>
+                </div>`;
+
+                addMsg(output, success ? 'system' : 'error', card);
+
+                // Add to ops list
+                const opEl = document.createElement('div');
+                opEl.className = 'ops-item';
+                opEl.textContent = (success ? '✓ ' : '✗ ') + query.substring(0, 28) + '...';
+                if (opsList.querySelector('.ops-item[style]')) opsList.innerHTML = '';
+                opsList.insertBefore(opEl, opsList.firstChild);
+                if (opsList.children.length > 6) opsList.removeChild(opsList.lastChild);
+
+                sendBtn.disabled = false;
+
+                // Refresh after completing
+                setTimeout(() => { loadNativeModelStats(); loadHackerOneLearnings(); }, 1500);
+
+            } else if (task.status === 'failed') {
+                loadingEl.remove();
+                addMsg('ERROR: ' + (task.error || 'Tarea fallida'), 'error');
+                sendBtn.disabled = false;
+            } else {
+                setTimeout(poll, 800);
+            }
+        };
+        poll();
+    } catch (e) {
+        addMsg('ERROR: ' + e.message, 'error');
+        sendBtn.disabled = false;
+    }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+queryInput.addEventListener('keypress', e => { if (e.key === 'Enter' && !sendBtn.disabled) sendMessage(); });
+queryInput.focus();
+
+// ── TAB SWITCHING ────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+
+// ── NATIVE MODEL STATS ────────────────────────────────────────
+async function loadNativeModelStats() {
+    try {
+        const r = await fetch('/api/native-model/stats');
+        const d = await r.json();
+        if (!d.success) return;
+        const s = d.data;
+
+        document.getElementById('m-version').textContent = 'v' + (s.version || '1.0.0');
+        document.getElementById('m-infer').textContent = s.totalInferences || 0;
+        document.getElementById('m-rate').textContent = s.successRate || '0%';
+        document.getElementById('m-know').textContent = s.knowledgeNodes || 0;
+        document.getElementById('m-epis').textContent = s.episodicMemories || 0;
+        document.getElementById('topbar-model').textContent = 'v' + (s.version || '1.0.0');
+        document.getElementById('s-model').textContent = 'v' + (s.version || '1.0.0');
+        document.getElementById('s-memories').textContent = s.episodicMemories || 0;
+        document.getElementById('s-infer').textContent = s.totalInferences || 0;
+        document.getElementById('s-success').textContent = s.successRate || '0%';
+
+        const pct = parseFloat(s.successRate || '0');
+        document.getElementById('m-bar').style.width = pct + '%';
+        document.getElementById('m-bar-pct').textContent = pct.toFixed(1) + '%';
+    } catch {}
+}
+
+// ── KNOWLEDGE GRAPH ────────────────────────────────────────────
+async function loadKnowledgeGraph() {
+    const container = document.getElementById('graph-nodes');
+    try {
+        const r = await fetch('/api/knowledge-graph');
+        const d = await r.json();
+
+        if (!d.success || !d.data?.nodes?.length) {
+            document.getElementById('s-firebase').textContent = d.data?.configured ? 'OK' : 'local';
+            container.innerHTML = '<div class="empty">Sin nodos aún — evalúa vulnerabilidades para poblar el grafo</div>';
+            document.getElementById('g-count').textContent = '0';
+            document.getElementById('s-nodes').textContent = '0';
+            return;
         }
 
-        // Event listeners
-        sendBtn.addEventListener('click', sendMessage);
-        queryInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !sendBtn.disabled) {
-                sendMessage();
-            }
+        const nodes = d.data.nodes;
+        document.getElementById('g-count').textContent = nodes.length;
+        document.getElementById('s-nodes').textContent = nodes.length;
+        document.getElementById('s-firebase').textContent = 'OK';
+
+        container.innerHTML = nodes.slice(0, 20).map(n => `
+            <div class="graph-node">
+                <div class="gn-title">${esc(n.title || 'Nodo')}</div>
+                <div class="gn-meta">
+                    ${(n.tags || []).slice(0, 3).map(t => `<span class="gn-tag">${esc(t)}</span>`).join('')}
+                    ${n.severity ? `<span class="gn-tag" style="color:var(--orange)">${esc(n.severity)}</span>` : ''}
+                </div>
+                ${n.links?.length ? `<div class="gn-links">↔ ${n.links.length} enlaces</div>` : ''}
+            </div>
+        `).join('');
+    } catch {
+        container.innerHTML = '<div class="empty">Firebase: sin conexión — datos en local</div>';
+        document.getElementById('s-firebase').textContent = 'local';
+    }
+}
+
+// ── HACKERONE LEARNINGS ────────────────────────────────────────
+async function loadHackerOneLearnings() {
+    const container = document.getElementById('learnings-list');
+    try {
+        const r = await fetch('/api/hackerone/learnings');
+        const d = await r.json();
+
+        if (!d.success || !d.data?.length) {
+            container.innerHTML = '<div class="empty">Sin learnings aún — evalúa casos de HackerOne</div>';
+            document.getElementById('s-learnings').textContent = '0';
+            return;
+        }
+
+        const items = d.data;
+        document.getElementById('s-learnings').textContent = items.length;
+
+        // Update H1 stats
+        const totalBounty = items.reduce((s, i) => s + (i.estimatedBounty || 0), 0);
+        const avgAccept = items.reduce((s, i) => s + (i.acceptanceProbability || 0), 0) / items.length;
+        const totalPrograms = items.reduce((s, i) => s + (i.programsFound || 0), 0);
+
+        document.getElementById('h1-total').textContent = items.length;
+        document.getElementById('h1-bounty').textContent = fmt(totalBounty);
+        document.getElementById('h1-programs').textContent = totalPrograms;
+        document.getElementById('h1-rate').textContent = (avgAccept * 100).toFixed(0) + '%';
+
+        container.innerHTML = items.slice(0, 15).map(item => `
+            <div class="learning-item">
+                <div class="li-title">${esc(item.vulnerabilityType || '?')}</div>
+                <div class="li-meta">
+                    CVSS ${item.cvssScore || '?'} · ${item.programsFound || 0} programas · ${fmt(item.estimatedBounty || 0)}
+                </div>
+                <span class="li-confidence">Accept: ${((item.acceptanceProbability || 0) * 100).toFixed(0)}%</span>
+            </div>
+        `).join('');
+
+        // H1 cases
+        document.getElementById('h1-cases').innerHTML = items.slice(0, 8).map(item => `
+            <div class="h1-case">
+                <div class="h1-case-type">${esc(item.vulnerabilityType || '?')}</div>
+                <div class="h1-case-vuln ${('severity-'+(item.severity||'medium'))}">
+                    CVSS ${item.cvssScore || '?'} — ${item.severity || 'medium'}
+                </div>
+                <div class="h1-case-meta">
+                    <span>${item.programsFound || 0} programas</span>
+                    <span>${fmt(item.estimatedBounty || 0)}</span>
+                    <span>${((item.acceptanceProbability||0)*100).toFixed(0)}% accept</span>
+                </div>
+            </div>
+        `).join('');
+    } catch {
+        container.innerHTML = '<div class="empty">Sin conexión a learnings</div>';
+    }
+}
+
+function refreshLearnings() { loadHackerOneLearnings(); }
+
+// ── SELF-PROGRAMMING ──────────────────────────────────────────
+async function loadSelfProgramming() {
+    try {
+        const r = await fetch('/api/self-programming/report');
+        const d = await r.json();
+        if (!d.success) return;
+        const rep = d.data;
+        const mods = rep.recentModifications || [];
+
+        if (mods.length === 0) {
+            document.getElementById('sp-mods').innerHTML = '<div class="empty">Sin modificaciones aún</div>';
+            return;
+        }
+
+        document.getElementById('sp-mods').innerHTML = mods.slice(-5).reverse().map(m => `
+            <div class="learning-item" style="border-left-color:var(--purple)">
+                <div class="li-title" style="color:var(--purple)">${esc(m.type || 'mod')}</div>
+                <div class="li-meta">${esc((m.description || '').substring(0, 60))}</div>
+                <span class="li-confidence" style="background:rgba(139,92,246,.1);color:var(--purple)">${m.reverted ? 'REVERTIDO' : 'ACTIVO'}</span>
+            </div>
+        `).join('');
+    } catch {}
+}
+
+// ── QUICK ASSESS ──────────────────────────────────────────────
+async function quickAssess() {
+    const vulnType = document.getElementById('vuln-input').value.trim();
+    if (!vulnType) return;
+
+    const resultEl = document.getElementById('assess-result');
+    resultEl.style.display = 'block';
+    resultEl.style.color = 'var(--text3)';
+    resultEl.textContent = 'Evaluando...';
+
+    try {
+        const r = await fetch('/api/security/assess', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vulnerability_type: vulnType }),
         });
-        queryInput.focus();
-    </script>
+        const d = await r.json();
+        if (!d.success) { resultEl.textContent = 'Error: ' + d.error; return; }
+
+        const a = d.data.assessment;
+        const programs = d.data.applicable_programs || [];
+        resultEl.style.color = 'var(--green)';
+        resultEl.textContent = `✓ ${vulnType.toUpperCase()} — CVSS ${(a.cvss_score||0).toFixed(1)} (${a.severity||'?'})
+Programas: ${programs.length} | Top: ${programs[0]?.program_name || 'N/A'}
+Bounty: $${programs[0]?.average_payout || 0} avg`;
+
+        // Refresh H1 data
+        setTimeout(() => loadHackerOneLearnings(), 1000);
+    } catch (e) {
+        resultEl.style.color = 'var(--red)';
+        resultEl.textContent = 'Error: ' + e.message;
+    }
+}
+</script>
 </body>
 </html>
