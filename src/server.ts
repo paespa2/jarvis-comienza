@@ -13,6 +13,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
+import * as fs from 'fs';
 import { IntegrationOrchestrator } from './integrations/IntegrationOrchestrator';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -1818,6 +1819,59 @@ app.get('/api/hackerone/learnings', async (req: Request, res: Response) => {
         learnings,
         total: learnings.length,
         configured: firebaseServerService.isConfigured(),
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/persistence/status
+ * Verificar estado de persistencia (Obsidian + Firebase)
+ */
+app.get('/api/persistence/status', async (req: Request, res: Response) => {
+  try {
+    // Verificar Obsidian vault
+    const vaultPath = path.join(process.cwd(), 'obsidian-vault/03-APRENDIZAJES');
+    const obsidianExists = fs.existsSync(vaultPath);
+    let obsidianFileCount = 0;
+    if (obsidianExists) {
+      const files = fs.readdirSync(vaultPath).filter(f => f.endsWith('.md'));
+      obsidianFileCount = files.length;
+    }
+
+    // Verificar Firebase
+    const firebaseConfigured = firebaseServerService.isConfigured();
+    const knowledgeNodes = firebaseConfigured ? await firebaseServerService.getKnowledgeGraph() : [];
+    const hackerOneLearnings = firebaseConfigured ? await firebaseServerService.getHackerOneLearnings(100) : [];
+
+    res.json({
+      success: true,
+      data: {
+        obsidian: {
+          enabled: obsidianExists,
+          vaultPath,
+          learningFilesCount: obsidianFileCount,
+          status: obsidianExists ? '✅ Guardando aprendizajes localmente' : '❌ Vault no encontrado',
+        },
+        firebase: {
+          configured: firebaseConfigured,
+          knowledgeNodesCount: knowledgeNodes.length,
+          hackerOneLearningsCount: hackerOneLearnings.length,
+          status: firebaseConfigured
+            ? (knowledgeNodes.length > 0 || hackerOneLearnings.length > 0
+              ? '✅ Conectado y guardando datos'
+              : '⚠️  Configurado pero sin datos (API key puede necesitar Service Account para escritura)')
+            : '❌ No configurado',
+        },
+        summary: {
+          totalLearningRecords: obsidianFileCount,
+          totalKnowledgeGraphNodes: knowledgeNodes.length,
+          totalHackerOneLearnings: hackerOneLearnings.length,
+          persistenceActive: obsidianExists,
+        },
       },
       timestamp: Date.now(),
     });

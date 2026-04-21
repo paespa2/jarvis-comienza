@@ -166,7 +166,13 @@ export const firebaseServerService = {
       console.log(`🔥 Firebase: KnowledgeNode guardado → ${nodeId}`);
       return nodeId;
     } catch (error: any) {
-      console.warn(`[Firebase] Error guardando nodo: ${error.message}`);
+      if (error.response?.status === 403) {
+        console.warn(`[Firebase] Error 403: API Key no tiene permisos en Firestore. Se requiere una Service Account key para escritura desde backend.`);
+      } else if (error.response?.status === 404) {
+        console.warn(`[Firebase] Error 404: Colección no existe. Asegúrate de crear la estructura en Firestore Console.`);
+      } else {
+        console.warn(`[Firebase] Error guardando nodo: ${error.message}`);
+      }
       return null;
     }
   },
@@ -203,7 +209,10 @@ export const firebaseServerService = {
   // -----------------------------------------------
 
   async saveHackerOneLearning(record: Omit<HackerOneLearningRecord, 'id' | 'learnedAt'>): Promise<string | null> {
-    if (!FIREBASE_CONFIG) return null;
+    if (!FIREBASE_CONFIG) {
+      console.warn('[Firebase] No configurado - HackerOne learning no se guardará en Firebase');
+      return null;
+    }
 
     const learningId = `h1-${record.vulnerabilityType.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
     const data = { ...record, id: learningId, learnedAt: Date.now() };
@@ -217,7 +226,11 @@ export const firebaseServerService = {
       console.log(`🔥 Firebase: HackerOne learning guardado → ${learningId}`);
       return learningId;
     } catch (error: any) {
-      console.warn(`[Firebase] Error guardando learning: ${error.message}`);
+      if (error.response?.status === 403) {
+        console.warn(`[Firebase] Error 403: API Key no tiene permisos. Necesita Service Account key para escritura en Firestore.`);
+      } else {
+        console.warn(`[Firebase] Error guardando learning: ${error.message}`);
+      }
       return null;
     }
   },
