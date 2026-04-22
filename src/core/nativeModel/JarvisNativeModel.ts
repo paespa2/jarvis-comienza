@@ -225,6 +225,9 @@ const CHAT_INTENT_PATTERNS: Record<string, RegExp> = {
   farewell: /^(adiós|adios|chau|bye|hasta luego|nos vemos|goodbye)/i,
   constitution: /(constitución|constitucion|alma|artículo|articulo|lealtad|paespa|tus reglas|tu misión|tu mision)/i,
   hackerone_intent: /(hackerone|bug bounty|vulnerabilidad|vulnerability|analiza|escanea|pentesting|encuentra.*bug|busca.*vuln|cve)/i,
+  knowledge_query: /(que has aprendido|qué has aprendido|que sabes|qué sabes|cuanto sabes|cuánto sabes|tu conocimiento|lo que sabes|dime.*aprendido|muestra.*conocimiento)/i,
+  learning_topic: /(eso es conocimiento|no es.*vulnerabilidad|es conocimiento|es información|cuéntame sobre|cuéntame más|explica|explícame)/i,
+  option_select: /^(opci[oó]n\s*[1-3abc]|[1-3]|[abc]|la\s*[1-3abc]|el\s*[1-3]|los tres|las tres|todos|all|los tres en cadena|en cadena|realiza los tres|hazlos todos)$/i,
   confirmation: /^(sí|si|ok|dale|claro|por supuesto|yes|sure|exacto|listo|vale)/i,
   negation: /^(no|nope|ninguno|nada)/i,
   question: /\?/,
@@ -270,6 +273,18 @@ const CHAT_TEMPLATES: Record<string, string[]> = {
     'Entendido. Para procesar eso correctamente, dime: tipo de vulnerabilidad (sql-injection, xss, rce, idor, etc), target si aplica, y severidad estimada. Puedo usar /api/security/assess o /api/hackerone/assess directamente si prefieres.',
     'Perfecto caso. ¿Quieres que haga: (a) assessment de vulnerabilidad para encontrar programas H1 que la acepten, (b) generar payloads específicos, o (c) plan de recon completo? También puedo hacer los tres en cadena.',
     'Listo para operar. Dame el detalle: vulnerabilidad + target, y genero assessment + programas aplicables + estimación de bounty + probabilidad de aceptación. Se guardará como aprendizaje en Obsidian y Firebase.',
+  ],
+  knowledge_query: [
+    'Claro, te cuento lo que tengo almacenado: {knowledgeSummary}',
+    'Aquí está mi base de conocimiento activa: {knowledgeSummary}',
+  ],
+  learning_topic: [
+    'Entendido — es conocimiento, no una vulnerabilidad. Explícame qué quieres que aprenda o que analice, y lo proceso en ese contexto.',
+    'Captado. Si es conceptual, puedo aprenderlo y guardarlo. ¿Me das más detalle sobre el tema?',
+  ],
+  option_select: [
+    'Ejecutando tu selección ahora.',
+    'Procesando la opción elegida.',
   ],
   confirmation: [
     'Perfecto. Dame el siguiente detalle para proceder.',
@@ -318,7 +333,11 @@ export class JarvisNativeModel {
 
   generate(input: NativeModelInput): NativeModelOutput {
     this.totalInferences++;
-    const domain = this.detectDomain(input.query);
+    // For chat mode with short messages, inherit domain from conversation history
+    const isShortChatMessage = input.mode === 'chat' && input.query.trim().length < 25;
+    const domain = (isShortChatMessage && input.history && input.history.length > 0)
+      ? (this.getHistoryDomain(input.history) || this.detectDomain(input.query))
+      : this.detectDomain(input.query);
 
     let text: string;
     let confidence: number;
@@ -518,7 +537,16 @@ export class JarvisNativeModel {
 
   private generateChat(input: NativeModelInput, domain: string): { text: string; confidence: number; reasoning: string } {
     const query = input.query.trim();
-    const intent = this.detectChatIntent(query);
+    const history = input.history || [];
+
+    // 1. Contextual option resolution — "1", "a", "todos", "los tres en cadena", etc.
+    const contextualReply = this.resolveContextualReply(query, history);
+    if (contextualReply) {
+      return { text: contextualReply, confidence: 0.95, reasoning: 'Resolución contextual de opción seleccionada' };
+    }
+
+    // 2. Detect intent with history awareness
+    const intent = this.detectChatIntent(query, history);
     const templates = CHAT_TEMPLATES[intent] || CHAT_TEMPLATES.default;
 
     // Variación: elegir template basado en cantidad de memorias + longitud de query
@@ -527,20 +555,26 @@ export class JarvisNativeModel {
 
     // Reemplazar placeholders con datos reales del modelo
     const stats = this.getStats();
+    const knowledgeSummary = this.buildKnowledgeSummary();
     response = response
       .replace(/\{version\}/g, stats.version)
       .replace(/\{inferences\}/g, String(stats.totalInferences))
       .replace(/\{successRate\}/g, stats.successRate)
       .replace(/\{memories\}/g, String(stats.episodicMemories))
       .replace(/\{nodes\}/g, String(stats.knowledgeNodes))
-      .replace(/\{domain\}/g, domain);
+      .replace(/\{domain\}/g, domain)
+      .replace(/\{knowledgeSummary\}/g, knowledgeSummary);
 
-    // Enriquecer con contexto conversacional si hay historia
-    const history = input.history || [];
-    if (history.length >= 2 && intent === 'default') {
-      const lastJarvis = [...history].reverse().find(t => t.role === 'jarvis');
-      if (lastJarvis && query.length < 30 && !query.includes('?')) {
-        response = `Continuando lo anterior: ${response}`;
+    // If the message is a learning/knowledge correction ("no es una vulnerabilidad, es conocimiento")
+    if (intent === 'learning_topic') {
+      return { text: response, confidence: 0.92, reasoning: 'Corrección de contexto: usuario clarificando tema' };
+    }
+
+    // If default intent but there's clear history context, be specific about the topic
+    if (intent === 'default' && history.length >= 2) {
+      const topicFromHistory = this.extractTopicFromHistory(history);
+      if (topicFromHistory) {
+        response = `Sobre "${topicFromHistory}": ${response}`;
       }
     }
 
@@ -558,12 +592,15 @@ export class JarvisNativeModel {
     };
   }
 
-  private detectChatIntent(query: string): string {
+  private detectChatIntent(query: string, history: ChatTurn[] = []): string {
     // El orden importa: patrones más específicos primero
     const priorityOrder = [
       'greeting',
       'farewell',
       'thanks',
+      'knowledge_query',
+      'learning_topic',
+      'option_select',
       'status',
       'identity',
       'capability',
@@ -579,7 +616,128 @@ export class JarvisNativeModel {
       const pattern = CHAT_INTENT_PATTERNS[intent];
       if (pattern && pattern.test(query)) return intent;
     }
+
+    // Context-based intent detection for very short messages
+    if (query.length < 10 && history.length > 0) {
+      const lastJarvisMsg = [...history].reverse().find(t => t.role === 'jarvis');
+      if (lastJarvisMsg) {
+        // If last Jarvis msg offered options, treat short reply as option selection
+        if (/\(a\)|\(b\)|\(c\)|\(1\)|\(2\)|\(3\)/i.test(lastJarvisMsg.text)) {
+          return 'option_select';
+        }
+        // If last Jarvis msg was asking for confirmation, treat as confirmation
+        if (/\?$/.test(lastJarvisMsg.text.trim())) {
+          return 'confirmation';
+        }
+      }
+    }
+
     return 'default';
+  }
+
+  // ============================================
+  // RESOLUCIÓN CONTEXTUAL DE OPCIONES
+  // ============================================
+
+  private resolveContextualReply(query: string, history: ChatTurn[]): string | null {
+    if (history.length === 0) return null;
+
+    const trimmed = query.trim().toLowerCase();
+    const lastJarvis = [...history].reverse().find(t => t.role === 'jarvis');
+    if (!lastJarvis) return null;
+
+    const lastResponse = lastJarvis.text;
+    const hasLetterOptions = /\(a\)|\(b\)|\(c\)/i.test(lastResponse);
+    const hasNumberOptions = /\(1\)|\(2\)|\(3\)|1\)|2\)|3\)/.test(lastResponse);
+    const hasOptions = hasLetterOptions || hasNumberOptions;
+
+    if (!hasOptions) return null;
+
+    const extractOption = (patterns: RegExp[]): string | null => {
+      for (const pat of patterns) {
+        const match = lastResponse.match(pat);
+        if (match) return match[1]?.trim() || null;
+      }
+      return null;
+    };
+
+    // Option 1 / A
+    if (/^(1|a|opci[oó]n\s*1|opci[oó]n\s*a|la\s*1|la\s*a|el\s*1)$/.test(trimmed)) {
+      const text = extractOption([/\(a\)[:\s]+([^\n(]+)/i, /\(1\)[:\s]+([^\n(]+)/i, /1\)\s+([^\n2(]+)/i]);
+      return text
+        ? `Ejecutando opción A/1: **${text}**.\n\nProcesando ahora, un momento...`
+        : 'Ejecutando la primera opción. ¿Tienes más detalles para que pueda proceder?';
+    }
+
+    // Option 2 / B
+    if (/^(2|b|opci[oó]n\s*2|opci[oó]n\s*b|la\s*2|la\s*b|el\s*2)$/.test(trimmed)) {
+      const text = extractOption([/\(b\)[:\s]+([^\n(]+)/i, /\(2\)[:\s]+([^\n(]+)/i, /2\)\s+([^\n3(]+)/i]);
+      return text
+        ? `Ejecutando opción B/2: **${text}**.\n\nProcesando ahora, un momento...`
+        : 'Ejecutando la segunda opción. ¿Tienes más detalles para que pueda proceder?';
+    }
+
+    // Option 3 / C
+    if (/^(3|c|opci[oó]n\s*3|opci[oó]n\s*c|la\s*3|la\s*c|el\s*3)$/.test(trimmed)) {
+      const text = extractOption([/\(c\)[:\s]+([^\n(]+)/i, /\(3\)[:\s]+([^\n(]+)/i, /3\)\s+([^\n(]+)/i]);
+      return text
+        ? `Ejecutando opción C/3: **${text}**.\n\nProcesando ahora, un momento...`
+        : 'Ejecutando la tercera opción. ¿Tienes más detalles para que pueda proceder?';
+    }
+
+    // All options / chain execution
+    if (/^(todos|todas|los tres|las tres|all|en cadena|los tres en cadena|realiza los tres|hazlos todos)$/.test(trimmed)) {
+      const optA = extractOption([/\(a\)[:\s]+([^\n(]+)/i, /\(1\)[:\s]+([^\n(]+)/i]);
+      const optB = extractOption([/\(b\)[:\s]+([^\n(]+)/i, /\(2\)[:\s]+([^\n(]+)/i]);
+      const optC = extractOption([/\(c\)[:\s]+([^\n(]+)/i, /\(3\)[:\s]+([^\n(]+)/i]);
+      const chain = [optA, optB, optC].filter(Boolean);
+      if (chain.length > 0) {
+        return `Ejecutando todos en cadena:\n${chain.map((o, i) => `${i + 1}. **${o}**`).join('\n')}\n\nIniciando secuencia... Dame los detalles del target/input para cada uno.`;
+      }
+      return 'Ejecutando todas las opciones en cadena. Dame el target o contexto para proceder con cada una.';
+    }
+
+    return null;
+  }
+
+  // ============================================
+  // UTILIDADES DE CONTEXTO CONVERSACIONAL
+  // ============================================
+
+  private getHistoryDomain(history: ChatTurn[]): string | null {
+    const recent = [...history].reverse().slice(0, 8);
+    const counts: Record<string, number> = {};
+    for (const turn of recent) {
+      const d = this.detectDomain(turn.text);
+      if (d !== 'general') counts[d] = (counts[d] || 0) + 1;
+    }
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return entries.length > 0 ? entries[0][0] : null;
+  }
+
+  private extractTopicFromHistory(history: ChatTurn[]): string | null {
+    const recent = [...history].reverse().slice(0, 4);
+    for (const turn of recent) {
+      if (turn.text.length > 20) {
+        // Extract first meaningful phrase (up to 50 chars)
+        const clean = turn.text.replace(/[*#\n]/g, ' ').trim();
+        const firstPhrase = clean.split(/[.!?]/)[0].trim();
+        if (firstPhrase.length > 10 && firstPhrase.length < 80) return firstPhrase;
+      }
+    }
+    return null;
+  }
+
+  private buildKnowledgeSummary(): string {
+    const domains = ['security', 'hackerone', 'reconnaissance', 'code', 'analysis'];
+    const summary = domains.map(d => {
+      const count = Array.from(this.knowledgeGraph.values()).filter(n => n.domain === d).length;
+      return count > 0 ? `${d}(${count})` : null;
+    }).filter(Boolean);
+    const memCount = this.episodicMemory.length;
+    return summary.length > 0
+      ? `${summary.join(', ')} + ${memCount} memorias episódicas`
+      : `${memCount} memorias episódicas y ${this.knowledgeGraph.size} conceptos`;
   }
 
   // ============================================

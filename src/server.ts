@@ -51,6 +51,9 @@ import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEng
 import { firebaseServerService } from './services/firebaseServerService';
 import { getHackerOneLearningService } from './services/hackerOneLearningService';
 
+// ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
+import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -163,6 +166,17 @@ async function initializeJarvis() {
   console.log(`   ✅ Core Teachings loaded: 100 enseñanzas`);
   console.log(`   ✅ Learning System initialized`);
   console.log(`   ✅ Obsidian Memory vault ready\n`);
+
+  // ✅ AUTO-RESEARCHER: Start daily cron for autonomous learning
+  console.log(`🔬 Starting Auto-Researcher (daily cron)...`);
+  const existingKeysGetter = () =>
+    selfProgrammingEngine.searchKnowledge('').map((k) => k.topic);
+  jarvisAutoResearcher.startDailyCron(
+    (entry) => selfProgrammingEngine.addKnowledge(entry as any),
+    existingKeysGetter,
+    24,
+  );
+  console.log(`   ✅ Auto-Researcher running — fetches arXiv papers every 24h\n`);
 
   console.log(`\n✅ Jarvis inicializado correctamente`);
   console.log(`📍 Escuchando en http://${HOST}:${PORT}`);
@@ -2048,6 +2062,114 @@ app.post('/api/bootstrap/hackerone', async (req: Request, res: Response) => {
       error: error.message,
     });
   }
+});
+
+// ============================================
+// AUTO-RESEARCH ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/research/status
+ * Estado del sistema de auto-investigación
+ */
+app.get('/api/research/status', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: jarvisAutoResearcher.getStatus(),
+    timestamp: Date.now(),
+  });
+});
+
+/**
+ * POST /api/research/run
+ * Ejecutar sesión de investigación manualmente
+ */
+app.post('/api/research/run', async (req: Request, res: Response) => {
+  try {
+    const { maxQueries = 3 } = req.body;
+    const existingKeys = selfProgrammingEngine.searchKnowledge('').map((k) => k.topic);
+
+    const session = await jarvisAutoResearcher.runResearchSession(
+      (entry) => selfProgrammingEngine.addKnowledge(entry as any),
+      existingKeys,
+      maxQueries,
+    );
+
+    // Registrar en Obsidian
+    obsidianMemory.registerAction({
+      timestamp: new Date().toISOString(),
+      type: 'learning',
+      title: `Auto-Research: ${session.papersFound} papers analizados`,
+      description: session.summary,
+      tags: ['research', 'auto-learning', ...session.topics],
+    });
+
+    res.json({
+      success: true,
+      data: {
+        papersFound: session.papersFound,
+        gapsIdentified: session.gapsIdentified,
+        knowledgeAdded: session.knowledgeAdded,
+        topics: session.topics,
+        summary: session.summary,
+        topGaps: session.gaps.slice(0, 5).map(g => ({
+          topic: g.topic,
+          relevance: `${(g.relevance * 100).toFixed(0)}%`,
+          domain: g.domain,
+          sourceCount: g.sourceCount,
+        })),
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(error.message.includes('en curso') ? 409 : 500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/research/last-session
+ * Obtener detalles de la última sesión de investigación
+ */
+app.get('/api/research/last-session', (req: Request, res: Response) => {
+  const session = jarvisAutoResearcher.getLastSession();
+  if (!session) {
+    return res.status(404).json({ success: false, error: 'No hay sesiones previas' });
+  }
+  res.json({ success: true, data: session, timestamp: Date.now() });
+});
+
+/**
+ * POST /api/research/start-cron
+ * Iniciar cron de investigación diaria (Railway)
+ */
+app.post('/api/research/start-cron', (req: Request, res: Response) => {
+  const { intervalHours = 24 } = req.body;
+  const existingKeysGetter = () =>
+    selfProgrammingEngine.searchKnowledge('').map((k) => k.topic);
+
+  jarvisAutoResearcher.startDailyCron(
+    (entry) => selfProgrammingEngine.addKnowledge(entry as any),
+    existingKeysGetter,
+    intervalHours,
+  );
+
+  res.json({
+    success: true,
+    data: { cronStarted: true, intervalHours, message: `Investigación autónoma programada cada ${intervalHours}h` },
+    timestamp: Date.now(),
+  });
+});
+
+/**
+ * POST /api/research/stop-cron
+ * Detener cron de investigación diaria
+ */
+app.post('/api/research/stop-cron', (req: Request, res: Response) => {
+  jarvisAutoResearcher.stopDailyCron();
+  res.json({ success: true, data: { cronStopped: true }, timestamp: Date.now() });
 });
 
 /**
