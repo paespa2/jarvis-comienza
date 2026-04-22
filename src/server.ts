@@ -2173,6 +2173,53 @@ app.post('/api/research/stop-cron', (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/research/transformer-circuits
+ * Forzar lectura inmediata de transformer-circuits.pub (Anthropic)
+ */
+app.post('/api/research/transformer-circuits', async (req: Request, res: Response) => {
+  try {
+    const existingKeys = selfProgrammingEngine.searchKnowledge('').map((k) => k.topic);
+    const session = await jarvisAutoResearcher.runResearchSession(
+      (entry) => selfProgrammingEngine.addKnowledge(entry as any),
+      existingKeys,
+      0, // Skip arXiv queries — only transformer-circuits
+    );
+
+    const tcPapers = session.papers.filter((p: any) => p.source === 'transformer-circuits');
+
+    obsidianMemory.registerAction({
+      timestamp: new Date().toISOString(),
+      type: 'learning',
+      title: `Anthropic Research: ${tcPapers.length} papers de transformer-circuits.pub`,
+      description: `Leídos ${tcPapers.length} papers de Anthropic. ${session.knowledgeAdded} conceptos de interpretabilidad añadidos.`,
+      tags: ['research', 'anthropic', 'interpretability', 'transformer-circuits'],
+    });
+
+    res.json({
+      success: true,
+      data: {
+        source: 'transformer-circuits.pub',
+        papersRead: tcPapers.length,
+        knowledgeAdded: session.knowledgeAdded,
+        papers: tcPapers.map((p: any) => ({
+          title: p.title,
+          published: p.published,
+          url: p.url,
+          concepts: p.concepts,
+          abstractPreview: p.abstract.substring(0, 200),
+        })),
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(error.message.includes('en curso') ? 409 : 500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * 404
  */
 app.use((req: Request, res: Response) => {
