@@ -177,6 +177,8 @@ export class PersistentMemoryManager {
   // ========================================
 
   async saveLesson(lesson: Lesson): Promise<void> {
+    if (!this.db) return; // Firebase stub
+
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO lessons
       (concept, rule, successRate, source, lastUsed)
@@ -205,7 +207,7 @@ export class PersistentMemoryManager {
   }
 
   async searchLessons(keywords: string[]): Promise<Lesson[]> {
-    if (keywords.length === 0) return [];
+    if (keywords.length === 0 || !this.db) return [];
 
     const placeholders = keywords.map(() => 'concept LIKE ?').join(' OR ');
     const stmt = this.db.prepare(`
@@ -219,6 +221,8 @@ export class PersistentMemoryManager {
   }
 
   async getLesson(concept: string): Promise<Lesson | null> {
+    if (!this.db) return null;
+
     const stmt = this.db.prepare(`
       SELECT * FROM lessons WHERE concept = ?
     `);
@@ -230,6 +234,8 @@ export class PersistentMemoryManager {
     concept: string,
     newSuccessRate: number
   ): Promise<void> {
+    if (!this.db) return;
+
     const stmt = this.db.prepare(`
       UPDATE lessons
       SET successRate = ?, lastUsed = ?, timesUsed = timesUsed + 1
@@ -244,6 +250,8 @@ export class PersistentMemoryManager {
   // ========================================
 
   async saveSkill(skill: Skill): Promise<void> {
+    if (!this.db) return; // Firebase stub
+
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO skills
       (name, type, implementation, effectiveness)
@@ -266,7 +274,7 @@ export class PersistentMemoryManager {
   }
 
   async searchSkills(keywords: string[]): Promise<Skill[]> {
-    if (keywords.length === 0) return [];
+    if (keywords.length === 0 || !this.db) return [];
 
     const placeholders = keywords.map(() => 'name LIKE ?').join(' OR ');
     const stmt = this.db.prepare(`
@@ -280,6 +288,8 @@ export class PersistentMemoryManager {
   }
 
   async getSkill(name: string): Promise<Skill | null> {
+    if (!this.db) return null;
+
     const stmt = this.db.prepare(`
       SELECT * FROM skills WHERE name = ?
     `);
@@ -291,6 +301,8 @@ export class PersistentMemoryManager {
     name: string,
     newEffectiveness: number
   ): Promise<void> {
+    if (!this.db) return;
+
     const stmt = this.db.prepare(`
       UPDATE skills
       SET effectiveness = ?, lastExecuted = ?, timesExecuted = timesExecuted + 1
@@ -327,6 +339,8 @@ export class PersistentMemoryManager {
   }
 
   async saveGenome(genome: Genome): Promise<void> {
+    if (!this.db) return; // Firebase stub
+
     const stmt = this.db.prepare(`
       INSERT INTO genomes
       (generationId, timestamp, mutationVector, fitnessScore, changes, parentGeneration)
@@ -344,6 +358,8 @@ export class PersistentMemoryManager {
   }
 
   async getGenomeHistory(limit: number = 10): Promise<Genome[]> {
+    if (!this.db) return []; // Firebase stub
+
     const stmt = this.db.prepare(`
       SELECT * FROM genomes
       ORDER BY generationId DESC
@@ -379,6 +395,8 @@ export class PersistentMemoryManager {
   // ========================================
 
   async saveTask(task: JarvisTask): Promise<void> {
+    if (!this.db) return; // Firebase stub
+
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO tasks
       (id, query, status, result, error, createdAt, startedAt, completedAt, duration)
@@ -399,6 +417,8 @@ export class PersistentMemoryManager {
   }
 
   async getTask(taskId: string): Promise<JarvisTask | null> {
+    if (!this.db) return null;
+
     const stmt = this.db.prepare(`
       SELECT * FROM tasks WHERE id = ?
     `);
@@ -417,6 +437,8 @@ export class PersistentMemoryManager {
     status?: string,
     limit: number = 100
   ): Promise<JarvisTask[]> {
+    if (!this.db) return [];
+
     let stmt;
 
     if (status) {
@@ -442,6 +464,8 @@ export class PersistentMemoryManager {
   // ========================================
 
   async savePattern(pattern: Pattern): Promise<void> {
+    if (!this.db) return; // Firebase stub
+
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO patterns
       (name, description, signature, confidence)
@@ -457,6 +481,8 @@ export class PersistentMemoryManager {
   }
 
   async getPatterns(limit: number = 50): Promise<Pattern[]> {
+    if (!this.db) return [];
+
     const stmt = this.db.prepare(`
       SELECT * FROM patterns
       ORDER BY confidence DESC
@@ -467,6 +493,8 @@ export class PersistentMemoryManager {
   }
 
   async findPattern(signature: string): Promise<Pattern | null> {
+    if (!this.db) return null;
+
     const stmt = this.db.prepare(`
       SELECT * FROM patterns WHERE signature = ?
     `);
