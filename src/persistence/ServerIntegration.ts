@@ -6,7 +6,6 @@
  */
 
 import { PersistentMemoryManager } from './PersistentMemoryManager';
-import { initializeDatabase } from './database';
 import { initializeBootstrapKnowledge } from '../reasoning/InitialKnowledge';
 
 // Export PersistentMemoryManager for server integration
@@ -25,10 +24,7 @@ let persistenceManager: PersistentMemoryManager | null = null;
 export async function initializePersistence(): Promise<PersistentMemoryManager> {
   console.log('\n💾 INITIALIZING PERSISTENT STORAGE...\n');
 
-  // Initialize database
-  initializeDatabase();
-
-  // Create memory manager
+  // Create memory manager (Firebase-based, no SQLite dependency)
   persistenceManager = new PersistentMemoryManager();
 
   // Bootstrap initial knowledge if needed

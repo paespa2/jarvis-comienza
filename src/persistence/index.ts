@@ -4,7 +4,6 @@
  * Exports all persistence-related modules and utilities
  */
 
-export { JarvisDatabase, initializeDatabase, getDatabase } from './database';
 export {
   PersistentMemoryManager,
   type Episode,
