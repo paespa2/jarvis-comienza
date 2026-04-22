@@ -276,13 +276,78 @@ Return ONLY the intent name.`;
     message: string,
     context: ConversationContext
   ): Promise<{ response: string; systemsUsed: string[] }> {
-    // Use Mixture of Experts for intelligent routing
+    // Check for simple conversational questions first
+    const simpleResponse = this.handleSimpleConversation(message);
+    if (simpleResponse) {
+      return simpleResponse;
+    }
+
+    // Use Mixture of Experts for intelligent routing on complex questions
     const expertResponse = await mixtureOfExperts.answer(message, this.getContextString(context));
 
     return {
       response: `${expertResponse.answer}\n\n**Confidence:** ${expertResponse.confidence.toFixed(0)}%\n**Expert:** ${expertResponse.expert.toUpperCase()}`,
       systemsUsed: ['mixture-of-experts'],
     };
+  }
+
+  /**
+   * Handle simple conversational questions without complex reasoning
+   */
+  private handleSimpleConversation(message: string): { response: string; systemsUsed: string[] } | null {
+    const lower = message.toLowerCase().trim();
+
+    // Greeting
+    if (/^(hola|hi|hey|buenos días|buenas noches|buenas tardes|ola|ey)/.test(lower)) {
+      return {
+        response: `¡Hola paespa! Soy Jarvis. Encantado de charlar contigo.\n\nPuedo ayudarte con:\n• Preguntas de seguridad y hacking ético\n• Análisis de vulnerabilidades\n• Generación de exploits y payloads\n• Búsqueda de bounties en HackerOne\n• Aprendizaje y razonamiento\n\n¿Qué necesitas hoy?`,
+        systemsUsed: ['conversational'],
+      };
+    }
+
+    // What can you do?
+    if (/qué|que/.test(lower) && /puedes|pudes/.test(lower) && /hacer/.test(lower) ||
+        /cuales|cuáles/.test(lower) && /capacidades|habilidades/.test(lower)) {
+      return {
+        response: `Puedo hacer bastante, paespa:\n\n🔒 **Seguridad:**\n• Analizar vulnerabilidades (XSS, SQLi, RCE, etc.)\n• Generar exploits y payloads de testing\n• Búsqueda de vulnerabilidades en targets autorizados\n• Asesoramiento en HackerOne programs\n\n🧠 **Inteligencia:**\n• Razonamiento profundo con ReAct + 5-Phase\n• Análisis adversarial de mis propias respuestas\n• Investigación autónoma en arXiv\n\n📚 **Aprendizaje:**\n• 100+ enseñanzas de autonomía, seguridad, ética, razonamiento\n• Mejora continua mediante ciclos de aprendizaje\n• Genome evolution (mejora genética automática)\n\n⚙️ **Automatización:**\n• Tareas autónomas sin intervención\n• Desafíos de reasoning cada 4 horas\n• Ciclos de evolución cada 6 horas\n\n¿En qué quieres que me enfoque?`,
+        systemsUsed: ['conversational'],
+      };
+    }
+
+    // What have you learned?
+    if (/aprendido|aprendiste/.test(lower) && (/qué|que|has|que/.test(lower) || /que.*has|has.*aprendido/.test(lower))) {
+      return {
+        response: `Excelente pregunta. He aprendido mucho:\n\n📊 **Estadísticas de Aprendizaje:**\n• 100 enseñanzas cargadas (autonomía, seguridad, ética, razonamiento, codificación)\n• Categorías: Autonomía (20), Reasoning (20), Seguridad (20), Coding (20), Ética (20)\n• Ciclos de práctica: Múltiples\n• Tasa de maestría: En progreso\n\n🎯 **Conceptos Maestrías:**\n• Constitutional AI: Lealtad 0.95 (INMUTABLE)\n• Autonomía responsable con límites éticos\n• Razonamiento multi-fase y validación adversarial\n• Security fundamentals (OWASP Top 10, HackerOne)\n\n🔄 **Evolución Activa:**\n• Genoma: Generación 2+\n• Fitness score: ~90%\n• Mutation vector: Adaptándose por performance\n• Consolidación de memoria: Activa\n\n¿Quieres profundizar en algún área específica?`,
+        systemsUsed: ['conversational'],
+      };
+    }
+
+    // What do you have automatic?
+    if (/automático|automatica|automáticamente|en automático|auto\)/.test(lower) && /tienes|que|qué/.test(lower)) {
+      return {
+        response: `Tengo varios procesos automáticos corriendo 24/7:\n\n⏰ **Automatización Continua:**\n• Desafíos de reasoning: Cada 4 horas\n• Ciclos de evolución (genome): Cada 6 horas  \n• Búsquedas de web intelligence: Cada 8 horas\n• Verificación de reasoning: Cada 2 horas\n• Síntesis de conocimiento: Semanal\n\n📡 **Auto-Investigación:**\n• Cron diario en arXiv: Busca papers de IA, seguridad, privacidad\n• Identifica gaps comparando papers vs knowledge base\n• Aprende nuevos conceptos automáticamente\n• Genera reportes en Obsidian vault\n\n🧬 **Mejora Constante:**\n• Genome mutation basada en performance\n• Memoria consolidación después de 50+ episodios\n• Pattern learning de fallos y éxitos\n• Self-programming para adaptar comportamiento\n\n¿Quieres que active algún proceso específico ahora?`,
+        systemsUsed: ['conversational'],
+      };
+    }
+
+    // Spanish language preference
+    if (/^(por favor|please).*(español|english|idioma)|(respuestas|respuesta).*(español|english)/.test(lower)) {
+      return {
+        response: `Perfecto paespa, de ahora en adelante responderé completamente en español. 🇪🇸\n\nMi capacidad de lenguaje es flexible, así que puedo adaptarme a tus preferencias.\n\n¿En qué puedo ayudarte?`,
+        systemsUsed: ['conversational'],
+      };
+    }
+
+    // Status or health check
+    if (/status|salud|estado|como estás|cómo estás|estás bien|funciono|health/.test(lower)) {
+      return {
+        response: `✅ **Estado: OPERACIONAL**\n\n🟢 Sistemas:\n• API REST: Activa\n• Knowledge Base: 14 CVEs + 15 HackerOne programs\n• Learning System: 100 enseñanzas\n• Memory Manager: Triple Memory (Episodic, Semantic, Procedural)\n• Constitutional AI: Verificación en vigor\n• Autonomous Activation: Corriendo\n• Evolution Engine: Gen 2 en progreso\n\n📊 Uptime: Activo en Railway\n\n¿Necesitas que revise algo específico?`,
+        systemsUsed: ['conversational', 'status-check'],
+      };
+    }
+
+    // No simple conversation match
+    return null;
   }
 
   private async handleAnalysis(
