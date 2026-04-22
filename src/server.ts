@@ -115,6 +115,10 @@ import { executionCommandHandler } from './core/execution/ExecutionCommandHandle
 import { contextMemoryManager } from './core/memory/ContextMemoryManager';
 import { contextMemoryHandler } from './core/memory/ContextMemoryHandler';
 
+// ✅ NAMED ENTITY RECOGNITION: Entity identification and tracking
+import { namedEntityRecognition } from './core/nlp/NamedEntityRecognition';
+import { entityTracker } from './core/nlp/EntityTracker';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -3067,6 +3071,218 @@ app.get('/api/context/stats', (req: Request, res: Response) => {
         ],
         status: 'operational',
         report: contextMemoryManager.generateMemoryReport()
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// NAMED ENTITY RECOGNITION ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/ner/recognize
+ * Reconocer entidades en texto
+ */
+app.post('/api/ner/recognize', (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'text es requerido'
+      });
+    }
+
+    const result = namedEntityRecognition.recognizeEntities(text);
+
+    res.json({
+      success: true,
+      data: {
+        entityCount: result.entities.length,
+        targets: result.primaryTargets.map(t => ({ type: t.type, value: t.value })),
+        tools: result.primaryTools.map(t => t.value),
+        vulnerabilities: result.vulnerabilities.map(v => v.value),
+        allEntities: result.entities.map(e => ({
+          type: e.type,
+          value: e.value,
+          confidence: e.confidence
+        })),
+        report: namedEntityRecognition.generateEntityReport(result)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/ner/extract-attack-parameters
+ * Extraer parámetros de ataque
+ */
+app.post('/api/ner/extract-attack-parameters', (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'text es requerido'
+      });
+    }
+
+    const params = namedEntityRecognition.extractAttackParameters(text);
+
+    res.json({
+      success: true,
+      data: {
+        targets: params.targets,
+        tools: params.tools,
+        vulnerabilities: params.vulnerabilities,
+        technologies: params.technologies,
+        ports: params.ports,
+        protocols: params.protocols,
+        files: params.files,
+        cves: params.cves
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/ner/track/session
+ * Crear sesión de rastreo
+ */
+app.post('/api/ner/track/session', (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionId es requerido'
+      });
+    }
+
+    const session = entityTracker.createSession(sessionId);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.sessionId,
+        status: 'initialized'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/ner/track/:sessionId/process
+ * Procesar mensaje y rastrear entidades
+ */
+app.post('/api/ner/track/:sessionId/process', (req: Request, res: Response) => {
+  try {
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'message es requerido'
+      });
+    }
+
+    const result = entityTracker.processMessage(req.params.sessionId, message);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    const active = entityTracker.getActiveEntities(req.params.sessionId);
+    const primaryTarget = entityTracker.getPrimaryTarget(req.params.sessionId);
+    const recommendedTools = entityTracker.getRecommendedTools(req.params.sessionId);
+
+    res.json({
+      success: true,
+      data: {
+        newEntitiesDetected: result.newEntities,
+        totalTargets: result.totalTargets,
+        totalTools: result.totalTools,
+        totalVulnerabilities: result.totalVulnerabilities,
+        activeEntities: active,
+        primaryTarget: primaryTarget?.value,
+        recommendedTools,
+        hasTargetChanged: entityTracker.hasTargetChanged(req.params.sessionId)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/ner/track/:sessionId/report
+ * Obtener reporte de rastreo
+ */
+app.get('/api/ner/track/:sessionId/report', (req: Request, res: Response) => {
+  try {
+    const report = entityTracker.generateTrackingReport(req.params.sessionId);
+    const data = entityTracker.exportTrackingData(req.params.sessionId);
+
+    res.json({
+      success: true,
+      data: {
+        ...data,
+        report
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/ner/status
+ * Obtener estado del sistema NER
+ */
+app.get('/api/ner/status', (req: Request, res: Response) => {
+  try {
+    res.json({
+      success: true,
+      data: {
+        system: 'NamedEntityRecognition',
+        status: 'operational',
+        capabilities: [
+          'domain-recognition',
+          'ip-address-detection',
+          'url-parsing',
+          'tool-identification',
+          'cve-detection',
+          'vulnerability-recognition',
+          'technology-detection',
+          'port-extraction',
+          'protocol-identification',
+          'file-path-detection',
+          'entity-tracking',
+          'attack-parameter-extraction'
+        ],
+        features: {
+          entityTypes: 10,
+          securityTools: 40,
+          commonVulnerabilities: 20,
+          technologyPatterns: 20
+        }
       },
       timestamp: Date.now()
     });
