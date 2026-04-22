@@ -13,4 +13,7 @@ dist/
 .jarvis.db
 .jarvis-native-model/
 .jarvis-self-programming/
+.jarvis-research/
 /obsidian-vault/
+/server.js
+/vite.config.js
