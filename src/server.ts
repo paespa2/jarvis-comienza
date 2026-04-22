@@ -107,6 +107,10 @@ import { livePreviewManager } from './core/streaming/LivePreviewManager';
 // ✅ GITHUB LEARNING REPOSITORY: Git-based persistent learning
 import { gitHubLearningRepository } from './core/learning/GitHubLearningRepository';
 
+// ✅ JARVIS CODE EXECUTOR: Execute code like Claude.Code
+import { jarvisCodeExecutor } from './core/execution/JarvisCodeExecutor';
+import { executionCommandHandler } from './core/execution/ExecutionCommandHandler';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -1818,13 +1822,45 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     const sessionId = providedSessionId || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const startTime = Date.now();
 
-    // 🌐 DETECCIÓN DE COMANDOS DE NAVEGACIÓN
+    // 🌐 DETECCIÓN DE COMANDOS (navegación, ejecución, etc)
     const navCommand = navigationCommandHandler.detectNavigationCommand(message);
+    const execCommand = executionCommandHandler.detectExecutionCommand(message);
     let response: any;
     let navigationResult = null;
+    let executionResult = null;
 
-    if (navCommand) {
-      // Ejecutar comando de navegación
+    // Prioridad: Ejecución > Navegación > Conversación
+    if (execCommand && execCommand.confidence > 0.7) {
+      // 💻 EJECUTAR CÓDIGO
+      executionResult = await executionCommandHandler.executeCommand(execCommand);
+      const execResponse = executionCommandHandler.generateResponse(execCommand, executionResult);
+
+      // Registrar en aprendizaje
+      if (executionResult.success) {
+        await livePreviewManager.recordEvent(sessionId, {
+          type: 'learning',
+          title: `Aprendizaje de ejecución: ${execCommand.type}`,
+          description: `Ejecutó ${execCommand.type} exitosamente`,
+          data: { type: execCommand.type, confidence: execCommand.confidence }
+        });
+      }
+
+      response = {
+        message: execResponse,
+        intent: 'code-execution',
+        confidence: execCommand.confidence,
+        systemsUsed: ['JarvisCodeExecutor'],
+        reasoning: `Detecté comando de ejecución. Tipo: ${execCommand.type}`,
+        followUpSuggestions: [
+          'Modifica el código',
+          'Corre pruebas',
+          'Haz commit de cambios'
+        ],
+        timestamp: Date.now(),
+        executionData: executionResult
+      };
+    } else if (navCommand && navCommand.confidence > 0.7) {
+      // 🌐 NAVEGAR WEB
       navigationResult = await navigationCommandHandler.executeNavigationCommand(navCommand);
       const navResponse = navigationCommandHandler.generateNavigationResponse(navCommand, navigationResult);
 
@@ -1843,7 +1879,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         navigationData: navigationResult
       };
     } else {
-      // Procesar con ConversationalInterface: intent classification + intelligent routing
+      // 🧠 CONVERSACIÓN NORMAL
       response = await conversationalInterface.process(message, sessionId);
     }
 
@@ -1875,6 +1911,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         followUpSuggestions: response.followUpSuggestions,
         generationTime,
         ...(navigationResult && { navigationData: navigationResult }),
+        ...(executionResult && { executionData: executionResult }),
       },
       timestamp: response.timestamp,
     });
@@ -2493,6 +2530,265 @@ app.get('/api/learning/insights', (req: Request, res: Response) => {
           topic: i.topic,
           confidence: `${(i.confidence * 100).toFixed(0)}%`
         }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// CODE EXECUTION ENDPOINTS (COMO CLAUDE.CODE)
+// ============================================
+
+/**
+ * POST /api/execute/bash
+ * Ejecutar comando bash
+ */
+app.post('/api/execute/bash', async (req: Request, res: Response) => {
+  try {
+    const { command, description } = req.body;
+    if (!command) {
+      return res.status(400).json({
+        success: false,
+        error: 'command es requerido'
+      });
+    }
+
+    const result = await jarvisCodeExecutor.executeBash(command, description);
+
+    res.json({
+      success: result.success,
+      data: {
+        command: result.command,
+        output: result.output.substring(0, 2000),
+        duration: result.duration,
+        error: result.error
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/execute/python
+ * Ejecutar script Python
+ */
+app.post('/api/execute/python', async (req: Request, res: Response) => {
+  try {
+    const { script, description } = req.body;
+    if (!script) {
+      return res.status(400).json({
+        success: false,
+        error: 'script es requerido'
+      });
+    }
+
+    const result = await jarvisCodeExecutor.executePython(script, description);
+
+    res.json({
+      success: result.success,
+      data: {
+        output: result.output.substring(0, 2000),
+        duration: result.duration,
+        error: result.error
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/execute/file/read
+ * Leer archivo
+ */
+app.post('/api/execute/file/read', async (req: Request, res: Response) => {
+  try {
+    const { path } = req.body;
+    if (!path) {
+      return res.status(400).json({
+        success: false,
+        error: 'path es requerido'
+      });
+    }
+
+    const result = await jarvisCodeExecutor.readFile(path);
+
+    res.json({
+      success: result.success,
+      data: {
+        path,
+        content: result.output.substring(0, 5000),
+        size: result.output.length,
+        error: result.error
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/execute/file/write
+ * Escribir archivo
+ */
+app.post('/api/execute/file/write', async (req: Request, res: Response) => {
+  try {
+    const { path, content, description } = req.body;
+    if (!path || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'path y content son requeridos'
+      });
+    }
+
+    const result = await jarvisCodeExecutor.writeFile(path, content, description);
+
+    res.json({
+      success: result.success,
+      data: {
+        path,
+        size: content.length,
+        message: result.output,
+        error: result.error
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/execute/git
+ * Ejecutar comando Git
+ */
+app.post('/api/execute/git', async (req: Request, res: Response) => {
+  try {
+    const { command, description } = req.body;
+    if (!command) {
+      return res.status(400).json({
+        success: false,
+        error: 'command es requerido'
+      });
+    }
+
+    const result = await jarvisCodeExecutor.gitCommand(command, description);
+
+    res.json({
+      success: result.success,
+      data: {
+        command: `git ${command}`,
+        output: result.output.substring(0, 1000),
+        duration: result.duration,
+        error: result.error
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/execute/code-analysis
+ * Analizar código
+ */
+app.post('/api/execute/code-analysis', async (req: Request, res: Response) => {
+  try {
+    const { filePath, language } = req.body;
+    if (!filePath) {
+      return res.status(400).json({
+        success: false,
+        error: 'filePath es requerido'
+      });
+    }
+
+    const readResult = await jarvisCodeExecutor.readFile(filePath);
+    if (!readResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: `No se pudo leer archivo: ${readResult.error}`
+      });
+    }
+
+    const lang = language || filePath.split('.').pop() || 'text';
+    const analysis = jarvisCodeExecutor.analyzeCode(filePath, lang, readResult.output);
+
+    res.json({
+      success: true,
+      data: {
+        file: filePath,
+        language: analysis.language,
+        lines: analysis.lines,
+        functions: analysis.functions,
+        imports: analysis.imports,
+        issues: analysis.issues,
+        suggestions: analysis.suggestions
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/execute/history
+ * Obtener historial de ejecuciones
+ */
+app.get('/api/execute/history', (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const history = jarvisCodeExecutor.getHistory(limit);
+
+    res.json({
+      success: true,
+      data: {
+        count: history.length,
+        executions: history.map(e => ({
+          id: e.id,
+          type: e.type,
+          success: e.success,
+          duration: e.duration,
+          timestamp: new Date(e.timestamp).toISOString()
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/execute/stats
+ * Obtener estadísticas de ejecuciones
+ */
+app.get('/api/execute/stats', (req: Request, res: Response) => {
+  try {
+    const stats = jarvisCodeExecutor.getStats();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        capabilities: [
+          'bash-execution',
+          'python-execution',
+          'file-operations',
+          'git-operations',
+          'code-analysis',
+          'plan-execution'
+        ],
+        status: 'operational',
+        report: jarvisCodeExecutor.generateCapabilityReport()
       },
       timestamp: Date.now()
     });
