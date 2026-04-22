@@ -41,6 +41,8 @@ import { coreTeachings } from './learning/CoreTeachings';
 // ✅ FASE 3C: HackerOne Specialization (Consolidated)
 import { hackerOneModule } from './specializations/HackerOneModule';
 import { kaliLearningModule } from './specializations/KaliLearningModule';
+import { criticalEvaluationEngine } from './optimization/CriticalEvaluationEngine';
+import { obsidianSync } from './memory/ObsidianSyncIntegration';
 
 // Backward-compat stubs — legacy endpoints consolidated into HackerOneModule
 const hackerOneAssistant = {
@@ -245,6 +247,26 @@ async function initializeJarvis() {
   console.log(`      • Web intelligence hunts every 8 hours`);
   console.log(`      • Reasoning verification every 2 hours`);
   console.log(`      • Knowledge synthesis weekly\n`);
+
+  // ✨ Initialize Critical Evaluation Engine
+  console.log(`\n🧠 Initializing Critical Evaluation Engine...`);
+  console.log(`   ✅ Listo para evaluar mejoras de forma crítica`);
+  console.log(`   • ADOPTAR: Mejora > 15% con ROI positivo`);
+  console.log(`   • RECHAZAR: Redundante o empeora performance`);
+  console.log(`   • REFINAR: Mejora marginal\n`);
+
+  // 📚 Initialize Obsidian Sync
+  console.log(`📚 Initializing Obsidian Sync Integration...`);
+  const obsidianReady = await obsidianSync.initializeSync();
+  if (obsidianReady) {
+    const syncStats = await obsidianSync.getSyncStats();
+    console.log(`   ✅ Obsidian sincronizado`);
+    console.log(`   📁 Vault: ${syncStats.vaultPath}`);
+    console.log(`   📖 Conocimiento: ${syncStats.knowledgeCount} notas`);
+    console.log(`   🔄 Sincronización periódica: ACTIVA\n`);
+  } else {
+    console.log(`   ⚠️  Obsidian no disponible - modo offline\n`);
+  }
 
   console.log(`\n✅ Jarvis inicializado correctamente`);
   console.log(`📍 Escuchando en http://${HOST}:${PORT}`);
@@ -2229,6 +2251,207 @@ app.post('/api/research/transformer-circuits', async (req: Request, res: Respons
       success: false,
       error: error.message,
     });
+  }
+});
+
+// ============================================
+// CRITICAL EVALUATION ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/critical-eval/stats
+ * Obtener estadísticas de evaluaciones críticas
+ */
+app.get('/api/critical-eval/stats', (req: Request, res: Response) => {
+  try {
+    const stats = criticalEvaluationEngine.getEvaluationStats();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        threshold_adoption: '15% improvement min',
+        threshold_roi: '10% ROI min',
+        threshold_redundancy: '5% difference = redundant',
+        policy: 'ADOPT valiosas | REJECT redundantes | REFINAR marginales'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/critical-eval/audit
+ * Obtener reporte de auditoría
+ */
+app.get('/api/critical-eval/audit', (req: Request, res: Response) => {
+  try {
+    const report = criticalEvaluationEngine.generateAuditReport();
+
+    res.json({
+      success: true,
+      data: { report },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// OBSIDIAN SYNC ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/obsidian/status
+ * Estado de sincronización con Obsidian
+ */
+app.get('/api/obsidian/status', async (req: Request, res: Response) => {
+  try {
+    const stats = await obsidianSync.getSyncStats();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        lastSyncAgo: Date.now() - stats.lastSync,
+        message: stats.enabled
+          ? '✅ Sincronización activa con Obsidian'
+          : '⚠️ Obsidian no disponible - modo offline'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/obsidian/save-knowledge
+ * Guardar conocimiento directamente en Obsidian
+ */
+app.post('/api/obsidian/save-knowledge', async (req: Request, res: Response) => {
+  try {
+    const { title, category, content, tags = [], references = [] } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'title y content son requeridos'
+      });
+    }
+
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      title,
+      category: category || 'general',
+      content,
+      tags,
+      references,
+      confidence: 0.9,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const saved = await obsidianSync.saveKnowledge(entry);
+
+    if (!saved) {
+      return res.status(500).json({
+        success: false,
+        error: 'Error guardando en Obsidian'
+      });
+    }
+
+    // También guardar en Obsidian memory local
+    obsidianMemory.registerAction({
+      timestamp: new Date().toISOString(),
+      type: 'action',
+      title: `Knowledge Saved: ${title}`,
+      description: `Categoría: ${category}. Tags: ${tags.join(', ')}`,
+      tags: ['obsidian-sync', 'knowledge', ...tags]
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message: `✅ Conocimiento guardado en Obsidian: ${title}`,
+        entryId: entry.id,
+        category,
+        tags
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/obsidian/search
+ * Buscar conocimiento en Obsidian
+ */
+app.get('/api/obsidian/search', async (req: Request, res: Response) => {
+  try {
+    const { q, category } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query (q) requerida'
+      });
+    }
+
+    let results;
+    if (category) {
+      results = await obsidianSync.readKnowledge(category as string);
+      results = results.filter(r =>
+        r.title.toLowerCase().includes((q as string).toLowerCase()) ||
+        r.content.toLowerCase().includes((q as string).toLowerCase())
+      );
+    } else {
+      results = await obsidianSync.searchKnowledge(q as string);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        query: q,
+        results,
+        count: results.length,
+        message: `${results.length} resultados encontrados`
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/obsidian/knowledge/:category
+ * Obtener conocimiento por categoría
+ */
+app.get('/api/obsidian/knowledge/:category', async (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    const knowledge = await obsidianSync.readKnowledge(category);
+
+    res.json({
+      success: true,
+      data: {
+        category,
+        knowledge,
+        count: knowledge.length,
+        topConfidence: knowledge.length > 0
+          ? Math.max(...knowledge.map(k => k.confidence))
+          : 0
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
