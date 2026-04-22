@@ -111,6 +111,10 @@ import { gitHubLearningRepository } from './core/learning/GitHubLearningReposito
 import { jarvisCodeExecutor } from './core/execution/JarvisCodeExecutor';
 import { executionCommandHandler } from './core/execution/ExecutionCommandHandler';
 
+// ✅ CONTEXT MEMORY: Long-term conversation coherence
+import { contextMemoryManager } from './core/memory/ContextMemoryManager';
+import { contextMemoryHandler } from './core/memory/ContextMemoryHandler';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -1822,6 +1826,17 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     const sessionId = providedSessionId || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const startTime = Date.now();
 
+    // 🧠 CONTEXT MEMORY: Mantener coherencia de conversación
+    const contextSessionId = contextMemoryHandler.getOrCreateSession();
+    const userContext = contextMemoryHandler.processUserMessage(contextSessionId, message);
+    const contextualPrompts = contextMemoryHandler.getContextualPrompts(contextSessionId);
+    const contextChanges = contextMemoryHandler.detectContextChanges(contextSessionId);
+
+    console.log(`\n🧠 [Context] Sesión: ${sessionId}`);
+    console.log(`   Objetivo actual: ${userContext.summary?.mainObjective || 'N/A'}`);
+    console.log(`   Objetivo detectado: ${userContext.shouldUpdateObjective}`);
+    console.log(`   Target detectado: ${userContext.shouldUpdateTarget}`);
+
     // 🌐 DETECCIÓN DE COMANDOS (navegación, ejecución, etc)
     const navCommand = navigationCommandHandler.detectNavigationCommand(message);
     const execCommand = executionCommandHandler.detectExecutionCommand(message);
@@ -1888,6 +1903,9 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     // Aprender del intercambio para mejorar respuestas futuras
     jarvisNativeModel.learn(message, response.message, response.confidence > 0.7, response.intent);
 
+    // 🧠 Registrar respuesta en Context Memory
+    contextMemoryHandler.processJarvisResponse(contextSessionId, response.message, response.intent);
+
     // Auto-documentar en Obsidian si es sustancial
     if (message.length > 20) {
       obsidianMemory.registerAction({
@@ -1898,6 +1916,9 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         tags: ['chat', response.intent, ...response.systemsUsed],
       });
     }
+
+    // Obtener recomendaciones basadas en contexto
+    const contextRecommendations = contextMemoryHandler.getContextBasedRecommendations(contextSessionId);
 
     res.json({
       success: true,
@@ -1912,6 +1933,14 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         generationTime,
         ...(navigationResult && { navigationData: navigationResult }),
         ...(executionResult && { executionData: executionResult }),
+        contextMemory: {
+          contextSessionId,
+          currentObjective: userContext.summary?.mainObjective,
+          currentTarget: userContext.summary?.keyEntities?.targets?.[0],
+          contextualPrompts: contextualPrompts.substring(0, 200),
+          contextBasedRecommendations: contextRecommendations,
+          coherenceScore: userContext.summary?.coherenceScore
+        }
       },
       timestamp: response.timestamp,
     });
@@ -2789,6 +2818,255 @@ app.get('/api/execute/stats', (req: Request, res: Response) => {
         ],
         status: 'operational',
         report: jarvisCodeExecutor.generateCapabilityReport()
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// CONTEXT MEMORY ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/context/create-session
+ * Crear nueva sesión de contexto
+ */
+app.post('/api/context/create-session', (req: Request, res: Response) => {
+  try {
+    const { userId, metadata } = req.body;
+    const context = contextMemoryManager.createSession(userId, metadata);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: context.sessionId,
+        userId: context.userId,
+        status: context.status,
+        createdAt: new Date(context.startTime).toISOString()
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/context/session/:sessionId
+ * Obtener información de sesión
+ */
+app.get('/api/context/session/:sessionId', (req: Request, res: Response) => {
+  try {
+    const summary = contextMemoryManager.getContextSummary(req.params.sessionId);
+
+    if (!summary) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: summary,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/context/session/:sessionId/history
+ * Obtener historial de conversación
+ */
+app.get('/api/context/session/:sessionId/history', (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 20;
+    const history = contextMemoryManager.getConversationHistory(req.params.sessionId, limit);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: req.params.sessionId,
+        messageCount: history.length,
+        messages: history.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          intent: m.intent,
+          sentiment: m.sentiment,
+          timestamp: new Date(m.timestamp).toISOString()
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/context/session/:sessionId/update-objective
+ * Actualizar objetivo de conversación
+ */
+app.post('/api/context/session/:sessionId/update-objective', (req: Request, res: Response) => {
+  try {
+    const { objective } = req.body;
+
+    if (!objective) {
+      return res.status(400).json({
+        success: false,
+        error: 'objective es requerido'
+      });
+    }
+
+    const result = contextMemoryManager.updateObjective(req.params.sessionId, objective);
+
+    res.json({
+      success: result,
+      data: {
+        sessionId: req.params.sessionId,
+        newObjective: objective
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/context/session/:sessionId/update-target
+ * Actualizar target de conversación
+ */
+app.post('/api/context/session/:sessionId/update-target', (req: Request, res: Response) => {
+  try {
+    const { target } = req.body;
+
+    if (!target) {
+      return res.status(400).json({
+        success: false,
+        error: 'target es requerido'
+      });
+    }
+
+    const result = contextMemoryManager.updateTarget(req.params.sessionId, target);
+
+    res.json({
+      success: result,
+      data: {
+        sessionId: req.params.sessionId,
+        newTarget: target
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/context/reasoning/:sessionId
+ * Obtener contexto para reasoning
+ */
+app.get('/api/context/reasoning/:sessionId', (req: Request, res: Response) => {
+  try {
+    const context = contextMemoryManager.getContextForReasoning(req.params.sessionId);
+
+    if (!context) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: context,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/context/session/:sessionId/save
+ * Guardar sesión a disco
+ */
+app.post('/api/context/session/:sessionId/save', async (req: Request, res: Response) => {
+  try {
+    const success = await contextMemoryManager.saveSession(req.params.sessionId);
+
+    res.json({
+      success,
+      data: {
+        sessionId: req.params.sessionId,
+        message: success ? 'Sesión guardada' : 'Error guardando sesión'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/context/session/:sessionId/end
+ * Finalizar sesión
+ */
+app.post('/api/context/session/:sessionId/end', async (req: Request, res: Response) => {
+  try {
+    // Guardar antes de finalizar
+    await contextMemoryManager.saveSession(req.params.sessionId);
+    const result = contextMemoryManager.endSession(req.params.sessionId);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        summary: contextMemoryManager.getContextSummary(req.params.sessionId)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/context/stats
+ * Obtener estadísticas de memoria
+ */
+app.get('/api/context/stats', (req: Request, res: Response) => {
+  try {
+    const stats = contextMemoryManager.getMemoryStats();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        capabilities: [
+          'conversation-coherence',
+          'entity-extraction',
+          'sentiment-analysis',
+          'context-persistence',
+          'objective-tracking',
+          'target-tracking'
+        ],
+        status: 'operational',
+        report: contextMemoryManager.generateMemoryReport()
       },
       timestamp: Date.now()
     });
