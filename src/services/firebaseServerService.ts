@@ -1,18 +1,22 @@
 /**
- * FIREBASE SERVER SERVICE
+ * FIREBASE SERVER SERVICE — Realtime Database (RTDB)
  *
- * Servicio de Firebase para el backend de Jarvis (Node.js).
- * Usa la API REST de Firestore directamente — sin SDK del cliente browser.
+ * Migrado de Firestore REST → Firebase Realtime Database REST.
+ * La API key browser SÍ funciona con RTDB desde backend Node.js.
  *
- * Guarda el knowledge graph de aprendizajes de Jarvis:
- * - Hallazgos de HackerOne como KnowledgeNodes
- * - Links bidireccionales entre conceptos relacionados
- * - Historial de aprendizajes con metadata
+ * Estructura en RTDB:
+ *   jarvis/
+ *     knowledge_graph/     - Nodos de conocimiento de Jarvis
+ *     h1_learnings/        - Aprendizajes de casos HackerOne
+ *     daily_metrics/       - Métricas diarias
+ *     research_sessions/   - Sesiones de auto-investigación
  *
- * Colecciones:
- *   jarvis/knowledge_nodes/{nodeId}   - Nodos del grafo
- *   jarvis/learnings/{learningId}     - Aprendizajes de casos HackerOne
- *   jarvis/metrics/{date}             - Métricas diarias
+ * REST API RTDB:
+ *   GET    {databaseURL}/{path}.json          - Leer
+ *   PUT    {databaseURL}/{path}.json          - Escribir/reemplazar
+ *   POST   {databaseURL}/{path}.json          - Append (genera key)
+ *   PATCH  {databaseURL}/{path}.json          - Actualizar campos
+ *   DELETE {databaseURL}/{path}.json          - Borrar
  */
 
 import axios from 'axios';
@@ -20,12 +24,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // ============================================
-// CONFIG FIREBASE
+// CONFIG FIREBASE RTDB
 // ============================================
 
 interface FirebaseConfig {
   projectId: string;
-  firestoreDatabaseId: string;
+  databaseURL: string;
   apiKey: string;
 }
 
@@ -34,9 +38,15 @@ function loadFirebaseConfig(): FirebaseConfig | null {
     const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
     if (!fs.existsSync(configPath)) return null;
     const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+
+    // Support both databaseURL (RTDB) and legacy Firestore config
+    const databaseURL = raw.databaseURL || `https://${raw.projectId}-default-rtdb.firebaseio.com`;
+
+    if (!raw.projectId || !raw.apiKey) return null;
+
     return {
       projectId: raw.projectId,
-      firestoreDatabaseId: raw.firestoreDatabaseId,
+      databaseURL: databaseURL.replace(/\/$/, ''), // strip trailing slash
       apiKey: raw.apiKey,
     };
   } catch {
@@ -56,7 +66,7 @@ export interface KnowledgeGraphNode {
   content: string;
   category: 'security' | 'hackerone' | 'recon' | 'code' | 'general';
   tags: string[];
-  links: string[];        // IDs de nodos relacionados
+  links: string[];
   cvssScore?: number;
   severity?: string;
   bountyEstimate?: number;
@@ -76,65 +86,95 @@ export interface HackerOneLearningRecord {
   acceptanceProbability: number;
   payloadsGenerated: number;
   reconStepsGenerated: number;
-  knowledgeNodeId: string;   // Link al nodo en el grafo
+  knowledgeNodeId: string;
   learnedAt: number;
   constitutionallyValid: boolean;
 }
 
 // ============================================
-// HELPERS FIRESTORE REST API
+// HELPERS RTDB REST API
 // ============================================
 
-function firestoreUrl(collection: string, docId?: string): string {
+function rtdbUrl(path: string): string {
   if (!FIREBASE_CONFIG) return '';
-  const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/${FIREBASE_CONFIG.firestoreDatabaseId}/documents`;
-  return docId ? `${base}/${collection}/${docId}?key=${FIREBASE_CONFIG.apiKey}` : `${base}/${collection}?key=${FIREBASE_CONFIG.apiKey}`;
+  // RTDB REST: {databaseURL}/{path}.json
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return `${FIREBASE_CONFIG.databaseURL}/${cleanPath}.json`;
 }
 
-function toFirestoreFields(obj: Record<string, any>): Record<string, any> {
-  const fields: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === 'string') {
-      fields[key] = { stringValue: value };
-    } else if (typeof value === 'number') {
-      fields[key] = { doubleValue: value };
-    } else if (typeof value === 'boolean') {
-      fields[key] = { booleanValue: value };
-    } else if (Array.isArray(value)) {
-      fields[key] = {
-        arrayValue: {
-          values: value.map(v => typeof v === 'string' ? { stringValue: v } : { doubleValue: v }),
-        },
-      };
-    }
+async function rtdbGet(path: string): Promise<any> {
+  const url = rtdbUrl(path);
+  const response = await axios.get(url, {
+    timeout: 8000,
+    validateStatus: (s) => s < 500,
+  });
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(`RTDB_AUTH_ERROR:${response.status}`);
   }
-  return fields;
+  return response.data;
 }
 
-function fromFirestoreFields(fields: Record<string, any>): Record<string, any> {
-  const obj: Record<string, any> = {};
-  for (const [key, val] of Object.entries(fields)) {
-    if (val.stringValue !== undefined) obj[key] = val.stringValue;
-    else if (val.doubleValue !== undefined) obj[key] = val.doubleValue;
-    else if (val.integerValue !== undefined) obj[key] = parseInt(val.integerValue);
-    else if (val.booleanValue !== undefined) obj[key] = val.booleanValue;
-    else if (val.arrayValue) {
-      obj[key] = (val.arrayValue.values || []).map((v: any) =>
-        v.stringValue ?? v.doubleValue ?? v.integerValue ?? null
-      );
-    }
+async function rtdbPut(path: string, data: any): Promise<void> {
+  const url = rtdbUrl(path);
+  const response = await axios.put(url, data, {
+    timeout: 8000,
+    headers: { 'Content-Type': 'application/json' },
+    validateStatus: (s) => s < 500,
+  });
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(`RTDB_AUTH_ERROR:${response.status}`);
   }
-  return obj;
+}
+
+async function rtdbPatch(path: string, data: any): Promise<void> {
+  const url = rtdbUrl(path);
+  const response = await axios.patch(url, data, {
+    timeout: 8000,
+    headers: { 'Content-Type': 'application/json' },
+    validateStatus: (s) => s < 500,
+  });
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(`RTDB_AUTH_ERROR:${response.status}`);
+  }
 }
 
 // ============================================
 // FIREBASE SERVER SERVICE
 // ============================================
 
+// Cooldown to avoid spamming auth errors in logs
+let _authErrorLogged = false;
+let _disabledUntil = 0;
+
+function isDisabled(): boolean {
+  return Date.now() < _disabledUntil;
+}
+
+function handleAuthError(err: Error, operation: string): void {
+  if (!_authErrorLogged) {
+    if (err.message.startsWith('RTDB_AUTH_ERROR')) {
+      console.warn(`[Firebase RTDB] ⚠️  Permiso denegado en "${operation}".`);
+      console.warn(`[Firebase RTDB]    Las reglas de la base de datos no permiten acceso sin autenticación.`);
+      console.warn(`[Firebase RTDB]    Ve a Firebase Console → Realtime Database → Reglas y establece:`);
+      console.warn(`[Firebase RTDB]    { "rules": { ".read": true, ".write": true } }  (solo para desarrollo)`);
+      console.warn(`[Firebase RTDB]    O agrega un Secret de servicio para autenticación de backend.`);
+      console.warn(`[Firebase RTDB]    Reintentos silenciados por 1h.`);
+    } else {
+      console.warn(`[Firebase RTDB] Error en "${operation}": ${err.message}`);
+    }
+    _authErrorLogged = true;
+    _disabledUntil = Date.now() + 60 * 60 * 1000;
+  }
+}
+
 export const firebaseServerService = {
+
   isConfigured(): boolean {
     return FIREBASE_CONFIG !== null;
+  },
+
+  getDatabaseURL(): string {
+    return FIREBASE_CONFIG?.databaseURL || '';
   },
 
   // -----------------------------------------------
@@ -142,65 +182,33 @@ export const firebaseServerService = {
   // -----------------------------------------------
 
   async saveKnowledgeNode(node: Omit<KnowledgeGraphNode, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> {
-    if (!FIREBASE_CONFIG) {
-      console.warn('[Firebase] No configurado - guardando solo localmente');
-      return null;
-    }
+    if (!FIREBASE_CONFIG || isDisabled()) return null;
 
-    const nodeId = node.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const nodeId = node.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').substring(0, 60);
     const now = Date.now();
-
-    const nodeData = {
-      ...node,
-      id: nodeId,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const nodeData: KnowledgeGraphNode = { ...node, id: nodeId, createdAt: now, updatedAt: now };
 
     try {
-      const url = firestoreUrl('jarvis/knowledge_graph/nodes', nodeId);
-      await axios.patch(url, {
-        fields: toFirestoreFields(nodeData as any),
-      }, { timeout: 5000 });
-
-      console.log(`🔥 Firebase: KnowledgeNode guardado → ${nodeId}`);
+      await rtdbPut(`jarvis/knowledge_graph/${nodeId}`, nodeData);
       return nodeId;
-    } catch (error: any) {
-      if (error.response?.status === 403) {
-        console.warn(`[Firebase] Error 403: API Key no tiene permisos en Firestore. Se requiere una Service Account key para escritura desde backend.`);
-      } else if (error.response?.status === 404) {
-        console.warn(`[Firebase] Error 404: Colección no existe. Asegúrate de crear la estructura en Firestore Console.`);
-      } else {
-        console.warn(`[Firebase] Error guardando nodo: ${error.message}`);
-      }
+    } catch (err: any) {
+      handleAuthError(err, 'saveKnowledgeNode');
       return null;
     }
   },
 
   // -----------------------------------------------
-  // CREAR LINK BIDIRECCIONAL ENTRE NODOS
+  // ENLAZAR DOS NODOS (actualizar links)
   // -----------------------------------------------
 
-  async linkNodes(nodeIdA: string, nodeIdB: string): Promise<void> {
-    if (!FIREBASE_CONFIG) return;
-
+  async linkNodes(nodeId1: string, nodeId2: string): Promise<void> {
+    if (!FIREBASE_CONFIG || isDisabled()) return;
     try {
-      // Obtener ambos nodos y agregar el link
-      for (const [fromId, toId] of [[nodeIdA, nodeIdB], [nodeIdB, nodeIdA]]) {
-        const url = firestoreUrl('jarvis/knowledge_graph/nodes', fromId);
-        const response = await axios.get(url, { timeout: 5000 });
-        const existingLinks: string[] = fromFirestoreFields(response.data.fields || {}).links || [];
-
-        if (!existingLinks.includes(toId)) {
-          existingLinks.push(toId);
-          await axios.patch(url, {
-            fields: toFirestoreFields({ links: existingLinks, updatedAt: Date.now() }),
-          }, { timeout: 5000 });
-        }
-      }
-      console.log(`🔗 Firebase: Nodos enlazados: ${nodeIdA} ↔ ${nodeIdB}`);
-    } catch (error: any) {
-      console.warn(`[Firebase] Error enlazando nodos: ${error.message}`);
+      // PATCH to add link without overwriting existing data
+      await rtdbPatch(`jarvis/knowledge_graph/${nodeId1}`, { [`link_${nodeId2}`]: true });
+      await rtdbPatch(`jarvis/knowledge_graph/${nodeId2}`, { [`link_${nodeId1}`]: true });
+    } catch (err: any) {
+      handleAuthError(err, 'linkNodes');
     }
   },
 
@@ -208,60 +216,39 @@ export const firebaseServerService = {
   // GUARDAR APRENDIZAJE DE HACKERONE
   // -----------------------------------------------
 
-  async saveHackerOneLearning(record: Omit<HackerOneLearningRecord, 'id' | 'learnedAt'>): Promise<string | null> {
-    if (!FIREBASE_CONFIG) {
-      console.warn('[Firebase] No configurado - HackerOne learning no se guardará en Firebase');
-      return null;
-    }
+  async saveHackerOneLearning(learning: Omit<HackerOneLearningRecord, 'id' | 'learnedAt'>): Promise<string | null> {
+    if (!FIREBASE_CONFIG || isDisabled()) return null;
 
-    const learningId = `h1-${record.vulnerabilityType.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
-    const data = { ...record, id: learningId, learnedAt: Date.now() };
+    const learningId = `learning-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const record: HackerOneLearningRecord = {
+      ...learning,
+      id: learningId,
+      learnedAt: Date.now(),
+    };
 
     try {
-      const url = firestoreUrl('jarvis/knowledge_graph/h1_learnings', learningId);
-      await axios.patch(url, {
-        fields: toFirestoreFields(data as any),
-      }, { timeout: 5000 });
-
-      console.log(`🔥 Firebase: HackerOne learning guardado → ${learningId}`);
+      await rtdbPut(`jarvis/h1_learnings/${learningId}`, record);
+      console.log(`[Firebase RTDB] ✅ HackerOne learning guardado: ${learningId}`);
       return learningId;
-    } catch (error: any) {
-      if (error.response?.status === 403) {
-        console.warn(`[Firebase] Error 403: API Key no tiene permisos. Necesita Service Account key para escritura en Firestore.`);
-      } else {
-        console.warn(`[Firebase] Error guardando learning: ${error.message}`);
-      }
+    } catch (err: any) {
+      handleAuthError(err, 'saveHackerOneLearning');
       return null;
     }
   },
 
   // -----------------------------------------------
-  // OBTENER TODOS LOS NODOS DEL GRAFO
+  // OBTENER GRAFO DE CONOCIMIENTO
   // -----------------------------------------------
 
-  // Cache to avoid spamming 403 errors on every frontend poll
-  _firebaseReadErrorLogged: false,
-  _firebaseReadDisabledUntil: 0,
-
   async getKnowledgeGraph(): Promise<KnowledgeGraphNode[]> {
-    if (!FIREBASE_CONFIG) return [];
-    if (Date.now() < (firebaseServerService as any)._firebaseReadDisabledUntil) return [];
+    if (!FIREBASE_CONFIG || isDisabled()) return [];
 
     try {
-      const url = firestoreUrl('jarvis/knowledge_graph/nodes');
-      const response = await axios.get(url, { timeout: 8000 });
-      const docs = response.data.documents || [];
-      return docs.map((doc: any) => fromFirestoreFields(doc.fields || {})) as KnowledgeGraphNode[];
-    } catch (error: any) {
-      if (!(firebaseServerService as any)._firebaseReadErrorLogged) {
-        if (error.response?.status === 403) {
-          console.warn('[Firebase] ⚠️  Lectura Firestore: API Key sin permisos (403). Necesita Service Account key. Reintentos silenciados por 1h.');
-        } else {
-          console.warn(`[Firebase] Error obteniendo grafo: ${error.message}`);
-        }
-        (firebaseServerService as any)._firebaseReadErrorLogged = true;
-        (firebaseServerService as any)._firebaseReadDisabledUntil = Date.now() + 60 * 60 * 1000;
-      }
+      const data = await rtdbGet('jarvis/knowledge_graph');
+      if (!data) return [];
+      return Object.values(data) as KnowledgeGraphNode[];
+    } catch (err: any) {
+      handleAuthError(err, 'getKnowledgeGraph');
       return [];
     }
   },
@@ -271,20 +258,15 @@ export const firebaseServerService = {
   // -----------------------------------------------
 
   async getHackerOneLearnings(limit = 10): Promise<HackerOneLearningRecord[]> {
-    if (!FIREBASE_CONFIG) return [];
-    if (Date.now() < (firebaseServerService as any)._firebaseReadDisabledUntil) return [];
+    if (!FIREBASE_CONFIG || isDisabled()) return [];
 
     try {
-      const url = firestoreUrl('jarvis/knowledge_graph/h1_learnings');
-      const response = await axios.get(`${url}&pageSize=${limit}`, { timeout: 8000 });
-      const docs = response.data.documents || [];
-      return docs.map((doc: any) => fromFirestoreFields(doc.fields || {})) as HackerOneLearningRecord[];
-    } catch (error: any) {
-      if (!(firebaseServerService as any)._firebaseReadErrorLogged) {
-        console.warn(`[Firebase] Error obteniendo learnings: ${error.message}`);
-        (firebaseServerService as any)._firebaseReadErrorLogged = true;
-        (firebaseServerService as any)._firebaseReadDisabledUntil = Date.now() + 60 * 60 * 1000;
-      }
+      const data = await rtdbGet('jarvis/h1_learnings');
+      if (!data) return [];
+      const records = Object.values(data) as HackerOneLearningRecord[];
+      return records.sort((a, b) => b.learnedAt - a.learnedAt).slice(0, limit);
+    } catch (err: any) {
+      handleAuthError(err, 'getHackerOneLearnings');
       return [];
     }
   },
@@ -294,16 +276,63 @@ export const firebaseServerService = {
   // -----------------------------------------------
 
   async saveDailyMetrics(metrics: Record<string, any>): Promise<void> {
-    if (!FIREBASE_CONFIG) return;
+    if (!FIREBASE_CONFIG || isDisabled()) return;
 
     const today = new Date().toISOString().split('T')[0];
     try {
-      const url = firestoreUrl('jarvis/knowledge_graph/daily_metrics', today);
-      await axios.patch(url, {
-        fields: toFirestoreFields({ ...metrics, date: today, updatedAt: Date.now() }),
-      }, { timeout: 5000 });
-    } catch (error: any) {
-      console.warn(`[Firebase] Error guardando métricas: ${error.message}`);
+      await rtdbPatch(`jarvis/daily_metrics/${today}`, { ...metrics, date: today, updatedAt: Date.now() });
+    } catch (err: any) {
+      handleAuthError(err, 'saveDailyMetrics');
+    }
+  },
+
+  // -----------------------------------------------
+  // GUARDAR SESIÓN DE INVESTIGACIÓN (AutoResearcher)
+  // -----------------------------------------------
+
+  async saveResearchSession(session: { timestamp: string; papersFound: number; knowledgeAdded: number; topics: string[]; summary: string }): Promise<void> {
+    if (!FIREBASE_CONFIG || isDisabled()) return;
+
+    const sessionId = `session-${Date.now()}`;
+    try {
+      await rtdbPut(`jarvis/research_sessions/${sessionId}`, session);
+    } catch (err: any) {
+      handleAuthError(err, 'saveResearchSession');
+    }
+  },
+
+  // -----------------------------------------------
+  // TEST DE CONEXIÓN
+  // -----------------------------------------------
+
+  async testConnection(): Promise<{ ok: boolean; message: string; databaseURL?: string }> {
+    if (!FIREBASE_CONFIG) {
+      return { ok: false, message: 'firebase-applet-config.json no encontrado o incompleto' };
+    }
+
+    try {
+      // Write a test value
+      await rtdbPut('jarvis/connection_test', {
+        timestamp: Date.now(),
+        message: 'Jarvis RTDB connection OK',
+        testedAt: new Date().toISOString(),
+      });
+
+      // Read it back
+      const result = await rtdbGet('jarvis/connection_test');
+      if (result?.message) {
+        console.log(`[Firebase RTDB] ✅ Conexión exitosa a: ${FIREBASE_CONFIG.databaseURL}`);
+        // Reset cooldown on success
+        _authErrorLogged = false;
+        _disabledUntil = 0;
+        return { ok: true, message: 'Conexión exitosa', databaseURL: FIREBASE_CONFIG.databaseURL };
+      }
+      return { ok: false, message: 'Escribió pero no pudo leer de vuelta' };
+    } catch (err: any) {
+      const msg = err.message.startsWith('RTDB_AUTH_ERROR')
+        ? 'Permiso denegado — abre las reglas de RTDB en Firebase Console'
+        : err.message;
+      return { ok: false, message: msg, databaseURL: FIREBASE_CONFIG.databaseURL };
     }
   },
 };
