@@ -70,6 +70,15 @@ import { wikiAutomation } from './core/wiki/WikiAutomation';
 // ✅ AUTONOMOUS ACTIVATION: Tier 2 self-triggered capabilities
 import { autonomousActivation } from './core/automation/AutonomousActivation';
 
+// ✅ MIXTURE OF EXPERTS: Specialized expert agents
+import { mixtureOfExperts } from './core/expertise/MixtureOfExperts';
+
+// ✅ CHAIN-OF-THOUGHT VERIFICATION: Self-verification of reasoning
+import { chainOfThoughtVerification } from './core/verification/ChainOfThoughtVerification';
+
+// ✅ ADVERSARIAL SELF-CHALLENGE: Find flaws in own reasoning
+import { adversarialSelfChallenge } from './core/adversarial/AdversarialSelfChallenge';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -2541,6 +2550,165 @@ app.get('/api/autonomous/status', (req: Request, res: Response) => {
         ? ((stats.completedTasks / (stats.completedTasks + stats.failedTasks)) * 100).toFixed(2) + '%'
         : 'N/A',
       recentTasks: stats.recentTasks.slice(-3),
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================
+// MIXTURE OF EXPERTS ENDPOINTS
+// ============================================
+
+app.post('/api/expertise/answer', async (req: Request, res: Response) => {
+  try {
+    const { query, context } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ ok: false, error: 'query is required' });
+    }
+
+    const response = await mixtureOfExperts.answer(query, context);
+
+    res.json({
+      ok: true,
+      answer: response.answer,
+      expert: response.expert,
+      confidence: (response.confidence * 100).toFixed(2) + '%',
+      expertiseDepth: (response.expertise_depth * 100).toFixed(2) + '%',
+      relatedTopics: response.relatedTopics,
+      suggestions: response.suggestions,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/expertise/collaborative', async (req: Request, res: Response) => {
+  try {
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ ok: false, error: 'query is required' });
+    }
+
+    const result = await mixtureOfExperts.collaborativeAnswer(query);
+
+    res.json({
+      ok: true,
+      synthesized: result.synthesized,
+      consensus: (result.consensus * 100).toFixed(2) + '%',
+      expertCount: result.expertPerspectives.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/expertise/stats', (req: Request, res: Response) => {
+  try {
+    const stats = mixtureOfExperts.getStats();
+
+    res.json({
+      ok: true,
+      experts: stats.experts,
+      totalQueries: stats.totalQueries,
+      distribution: stats.expertUsageDistribution,
+      topPerformer: stats.topPerformingExpert,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================
+// CHAIN-OF-THOUGHT VERIFICATION ENDPOINTS
+// ============================================
+
+app.post('/api/verification/verify', async (req: Request, res: Response) => {
+  try {
+    const { answer, query } = req.body;
+
+    if (!answer || !query) {
+      return res.status(400).json({ ok: false, error: 'answer and query are required' });
+    }
+
+    const result = await chainOfThoughtVerification.verify(answer, query);
+
+    res.json({
+      ok: true,
+      logicalConsistency: (result.logicalConsistency * 100).toFixed(2) + '%',
+      evidenceStrength: (result.evidenceStrength * 100).toFixed(2) + '%',
+      overallConfidence: (result.overallConfidence * 100).toFixed(2) + '%',
+      criticalAssumptions: result.criticalAssumptions,
+      weakPoints: result.weakPoints,
+      alternativeConclusions: result.alternativeConclusions.slice(0, 3),
+      recommendations: result.recommendedActions,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/verification/multi-path', async (req: Request, res: Response) => {
+  try {
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ ok: false, error: 'query is required' });
+    }
+
+    const result = await chainOfThoughtVerification.verifyMultiplePaths(query, 3);
+
+    res.json({
+      ok: true,
+      pathCount: result.pathResults.length,
+      aggregatedConfidence: (result.aggregatedConfidence * 100).toFixed(2) + '%',
+      consensus: result.consensus,
+      recommendation: result.recommendation,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================
+// ADVERSARIAL SELF-CHALLENGE ENDPOINTS
+// ============================================
+
+app.post('/api/adversarial/challenge', async (req: Request, res: Response) => {
+  try {
+    const { answer, query } = req.body;
+
+    if (!answer || !query) {
+      return res.status(400).json({ ok: false, error: 'answer and query are required' });
+    }
+
+    const result = await adversarialSelfChallenge.challengeAnswer(answer, query);
+
+    res.json({
+      ok: true,
+      robustnessScore: (result.robustnessScore * 100).toFixed(2) + '%',
+      challengesFound: result.challenges.length,
+      criticalFlaws: result.criticalFlaws,
+      improvementSuggestions: result.improvementSuggestions,
+      fortifiedAnswer: result.fortifiedAnswer,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/adversarial/stats', (req: Request, res: Response) => {
+  try {
+    const stats = adversarialSelfChallenge.getStats();
+
+    res.json({
+      ok: true,
+      totalChallenges: stats.totalChallenges,
+      typeDistribution: stats.typeDistribution,
+      averageSeverity: stats.averageSeverity.toFixed(2),
+      recentChallenges: stats.recentChallenges.slice(-5),
     });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
