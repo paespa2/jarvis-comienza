@@ -82,6 +82,9 @@ import { adversarialSelfChallenge } from './core/adversarial/AdversarialSelfChal
 // ✅ CONVERSATIONAL INTERFACE: Natural language intent classification & routing
 import { conversationalInterface } from './core/conversation/ConversationalInterface';
 
+// ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
+import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -2687,6 +2690,108 @@ app.get('/api/adversarial/stats', (req: Request, res: Response) => {
       typeDistribution: stats.typeDistribution,
       averageSeverity: stats.averageSeverity.toFixed(2),
       recentChallenges: stats.recentChallenges.slice(-5),
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================
+// FEDFSH AGGREGATION ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/fedfsh/aggregate
+ * Aggregate multiple expert responses using Fisher-weighted averaging
+ */
+app.post('/api/fedfsh/aggregate', async (req: Request, res: Response) => {
+  try {
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ ok: false, error: 'query is required' });
+    }
+
+    // Get responses from all experts
+    const expertResponses = [];
+    for (const expert of mixtureOfExperts['experts'].values()) {
+      const response = await expert.answer(query);
+      expertResponses.push({ expert, response });
+    }
+
+    // Apply FedFish aggregation
+    const result = await fedFishAggregator.aggregateExpertKnowledge(
+      expertResponses,
+      query
+    );
+
+    res.json({
+      ok: true,
+      aggregatedResponse: result.aggregatedResponse,
+      expertPerspectives: result.expertPerspectives.map(p => ({
+        expert: p.expert,
+        confidence: (p.confidence * 100).toFixed(2) + '%',
+        fisherWeight: (p.fisherWeight * 100).toFixed(2) + '%',
+      })),
+      aggregationMetrics: {
+        consensusScore: (result.aggregationMetrics.consensusScore * 100).toFixed(2) + '%',
+        clientServerBarrier: result.aggregationMetrics.clientServerBarrier.toFixed(4),
+        weightDistribution: result.aggregationMetrics.weightDistribution,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/fedfsh/stats
+ * Get FedFish aggregation statistics
+ */
+app.get('/api/fedfsh/stats', (req: Request, res: Response) => {
+  try {
+    const stats = fedFishAggregator.getStats();
+
+    res.json({
+      ok: true,
+      aggregationsPerformed: stats.aggregationsPerformed,
+      averageClientServerBarrier: stats.averageCSB.toFixed(4),
+      averageImprovementOverFedAvg: `${(stats.averageImprovement).toFixed(1)}%`,
+      consensusQuality: `${(stats.consensusQuality * 100).toFixed(2)}%`,
+      lastAggregation: stats.lastMetrics,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/expertise/collaborative-fedfsh
+ * Enhanced collaborative answer using FedFish aggregation
+ */
+app.post('/api/expertise/collaborative-fedfsh', async (req: Request, res: Response) => {
+  try {
+    const { query } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ ok: false, error: 'query is required' });
+    }
+
+    const result = await mixtureOfExperts.collaborativeAnswerWithFedFish(query);
+
+    res.json({
+      ok: true,
+      synthesized: result.synthesized,
+      expertPerspectives: result.expertPerspectives.map(p => ({
+        expert: p.expert,
+        confidence: (p.confidence * 100).toFixed(2) + '%',
+        fisherWeight: (p.fisherWeight * 100).toFixed(2) + '%',
+      })),
+      consensus: (result.consensus * 100).toFixed(2) + '%',
+      aggregationMetrics: {
+        consensusScore: (result.aggregationMetrics.consensusScore * 100).toFixed(2) + '%',
+        clientServerBarrier: result.aggregationMetrics.clientServerBarrier.toFixed(4),
+      },
     });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
