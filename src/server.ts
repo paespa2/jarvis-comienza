@@ -63,6 +63,10 @@ import { evolutionEngine } from './core/evolution/EvolutionEngine';
 // ✅ ADVANCED REASONING ENGINE: Multi-strategy reasoning & inference
 import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngine';
 
+// ✅ LLM WIKI SYSTEM: Personal knowledge base maintenance
+import { llmWikiSystem } from './core/wiki/LLMWikiSystem';
+import { wikiAutomation } from './core/wiki/WikiAutomation';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -192,6 +196,11 @@ async function initializeJarvis() {
   await evolutionEngine.initialize();
   evolutionInitialized = true;
   console.log(`   ✅ Evolution Engine ready — Jarvis will improve itself continuously\n`);
+
+  // ✅ LLM WIKI SYSTEM: Start automated knowledge base maintenance
+  console.log(`📚 Initializing LLM Wiki System (personal knowledge base)...`);
+  wikiAutomation.startAutomation('./jarvis-wiki/sources');
+  console.log(`   ✅ Wiki System ready — Weekly lints, daily ingestion checks\n`);
 
   console.log(`\n✅ Jarvis inicializado correctamente`);
   console.log(`📍 Escuchando en http://${HOST}:${PORT}`);
@@ -2350,6 +2359,125 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     success: false,
     error: err.message || 'Error interno del servidor',
   });
+});
+
+// ============================================
+// LLM WIKI SYSTEM ENDPOINTS
+// ============================================
+
+app.post('/api/wiki/ingest', async (req: Request, res: Response) => {
+  try {
+    const { filename, title, type } = req.body;
+
+    if (!filename || !title || !type) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'filename, title, and type are required' });
+    }
+
+    const source = await llmWikiSystem.ingestSource(filename, title, type);
+
+    res.json({
+      ok: true,
+      message: `✅ Ingested: ${title}`,
+      sourceId: source.id,
+      takeaways: source.keyTakeaways,
+      tags: source.tags,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/wiki/query', async (req: Request, res: Response) => {
+  try {
+    const { question } = req.body;
+
+    if (!question) {
+      return res.status(400).json({ ok: false, error: 'question is required' });
+    }
+
+    const result = await llmWikiSystem.queryWiki(question);
+
+    res.json({
+      ok: true,
+      answer: result.answer,
+      sources: result.sources,
+      newPage: result.newPage ? `Created synthesis page: ${result.newPage}` : null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/wiki/lint', async (req: Request, res: Response) => {
+  try {
+    const result = await llmWikiSystem.lintWiki();
+
+    res.json({
+      ok: true,
+      issues: result.issues,
+      suggestions: result.suggestions,
+      message: `Found ${result.issues.length} issues, ${result.suggestions.length} suggestions`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/wiki/stats', (req: Request, res: Response) => {
+  try {
+    const stats = llmWikiSystem.getStats();
+
+    res.json({
+      ok: true,
+      totalSources: stats.totalSources,
+      totalPages: stats.totalPages,
+      pagesByCategory: stats.pagesByCategory,
+      recentOperations: stats.recentOperations.slice(-5),
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/wiki/automation/start', (req: Request, res: Response) => {
+  try {
+    const sourcesDir = req.body.sourcesDir || './jarvis-wiki/sources';
+    wikiAutomation.startAutomation(sourcesDir);
+
+    res.json({
+      ok: true,
+      message: '🔄 Wiki automation started (weekly lint, daily ingest checks)',
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/wiki/automation/stop', (req: Request, res: Response) => {
+  try {
+    wikiAutomation.stopAutomation();
+
+    res.json({ ok: true, message: '⛔ Wiki automation stopped' });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/wiki/automation/status', (req: Request, res: Response) => {
+  try {
+    const status = wikiAutomation.getStatus();
+
+    res.json({
+      ok: true,
+      isRunning: status.isRunning,
+      lastLintTime: status.lastLintTime,
+      lastIngestTime: status.lastIngestTime,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // ============================================
