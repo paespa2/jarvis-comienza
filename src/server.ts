@@ -40,6 +40,7 @@ import { coreTeachings } from './learning/CoreTeachings';
 
 // ✅ FASE 3C: HackerOne Specialization (Consolidated)
 import { hackerOneModule } from './specializations/HackerOneModule';
+import { kaliLearningModule } from './specializations/KaliLearningModule';
 
 // Backward-compat stubs — legacy endpoints consolidated into HackerOneModule
 const hackerOneAssistant = {
@@ -2228,6 +2229,209 @@ app.post('/api/research/transformer-circuits', async (req: Request, res: Respons
       success: false,
       error: error.message,
     });
+  }
+});
+
+// ============================================
+// KALI LEARNING ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/kali/tools
+ * Obtener todas las herramientas de Kali que Jarvis está aprendiendo
+ */
+app.get('/api/kali/tools', (req: Request, res: Response) => {
+  try {
+    const tools = kaliLearningModule.getAllTools();
+    const stats = kaliLearningModule.getStatistics();
+
+    res.json({
+      success: true,
+      data: {
+        tools: tools.map(t => ({
+          name: t.name,
+          category: t.category,
+          description: t.description,
+          difficulty: t.difficulty,
+          estimatedMasteryDays: t.estimatedMasteryDays,
+          vulnerabilityTypes: t.vulnerabilityTypes,
+          exampleSyntax: t.syntax.slice(0, 2)
+        })),
+        statistics: stats,
+        totalTools: tools.length
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/kali/tools/:toolName
+ * Obtener detalles de una herramienta específica de Kali
+ */
+app.get('/api/kali/tools/:toolName', (req: Request, res: Response) => {
+  try {
+    const { toolName } = req.params;
+    const tools = kaliLearningModule.getAllTools();
+    const tool = tools.find(t => t.name.toLowerCase() === toolName.toLowerCase());
+
+    if (!tool) {
+      return res.status(404).json({
+        success: false,
+        error: `Herramienta '${toolName}' no encontrada en base de Kali`
+      });
+    }
+
+    const masteryPath = kaliLearningModule.getMasteryPath(tool.name);
+
+    res.json({
+      success: true,
+      data: {
+        tool,
+        masteryPath,
+        learningResources: tool.resources
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/kali/practice/:toolName
+ * Practicar una herramienta específica de Kali
+ */
+app.post('/api/kali/practice/:toolName', async (req: Request, res: Response) => {
+  try {
+    const { toolName } = req.params;
+    console.log(`\n💪 [KaliPractice] Practicando: ${toolName}`);
+
+    const result = await kaliLearningModule.practiceTool(toolName);
+
+    if (!result.success) {
+      return res.status(404).json({
+        success: false,
+        error: `No se pudo practicar '${toolName}'`
+      });
+    }
+
+    // Registrar en Obsidian
+    obsidianMemory.registerAction({
+      timestamp: new Date().toISOString(),
+      type: 'learning',
+      title: `Kali Practice: ${toolName}`,
+      description: `Práctica de ${toolName} - Mejora de maestría: +${(result.mastery * 100).toFixed(0)}%`,
+      tags: ['kali', 'practice', toolName]
+    });
+
+    res.json({
+      success: true,
+      data: {
+        tool: toolName,
+        practiceResult: result.success ? 'EXITOSO' : 'NECESITA MEJORA',
+        masteryGain: result.mastery,
+        message: result.success
+          ? `✅ Práctica exitosa de ${toolName}`
+          : `⚠️  Práctica incompleta de ${toolName} - Repite para mejorar`
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/kali/stats
+ * Obtener estadísticas de aprendizaje de Kali
+ */
+app.get('/api/kali/stats', (req: Request, res: Response) => {
+  try {
+    const stats = kaliLearningModule.getStatistics();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        masteryLevel: stats.masteryPercentage < 25 ? 'BEGINNER' :
+                      stats.masteryPercentage < 50 ? 'INTERMEDIATE' :
+                      stats.masteryPercentage < 75 ? 'ADVANCED' : 'EXPERT',
+        progressBar: '█'.repeat(Math.floor(stats.masteryPercentage / 5)) +
+                     '░'.repeat(20 - Math.floor(stats.masteryPercentage / 5))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/kali/learning-plan
+ * Generar plan de aprendizaje personalizado de Kali
+ */
+app.get('/api/kali/learning-plan', (req: Request, res: Response) => {
+  try {
+    const { difficulty = 'beginner' } = req.query;
+    const plan = kaliLearningModule.generateLearningPlan(
+      (difficulty as any) || 'beginner'
+    );
+
+    res.json({
+      success: true,
+      data: {
+        targetDifficulty: difficulty,
+        ...plan,
+        toolsCount: plan.toolsToLearn.length,
+        toolNames: plan.toolsToLearn.map(t => t.name),
+        estimatedWeeks: Math.ceil(plan.totalDaysEstimated / 7)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/kali/auto-research
+ * Ejecutar auto-investigación sobre técnicas de Kali
+ */
+app.post('/api/kali/auto-research', async (req: Request, res: Response) => {
+  try {
+    console.log('\n🔬 [KaliLearning] Auto-investigación iniciada...');
+
+    // Ejecutar auto-investigación
+    await kaliLearningModule.autoResearchKaliTechniques();
+
+    // Consolidar aprendizajes
+    const consolidation = await kaliLearningModule.consolidateLearnings();
+
+    // Registrar en Obsidian
+    obsidianMemory.registerAction({
+      timestamp: new Date().toISOString(),
+      type: 'learning',
+      title: `Kali Auto-Research: ${consolidation.knowledgeNodesCreated} nodes`,
+      description: `Herramientas maestras: ${consolidation.toolsMastered.join(', ')}. Confianza mejorada: +${(consolidation.confidenceImprovement * 100).toFixed(0)}%`,
+      tags: ['kali', 'auto-research', 'learning']
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message: '✅ Auto-investigación de Kali completada',
+        consolidation,
+        nextAction: consolidation.toolsMastered.length > 0
+          ? `Siguiente herramienta para dominar: ${consolidation.toolsMastered[0]}`
+          : 'Continúa practicando herramientas base'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
