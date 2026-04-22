@@ -60,6 +60,9 @@ import { jarvisWebIntelligence } from './core/web/JarvisWebIntelligence';
 // ✅ EVOLUTION ENGINE: Autonomous continuous learning & improvement
 import { evolutionEngine } from './core/evolution/EvolutionEngine';
 
+// ✅ ADVANCED REASONING ENGINE: Multi-strategy reasoning & inference
+import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngine';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -2347,6 +2350,52 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     success: false,
     error: err.message || 'Error interno del servidor',
   });
+});
+
+// ============================================
+// ADVANCED REASONING ENGINE ENDPOINTS
+// ============================================
+
+app.post('/api/reasoning/reason', async (req: Request, res: Response) => {
+  try {
+    const { query, context, constraints, previousAttempts } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ ok: false, error: 'query is required' });
+    }
+
+    const result = await advancedReasoningEngine.reason({
+      query,
+      context,
+      constraints,
+      previousAttempts,
+    });
+
+    res.json({
+      ok: true,
+      answer: result.answer,
+      reasoning: result.reasoning.map(r => ({
+        strategy: r.strategyUsed,
+        steps: r.steps,
+        conclusion: r.conclusion,
+        confidence: (r.confidence * 100).toFixed(2) + '%',
+      })),
+      confidence: (result.confidence * 100).toFixed(2) + '%',
+      alternatives: result.alternatives,
+      explanation: result.explaination,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/reasoning/stats', (req: Request, res: Response) => {
+  try {
+    const stats = advancedReasoningEngine.getStats();
+    res.json({ ok: true, stats });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // ============================================
