@@ -29,9 +29,8 @@ import {
   JarvisReasoningEvolution
 } from './reasoning';
 
-// ✅ FASE 3B: Q&A System (Offline Knowledge)
-import { knowledgeQAEngine } from './qa/KnowledgeQAEngine';
-import { codeGenerationEngine } from './qa/CodeGenerationEngine';
+// ✅ FASE 3B: Q&A System (Offline Knowledge) - Unified
+import { unifiedQAEngine } from './qa/UnifiedQAEngine';
 import { securityKnowledgeBase } from './qa/SecurityKnowledgeBase';
 
 // ✅ FASE 3B: Learning System (Autonomous Growth)
@@ -674,7 +673,7 @@ app.post('/api/qa/ask', async (req: Request, res: Response) => {
     console.log(`\n📚 [Q&A] Respondiendo: "${query}"`);
     const startTime = Date.now();
 
-    const answer = await knowledgeQAEngine.answer(query);
+    const answer = await unifiedQAEngine.answer(query);
     const responseTime = Date.now() - startTime;
 
     // Registrar en memoria
@@ -724,22 +723,32 @@ app.post('/api/qa/generate-code', async (req: Request, res: Response) => {
     console.log(`\n💻 [CodeGen] Generando: "${query}"`);
     const startTime = Date.now();
 
-    const code = await codeGenerationEngine.generate(query, type);
+    const response = await unifiedQAEngine.answer(query);
     const responseTime = Date.now() - startTime;
+
+    if (!response.code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not generate code for that request. Try: "Generate SQL injection test script" or "Create XSS payload tester"'
+      });
+    }
 
     // Registrar en memoria
     obsidianMemory.registerImprovement(
-      `Código Generado: ${code.language.toUpperCase()}`,
+      `Código Generado: ${response.code!.language.toUpperCase()}`,
       query,
       'medio',
-      code.code,
+      response.code!.content,
       [40, 50] // Relacionado a enseñanzas de seguridad
     );
 
     res.json({
       success: true,
       data: {
-        ...code,
+        code: response.code,
+        answer: response.answer,
+        type: response.type,
+        confidence: response.confidence,
         responseTime
       },
       timestamp: Date.now(),
@@ -1157,7 +1166,7 @@ app.post('/api/security/recon', (req: Request, res: Response) => {
     const osintQueries = reconEngine.generateOSINTQueries(target);
     const scripts = reconEngine.generateEnumerationScripts(target, scope as 'dns' | 'web' | 'network');
     const plan = reconEngine.generateVulnerabilityAssessmentPlan(target);
-    const checklist = codeGenerationEngine.generateAssessmentChecklist(target);
+    const checklist = unifiedQAEngine.generateAssessmentChecklist(target);
 
     // Auto-documentar
     obsidianMemory.registerAction({
