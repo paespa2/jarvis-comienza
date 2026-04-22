@@ -101,6 +101,12 @@ import { conversationalInterface } from './core/conversation/ConversationalInter
 import { autonomousWebNavigator } from './autonomy/AutonomousWebNavigator';
 import { navigationCommandHandler } from './core/conversation/NavigationCommandHandler';
 
+// ✅ LIVE PREVIEW: Real-time streaming of Jarvis actions
+import { livePreviewManager } from './core/streaming/LivePreviewManager';
+
+// ✅ GITHUB LEARNING REPOSITORY: Git-based persistent learning
+import { gitHubLearningRepository } from './core/learning/GitHubLearningRepository';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -2121,6 +2127,376 @@ app.get('/api/navigation/status', (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// LIVE PREVIEW STREAMING ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/live-preview/start
+ * Iniciar sesión de live preview
+ */
+app.post('/api/live-preview/start', (req: Request, res: Response) => {
+  try {
+    const { type, metadata } = req.body;
+    const streamType = type || 'navigation';
+
+    const session = livePreviewManager.createSession(streamType, metadata);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.id,
+        type: session.type,
+        status: session.status,
+        message: 'Sesión de live preview iniciada'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/live-preview/session/:sessionId/events
+ * Obtener eventos de una sesión de live preview
+ */
+app.get('/api/live-preview/session/:sessionId/events', (req: Request, res: Response) => {
+  try {
+    const events = livePreviewManager.getSessionEvents(req.params.sessionId);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: req.params.sessionId,
+        eventCount: events.length,
+        events: events.map(e => ({
+          type: e.type,
+          title: e.title,
+          description: e.description,
+          severity: e.severity,
+          timestamp: new Date(e.timestamp).toISOString()
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/live-preview/session/:sessionId/summary
+ * Obtener resumen de sesión de live preview
+ */
+app.get('/api/live-preview/session/:sessionId/summary', (req: Request, res: Response) => {
+  try {
+    const summary = livePreviewManager.getSessionSummary(req.params.sessionId);
+
+    if (!summary) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: summary,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/live-preview/session/:sessionId/end
+ * Finalizar sesión de live preview
+ */
+app.post('/api/live-preview/session/:sessionId/end', (req: Request, res: Response) => {
+  try {
+    const result = livePreviewManager.endSession(req.params.sessionId);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        report: livePreviewManager.generateSessionReport(req.params.sessionId)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/live-preview/status
+ * Obtener estado del sistema de live preview
+ */
+app.get('/api/live-preview/status', (req: Request, res: Response) => {
+  try {
+    const activeSessions = livePreviewManager.getActiveSessions();
+    const history = livePreviewManager.getEventHistory(50);
+
+    res.json({
+      success: true,
+      data: {
+        activeSessions: activeSessions.length,
+        recentEvents: history.length,
+        capabilities: [
+          'real-time-streaming',
+          'event-recording',
+          'session-tracking',
+          'progress-monitoring'
+        ],
+        status: 'operational'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// GITHUB LEARNING REPOSITORY ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/learning/record-technique
+ * Registrar técnica aprendida en GitHub
+ */
+app.post('/api/learning/record-technique', async (req: Request, res: Response) => {
+  try {
+    const { name, category, description, steps, examples, tools, confidence } = req.body;
+
+    const technique = {
+      id: `tech-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      category,
+      description,
+      steps: steps || [],
+      examples: examples || [],
+      tools: tools || [],
+      successRate: 0.8,
+      timesUsed: 0,
+      lastUsed: Date.now(),
+      confidence: confidence || 0.7,
+      tags: [...(tools || []), category]
+    };
+
+    const success = await gitHubLearningRepository.recordTechnique(technique);
+
+    res.json({
+      success,
+      data: {
+        techniqueId: technique.id,
+        name: technique.name,
+        message: success ? 'Técnica registrada en GitHub' : 'Error registrando técnica'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/learning/record-improvement
+ * Registrar mejora aplicada
+ */
+app.post('/api/learning/record-improvement', async (req: Request, res: Response) => {
+  try {
+    const { title, description, beforeMetrics, afterMetrics, code } = req.body;
+
+    // Calcular mejora
+    const improvements = Object.keys(beforeMetrics).map(key => {
+      const before = beforeMetrics[key] || 0;
+      const after = afterMetrics[key] || 0;
+      return (after - before) / (before || 1);
+    });
+    const avgImprovement = improvements.reduce((a, b) => a + b, 0) / improvements.length;
+
+    const improvement = {
+      id: `imp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title,
+      description,
+      beforeMetrics,
+      afterMetrics,
+      improvement: avgImprovement,
+      appliedAt: Date.now(),
+      code
+    };
+
+    const success = await gitHubLearningRepository.recordImprovement(improvement);
+
+    res.json({
+      success,
+      data: {
+        improvementId: improvement.id,
+        title,
+        improvement: `${(improvement.improvement * 100).toFixed(1)}%`,
+        message: success ? 'Mejora registrada en GitHub' : 'Error registrando mejora'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/learning/record-insight
+ * Registrar insight descubierto
+ */
+app.post('/api/learning/record-insight', async (req: Request, res: Response) => {
+  try {
+    const { topic, insight, confidence, sources, relatedTo } = req.body;
+
+    const insightObj = {
+      id: `insight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      topic,
+      insight,
+      confidence: confidence || 0.7,
+      sources: sources || [],
+      relatedTo: relatedTo || [],
+      timestamp: Date.now()
+    };
+
+    const success = await gitHubLearningRepository.recordInsight(insightObj);
+
+    res.json({
+      success,
+      data: {
+        insightId: insightObj.id,
+        topic,
+        confidence: `${(insightObj.confidence * 100).toFixed(0)}%`,
+        message: success ? 'Insight registrado en GitHub' : 'Error registrando insight'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/learning/repository-info
+ * Obtener información del repositorio de aprendizaje
+ */
+app.get('/api/learning/repository-info', (req: Request, res: Response) => {
+  try {
+    const info = gitHubLearningRepository.getRepositoryInfo();
+
+    res.json({
+      success: true,
+      data: {
+        ...info,
+        report: gitHubLearningRepository.generateLearningReport()
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/learning/techniques
+ * Obtener todas las técnicas aprendidas
+ */
+app.get('/api/learning/techniques', (req: Request, res: Response) => {
+  try {
+    const query = req.query.search as string | undefined;
+    const category = req.query.category as string | undefined;
+
+    let techniques = gitHubLearningRepository.getTechniques();
+
+    if (query) {
+      techniques = gitHubLearningRepository.searchTechniques(query);
+    } else if (category) {
+      techniques = gitHubLearningRepository.getTechniquesByCategory(category);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        count: techniques.length,
+        techniques: techniques.map(t => ({
+          id: t.id,
+          name: t.name,
+          category: t.category,
+          confidence: `${(t.confidence * 100).toFixed(0)}%`,
+          timesUsed: t.timesUsed
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/learning/improvements
+ * Obtener todas las mejoras aplicadas
+ */
+app.get('/api/learning/improvements', (req: Request, res: Response) => {
+  try {
+    const improvements = gitHubLearningRepository.getImprovements();
+
+    res.json({
+      success: true,
+      data: {
+        count: improvements.length,
+        improvements: improvements.map(i => ({
+          id: i.id,
+          title: i.title,
+          improvement: `${(i.improvement * 100).toFixed(1)}%`,
+          appliedAt: new Date(i.appliedAt).toISOString()
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/learning/insights
+ * Obtener todos los insights descubiertos
+ */
+app.get('/api/learning/insights', (req: Request, res: Response) => {
+  try {
+    const insights = gitHubLearningRepository.getInsights();
+
+    res.json({
+      success: true,
+      data: {
+        count: insights.length,
+        insights: insights.map(i => ({
+          id: i.id,
+          topic: i.topic,
+          confidence: `${(i.confidence * 100).toFixed(0)}%`
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
