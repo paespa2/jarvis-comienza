@@ -17,6 +17,7 @@
 
 import { jarvisNativeModel } from '../nativeModel/JarvisNativeModel';
 import { selfProgrammingEngine } from '../selfProgramming/SelfProgrammingEngine';
+import { fedFishAggregator, FedFishAggregationResult } from '../aggregation/FedFishAggregator';
 
 export type ExpertType = 'security' | 'methodology' | 'research';
 
@@ -47,6 +48,11 @@ export class ExpertAgent {
   confidenceScores: number[] = [];
   knowledgeBase: Map<string, any> = new Map();
   specialties: Set<string> = new Set();
+
+  // Fisher Information tracking for FedFish aggregation
+  fisherAccumulator: number = 0;  // accumulated squared gradients
+  fisherQueryCount: number = 0;
+  lastFisherUpdate: number = 0;
 
   constructor(type: ExpertType, specialty: string) {
     this.type = type;
@@ -113,6 +119,14 @@ export class ExpertAgent {
     }
 
     this.confidenceScores.push(confidence);
+
+    // Track Fisher Information: use squared gradient magnitude as proxy
+    // Fisher ~ (confidence)^2 * (answer length / max_length)
+    const answerLength = Math.min(response.text.length, 1000);
+    const fisherEstimate = Math.pow(confidence, 2) * (answerLength / 1000);
+    this.fisherAccumulator += fisherEstimate;
+    this.fisherQueryCount++;
+    this.lastFisherUpdate = Date.now();
 
     // Extract related topics and suggestions
     const relatedTopics = this.extractRelatedTopics(response.text);
@@ -189,6 +203,16 @@ export class ExpertAgent {
     const successRate = this.successfulQueries / this.totalQueries;
 
     return Math.min(1, (avgConfidence + successRate) / 2);
+  }
+
+  /**
+   * Get Fisher Information diagonal (average importance)
+   */
+  getFisherDiagonal(): number {
+    if (this.fisherQueryCount === 0) {
+      return 0.5; // Default for new expert
+    }
+    return this.fisherAccumulator / this.fisherQueryCount;
   }
 
   getStats(): ExpertStats {
@@ -313,6 +337,61 @@ export class MixtureOfExperts {
       synthesized,
       expertPerspectives: perspectives,
       consensus: avgConfidence,
+    };
+  }
+
+  /**
+   * FedFish Collaborative Answer: Advanced aggregation using Fisher Information
+   * Weights expert contributions by parameter importance instead of simple averaging
+   */
+  async collaborativeAnswerWithFedFish(query: string): Promise<{
+    synthesized: string;
+    expertPerspectives: Array<{
+      expert: ExpertType;
+      response: string;
+      confidence: number;
+      fisherWeight: number;
+    }>;
+    consensus: number;
+    aggregationMetrics: any;
+  }> {
+    const expertResponses: Array<{ expert: ExpertAgent; response: ExpertResponse }> = [];
+
+    // Get all expert answers
+    for (const expert of this.experts.values()) {
+      const response = await expert.answer(query);
+      expertResponses.push({ expert, response });
+    }
+
+    // Apply FedFish aggregation
+    let fedFishResult: FedFishAggregationResult;
+    try {
+      fedFishResult = await fedFishAggregator.aggregateExpertKnowledge(
+        expertResponses,
+        query
+      );
+    } catch (err: any) {
+      console.error('[MoE] FedFish aggregation failed:', err.message);
+      // Fallback to simple collaborative answer
+      const fallback = await this.collaborativeAnswer(query);
+      return {
+        synthesized: fallback.synthesized,
+        expertPerspectives: fallback.expertPerspectives.map(p => ({
+          expert: p.expert,
+          response: p.answer,
+          confidence: p.confidence,
+          fisherWeight: 1 / 3, // equal weights
+        })),
+        consensus: fallback.consensus,
+        aggregationMetrics: { error: 'Aggregation failed, using fallback' },
+      };
+    }
+
+    return {
+      synthesized: fedFishResult.aggregatedResponse,
+      expertPerspectives: fedFishResult.expertPerspectives,
+      consensus: fedFishResult.aggregationMetrics.consensusScore,
+      aggregationMetrics: fedFishResult.aggregationMetrics,
     };
   }
 
