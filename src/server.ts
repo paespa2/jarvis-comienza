@@ -1881,6 +1881,127 @@ app.get('/api/persistence/status', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/bootstrap/hackerone
+ * Enseña a Jarvis todo lo necesario para ser un top bug hunter
+ */
+app.post('/api/bootstrap/hackerone', async (req: Request, res: Response) => {
+  try {
+    const { H1_BOOTSTRAP_DATA, BOOTSTRAP_TASKS } = await import('./knowledge/hackerOneBootstrap');
+
+    console.log('🚀 INICIANDO BOOTSTRAP HACKERONE PARA JARVIS...\n');
+
+    let knowledgeAdded = 0;
+    let patternsAdded = 0;
+    const startTime = Date.now();
+
+    // 1. Enseñar todas las vulnerabilidades top
+    console.log('📚 Enseñando Top 20 Vulnerabilidades HackerOne...');
+    for (const vuln of H1_BOOTSTRAP_DATA.topVulnerabilities) {
+      selfProgrammingEngine.addKnowledge({
+        category: 'security',
+        topic: vuln.name,
+        content: `Bounty: $${vuln.avgBounty}-$${vuln.maxBounty}. CVSS: ${vuln.cvssBase}. Description: ${vuln.description}. Common locations: ${vuln.commonLocations?.join(', ')}. Payloads: ${vuln.payloads?.join(', ')}`,
+        confidence: 0.95,
+      });
+      knowledgeAdded++;
+    }
+
+    // 2. Enseñar metodología de recon
+    console.log('🔍 Enseñando Metodología Completa de Recon...');
+    Object.entries(H1_BOOTSTRAP_DATA.reconMethodology).forEach(([phase, data]: any) => {
+      const stepsStr = data.steps?.map((s: any) => `${s.name}: ${s.command || s.notes}`).join(' | ');
+      selfProgrammingEngine.addKnowledge({
+        category: 'tools',
+        topic: phase,
+        content: stepsStr,
+        confidence: 0.9,
+      });
+      knowledgeAdded++;
+    });
+
+    // 3. Enseñar programas HackerOne top
+    console.log('🎯 Enseñando Top 20 Programas HackerOne...');
+    for (const program of H1_BOOTSTRAP_DATA.topPrograms) {
+      selfProgrammingEngine.addKnowledge({
+        category: 'hackerone',
+        topic: program.name,
+        content: `Avg Bounty: $${program.avgBounty}. Response: ${program.responseTime}. Assets: ${program.assets.join(', ')}. Scope: ${program.scope.join(', ')}`,
+        confidence: 0.95,
+      });
+      knowledgeAdded++;
+    }
+
+    // 4. Enseñar patrones de razonamiento
+    console.log('🧠 Enseñando Patrones de Razonamiento de Explotación...');
+    for (const pattern of H1_BOOTSTRAP_DATA.reasoningPatterns) {
+      selfProgrammingEngine.addReasoningPattern({
+        name: pattern.name,
+        trigger: pattern.trigger,
+        steps: pattern.steps,
+      });
+      patternsAdded++;
+    }
+
+    // 5. Enseñar payloads efectivos
+    console.log('💣 Enseñando Payloads Efectivos...');
+    Object.entries(H1_BOOTSTRAP_DATA.effectivePayloads).forEach(([type, payloads]: any) => {
+      selfProgrammingEngine.addKnowledge({
+        category: 'tools',
+        topic: `${type}-payloads`,
+        content: payloads.join(' | '),
+        confidence: 0.9,
+      });
+      knowledgeAdded++;
+    });
+
+    // 6. Optimizar parámetros basado en aprendizaje
+    console.log('🔧 Auto-optimizando parámetros para HackerOne focus...');
+    selfProgrammingEngine.modifyParameter('aggressiveness', 0.8, 'HackerOne mode: búsqueda agresiva de vulnerabilidades');
+    selfProgrammingEngine.modifyParameter('creativity', 0.85, 'HackerOne mode: técnicas innovadoras de explotación');
+    selfProgrammingEngine.modifyParameter('learningRate', 0.2, 'HackerOne mode: aprender rápido de cada caso');
+
+    const elapsedTime = Date.now() - startTime;
+
+    console.log(`\n✅ BOOTSTRAP COMPLETADO EN ${elapsedTime}ms`);
+    console.log(`   • ${knowledgeAdded} entradas de conocimiento agregadas`);
+    console.log(`   • ${patternsAdded} patrones de razonamiento agregados`);
+    console.log(`   • Parámetros optimizados para HackerOne`);
+    console.log(`   • Jarvis ahora es un TOP BUG HUNTER 🏆\n`);
+
+    // Retornar reporte
+    res.json({
+      success: true,
+      data: {
+        bootstrapCompleted: true,
+        knowledgeAdded,
+        patternsAdded,
+        parametersOptimized: 3,
+        elapsedTimeMs: elapsedTime,
+        jarvisStatus: {
+          mode: 'HACKERONE_SPECIALIST',
+          readiness: '100%',
+          capabilities: [
+            'Top 20 Vulnerabilities Knowledge',
+            'Complete Recon Methodology',
+            'Top Programs Database',
+            'Exploitation Pattern Recognition',
+            'Effective Payload Library',
+            'Real-time Learning from Cases',
+          ],
+        },
+        message: 'Jarvis está listo para ser un bug hunter profesional en HackerOne',
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * 404
  */
 app.use((req: Request, res: Response) => {
