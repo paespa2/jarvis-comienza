@@ -239,17 +239,29 @@ export const firebaseServerService = {
   // OBTENER TODOS LOS NODOS DEL GRAFO
   // -----------------------------------------------
 
+  // Cache to avoid spamming 403 errors on every frontend poll
+  _firebaseReadErrorLogged: false,
+  _firebaseReadDisabledUntil: 0,
+
   async getKnowledgeGraph(): Promise<KnowledgeGraphNode[]> {
     if (!FIREBASE_CONFIG) return [];
+    if (Date.now() < (firebaseServerService as any)._firebaseReadDisabledUntil) return [];
 
     try {
       const url = firestoreUrl('jarvis/knowledge_graph/nodes');
       const response = await axios.get(url, { timeout: 8000 });
-
       const docs = response.data.documents || [];
       return docs.map((doc: any) => fromFirestoreFields(doc.fields || {})) as KnowledgeGraphNode[];
     } catch (error: any) {
-      console.warn(`[Firebase] Error obteniendo grafo: ${error.message}`);
+      if (!(firebaseServerService as any)._firebaseReadErrorLogged) {
+        if (error.response?.status === 403) {
+          console.warn('[Firebase] ⚠️  Lectura Firestore: API Key sin permisos (403). Necesita Service Account key. Reintentos silenciados por 1h.');
+        } else {
+          console.warn(`[Firebase] Error obteniendo grafo: ${error.message}`);
+        }
+        (firebaseServerService as any)._firebaseReadErrorLogged = true;
+        (firebaseServerService as any)._firebaseReadDisabledUntil = Date.now() + 60 * 60 * 1000;
+      }
       return [];
     }
   },
@@ -260,16 +272,19 @@ export const firebaseServerService = {
 
   async getHackerOneLearnings(limit = 10): Promise<HackerOneLearningRecord[]> {
     if (!FIREBASE_CONFIG) return [];
+    if (Date.now() < (firebaseServerService as any)._firebaseReadDisabledUntil) return [];
 
     try {
       const url = firestoreUrl('jarvis/knowledge_graph/h1_learnings');
       const response = await axios.get(`${url}&pageSize=${limit}`, { timeout: 8000 });
-
       const docs = response.data.documents || [];
-      return docs
-        .map((doc: any) => fromFirestoreFields(doc.fields || {})) as HackerOneLearningRecord[];
+      return docs.map((doc: any) => fromFirestoreFields(doc.fields || {})) as HackerOneLearningRecord[];
     } catch (error: any) {
-      console.warn(`[Firebase] Error obteniendo learnings: ${error.message}`);
+      if (!(firebaseServerService as any)._firebaseReadErrorLogged) {
+        console.warn(`[Firebase] Error obteniendo learnings: ${error.message}`);
+        (firebaseServerService as any)._firebaseReadErrorLogged = true;
+        (firebaseServerService as any)._firebaseReadDisabledUntil = Date.now() + 60 * 60 * 1000;
+      }
       return [];
     }
   },

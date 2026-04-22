@@ -54,6 +54,9 @@ import { getHackerOneLearningService } from './services/hackerOneLearningService
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 
+// ✅ WEB INTELLIGENCE: Page structure analysis & scraping strategy
+import { jarvisWebIntelligence } from './core/web/JarvisWebIntelligence';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -2216,6 +2219,102 @@ app.post('/api/research/transformer-circuits', async (req: Request, res: Respons
       success: false,
       error: error.message,
     });
+  }
+});
+
+// ============================================
+// WEB INTELLIGENCE ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/web/analyze
+ * Analiza la estructura de una página web: forms, APIs, tecnologías,
+ * estrategia de scraping, y relevancia bug bounty
+ */
+app.post('/api/web/analyze', async (req: Request, res: Response) => {
+  try {
+    const { url, teach = true } = req.body;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ success: false, error: 'url es requerida (string)' });
+    }
+
+    const startTime = Date.now();
+    const analysis = await jarvisWebIntelligence.analyzePage(url);
+    const report = jarvisWebIntelligence.generateReport(analysis);
+    const elapsed = Date.now() - startTime;
+
+    // Auto-teach what Jarvis learned about this site
+    if (teach) {
+      const techNames = analysis.technologies.map(t => t.name).join(', ');
+      selfProgrammingEngine.addKnowledge({
+        category: 'tools' as any,
+        topic: `[WebScraping] ${new URL(url).hostname}`,
+        content: `Estructura de ${url}: techs=[${techNames}], forms=${analysis.forms.length}, APIs=${analysis.apiEndpoints.length}, approach=${analysis.scrapingStrategy.approach}. Vulns potenciales: ${analysis.bugBountyRelevance.potentialVulnerabilities.slice(0, 2).join('; ')}`,
+        confidence: 0.88,
+      });
+
+      obsidianMemory.registerAction({
+        timestamp: new Date().toISOString(),
+        type: 'action',
+        title: `WebAnalysis: ${new URL(url).hostname}`,
+        description: `Analizada: ${analysis.technologies.length} techs, ${analysis.forms.length} forms, ${analysis.apiEndpoints.length} APIs. Approach: ${analysis.scrapingStrategy.approach}`,
+        tags: ['web', 'scraping', 'analysis', new URL(url).hostname],
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        url: analysis.url,
+        title: analysis.title,
+        statusCode: analysis.statusCode,
+        elapsed: elapsed + 'ms',
+        summary: {
+          technologies: analysis.technologies.slice(0, 6).map(t => t.name),
+          formsFound: analysis.forms.length,
+          formPurposes: analysis.forms.map(f => f.purpose),
+          apiEndpoints: analysis.apiEndpoints.slice(0, 5).map(e => e.url),
+          externalDomains: analysis.externalDomains.slice(0, 5),
+        },
+        scrapingStrategy: analysis.scrapingStrategy,
+        bugBountyRelevance: analysis.bugBountyRelevance,
+        securityHeaders: analysis.securityHeaders,
+        tables: analysis.tables,
+        report,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/web/scraping-strategy
+ * Obtiene únicamente la estrategia de scraping para una URL (más rápido)
+ */
+app.post('/api/web/scraping-strategy', async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ success: false, error: 'url es requerida' });
+
+    const analysis = await jarvisWebIntelligence.analyzePage(url);
+
+    res.json({
+      success: true,
+      data: {
+        url: analysis.url,
+        approach: analysis.scrapingStrategy.approach,
+        tool: analysis.scrapingStrategy.recommended_tool,
+        selectors: analysis.scrapingStrategy.selectors,
+        notes: analysis.scrapingStrategy.notes,
+        sampleCode: analysis.scrapingStrategy.sampleCode,
+        technologies: analysis.technologies.map(t => t.name),
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
