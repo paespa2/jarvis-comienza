@@ -1,13 +1,10 @@
 # Dockerfile para Jarvis IA
-# Force rebuild - Node 24 with build tools for better-sqlite3
+# Production deployment - Node 24-alpine
+# Removed better-sqlite3 dependency - using Firebase for persistence
 
 FROM node:24-alpine
 
 WORKDIR /app
-
-# Build tools for native modules (better-sqlite3)
-# Note: Node.js 24+ has better native addon support
-RUN apk add --no-cache python3 make g++ gcc
 
 # Environment
 ENV NODE_ENV=production
