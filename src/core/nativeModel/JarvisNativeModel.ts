@@ -35,6 +35,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { jarvisReActEngine, type ReActResult } from '../reasoning/JarvisReActEngine';
+
 // ============================================
 // CONSTITUCIÓN DE JARVIS - ALMA DEL MODELO
 // ============================================
@@ -60,7 +62,7 @@ export interface NativeModelInput {
   previousState?: string;
   iteration?: number;
   maxIterations?: number;
-  mode: 'plan' | 'observe' | 'reflect' | 'synthesize' | 'chat';
+  mode: 'plan' | 'observe' | 'reflect' | 'synthesize' | 'chat' | 'react' | 'fivephase';
   history?: ChatTurn[];
 }
 
@@ -338,10 +340,24 @@ export class JarvisNativeModel {
       case 'chat':
         ({ text, confidence, reasoning } = this.generateChat(input, domain));
         break;
+      case 'react':
+        ({ text, confidence, reasoning } = this.generateReAct(input, domain));
+        break;
+      case 'fivephase':
+        ({ text, confidence, reasoning } = this.generateFivePhase(input, domain));
+        break;
       default:
         text = this.generateGeneric(input.query);
         confidence = 0.6;
         reasoning = 'Modo genérico activado';
+    }
+
+    // AUTO-SELECCIÓN DE ESTRATEGIA en modo chat según complejidad
+    if (input.mode === 'chat') {
+      const strategy = jarvisReActEngine.selectStrategy(input.query, domain);
+      if (strategy !== 'direct') {
+        reasoning += ` [estrategia auto: ${strategy}]`;
+      }
     }
 
     // Buscar memorias episódicas similares para enriquecer la respuesta
@@ -716,6 +732,55 @@ ${state ? state.substring(0, 500) : 'Tarea procesada exitosamente.'}
 
     // Persistir el aprendizaje
     this.saveModel();
+  }
+
+  // ============================================
+  // MODO REACT — RAZONAMIENTO ITERATIVO
+  // ============================================
+
+  private generateReAct(input: NativeModelInput, domain: string): { text: string; confidence: number; reasoning: string } {
+    const result: ReActResult = jarvisReActEngine.runReActLoop(
+      input.query,
+      input.context || input.previousState || '',
+      domain,
+    );
+
+    const failedProbes = result.adversarialProbes.filter(p => p.result === 'FAIL').length;
+    const probeNote = failedProbes > 0 ? ` (${failedProbes} probe(s) corregidos)` : ' (validación adversarial: OK)';
+    const stopNote = result.stoppedBy === 'diminishing_returns'
+      ? ' [detenido: rendimiento decreciente]'
+      : result.stoppedBy === 'completion' ? ' [completo]' : ' [budget]';
+
+    return {
+      text: result.finalAnswer,
+      confidence: result.qualityScore,
+      reasoning: `ReAct loop: ${result.totalIterations} iteraciones${stopNote}${probeNote}`,
+    };
+  }
+
+  // ============================================
+  // MODO 5-PHASE — PLAN PROFUNDO
+  // ============================================
+
+  private generateFivePhase(input: NativeModelInput, domain: string): { text: string; confidence: number; reasoning: string } {
+    const result: ReActResult = jarvisReActEngine.runFivePhases(
+      input.query,
+      domain,
+      input.context || input.previousState,
+    );
+
+    const phaseSummary = result.planPhases
+      ? result.planPhases.map(p => `Fase ${p.phase} (${p.name})`).join(' → ')
+      : '5 fases completadas';
+
+    const failedProbes = result.adversarialProbes.filter(p => p.result === 'FAIL').length;
+    const probeNote = failedProbes > 0 ? ` — ${failedProbes} corrección(es) aplicada(s)` : ' — validación OK';
+
+    return {
+      text: result.finalAnswer,
+      confidence: result.qualityScore,
+      reasoning: `5-Phase Planning: ${phaseSummary}${probeNote}`,
+    };
   }
 
   // ============================================

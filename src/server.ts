@@ -1881,6 +1881,55 @@ app.get('/api/persistence/status', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/reason
+ * Razonamiento profundo: ReAct loop o 5-Phase planning
+ * Body: { query, mode?: 'react' | 'fivephase' | 'auto', context? }
+ */
+app.post('/api/reason', (req: Request, res: Response) => {
+  try {
+    const { query, mode = 'auto', context } = req.body;
+    if (!query) {
+      return res.status(400).json({ success: false, error: 'query es requerido' });
+    }
+
+    const startTime = Date.now();
+
+    // Auto-detectar modo según complejidad
+    const { jarvisReActEngine } = require('./core/reasoning/JarvisReActEngine');
+    const domain = jarvisNativeModel.detectDomain(query);
+    const strategy = mode === 'auto' ? jarvisReActEngine.selectStrategy(query, domain) : mode;
+
+    let result: any;
+    if (strategy === 'five_phase' || mode === 'fivephase') {
+      result = jarvisReActEngine.runFivePhases(query, domain, context);
+    } else {
+      result = jarvisReActEngine.runReActLoop(query, context || '', domain);
+    }
+
+    // Aprender del resultado
+    jarvisNativeModel.learn(query, result.finalAnswer, true, domain);
+
+    res.json({
+      success: true,
+      data: {
+        answer: result.finalAnswer,
+        strategy: strategy === 'direct' ? 'react' : strategy,
+        domain,
+        iterations: result.totalIterations,
+        stoppedBy: result.stoppedBy,
+        qualityScore: result.qualityScore,
+        adversarialProbes: result.adversarialProbes,
+        planPhases: result.planPhases || null,
+        elapsedMs: Date.now() - startTime,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/bootstrap/hackerone
  * Enseña a Jarvis todo lo necesario para ser un top bug hunter
  */
