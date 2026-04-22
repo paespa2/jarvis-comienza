@@ -1,11 +1,12 @@
 # Dockerfile para Jarvis IA
 
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
-# Build tools needed for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++
+# Build tools for native modules (better-sqlite3)
+# Note: Node.js 24+ has better native addon support
+RUN apk add --no-cache python3 make g++ gcc
 
 # Environment
 ENV NODE_ENV=production

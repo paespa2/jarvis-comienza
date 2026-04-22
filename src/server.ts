@@ -57,6 +57,9 @@ import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 // ✅ WEB INTELLIGENCE: Page structure analysis & scraping strategy
 import { jarvisWebIntelligence } from './core/web/JarvisWebIntelligence';
 
+// ✅ EVOLUTION ENGINE: Autonomous continuous learning & improvement
+import { evolutionEngine } from './core/evolution/EvolutionEngine';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -180,6 +183,12 @@ async function initializeJarvis() {
     24,
   );
   console.log(`   ✅ Auto-Researcher running — fetches arXiv papers every 24h\n`);
+
+  // ✅ EVOLUTION ENGINE: Initialize genetic algorithm for continuous improvement
+  console.log(`🧬 Initializing Evolution Engine (genetic algorithm)...`);
+  await evolutionEngine.initialize();
+  evolutionInitialized = true;
+  console.log(`   ✅ Evolution Engine ready — Jarvis will improve itself continuously\n`);
 
   console.log(`\n✅ Jarvis inicializado correctamente`);
   console.log(`📍 Escuchando en http://${HOST}:${PORT}`);
@@ -2338,6 +2347,106 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     success: false,
     error: err.message || 'Error interno del servidor',
   });
+});
+
+// ============================================
+// EVOLUTION ENGINE ENDPOINTS
+// ============================================
+
+// Initialize evolution engine on first request
+let evolutionInitialized = false;
+
+app.post('/api/evolution/initialize', async (req: Request, res: Response) => {
+  try {
+    if (!evolutionInitialized) {
+      await evolutionEngine.initialize();
+      evolutionInitialized = true;
+      res.json({ ok: true, message: '🧬 Evolution engine initialized with baseline variant' });
+    } else {
+      res.json({ ok: true, message: '⚠️  Evolution engine already initialized' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/evolution/evolve', async (req: Request, res: Response) => {
+  try {
+    if (!evolutionInitialized) {
+      await evolutionEngine.initialize();
+      evolutionInitialized = true;
+    }
+
+    const report = await evolutionEngine.evolveGeneration();
+    res.json({
+      ok: true,
+      generation: report.generationNumber,
+      bestFitness: (report.bestFitness * 100).toFixed(2) + '%',
+      averageFitness: (report.averageFitness * 100).toFixed(2) + '%',
+      topVariants: report.topVariants,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/evolution/status', (req: Request, res: Response) => {
+  try {
+    const stats = evolutionEngine.getStats();
+    const best = evolutionEngine.getBestVariant();
+
+    res.json({
+      ok: true,
+      generation: stats.generationNumber,
+      populationSize: stats.populationSize,
+      isRunning: stats.isRunning,
+      totalVariantsEvaluated: stats.totalVariantsEvaluated,
+      bestVariant: best ? {
+        id: best.id,
+        fitness: (best.fitnessScore * 100).toFixed(2) + '%',
+        workingCapabilities: best.workingCapabilities.length,
+        experimentalCapabilities: best.experimentalCapabilities.length,
+        failedCapabilities: best.failedCapabilities.length,
+      } : null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/evolution/apply-best', async (req: Request, res: Response) => {
+  try {
+    const message = await evolutionEngine.applyBestVariant();
+    res.json({ ok: true, message });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/evolution/reports', (req: Request, res: Response) => {
+  try {
+    const stats = evolutionEngine.getStats();
+    res.json({
+      ok: true,
+      totalGenerations: stats.generationReports ? stats.generationReports.length : 0,
+      reports: stats.generationReports || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/evolution/population', (req: Request, res: Response) => {
+  try {
+    const population = evolutionEngine.getPopulation();
+    res.json({
+      ok: true,
+      populationSize: population.length,
+      variants: population.map(v => v.getSummary()),
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // ============================================
