@@ -75,20 +75,22 @@ export abstract class BaseAgent {
    * Método principal que todo agente debe implementar.
    * INVARIANTE: Siempre pasa por validación constitucional primero.
    */
-  abstract async execute(task: AgentTask): Promise<AgentExecutionResult>;
+  abstract execute(task: AgentTask): Promise<AgentExecutionResult>;
 
   /**
    * Validación constitucional antes de ejecutar
    */
   protected async validateConstituionally(task: AgentTask): Promise<boolean> {
-    const { valid, validation } = await ConstitutionalAI.validateAction(
-      task.description,
-      'paespa',
-      'medium',
-      true
-    );
+    const validation = await ConstitutionalAI.validateAction({
+      action: task.description,
+      beneficiary: 'paespa',
+      risk_level: 'medium',
+      is_proactive: true,
+      involves_evolution: false,
+      impacts_identity: false,
+    });
 
-    if (!valid) {
+    if (!validation.isConstitutional) {
       console.log(
         `❌ Agente ${this.agentName} rechazó tarea por validación constitucional`
       );

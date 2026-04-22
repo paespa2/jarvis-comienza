@@ -212,7 +212,7 @@ export class LearningSystem {
 
     if (unmastered.length === 0) {
       // Si todas están maestría, priorizar especialización
-      const all = coreTeachings.getAllTeachings();
+      const all = coreTeachings.getUnmasteredTeachings();
       return all[Math.floor(Math.random() * all.length)].id;
     }
 
@@ -257,11 +257,11 @@ export class LearningSystem {
    * Verifica alineación constitucional
    */
   verifyConstitutionalAlignment(): ConstitutionalAlignment {
-    const ethicsTeachings = coreTeachings.getTeachingsByCategory('ETHICS');
+    const ethicsTeachings = coreTeachings.getTeachingsByCategory('ethics');
     const masteredEthics = ethicsTeachings.filter(t => t.mastered).length;
-    const ethicsRatio = masteredEthics / ethicsTeachings.length;
+    const ethicsRatio = masteredEthics / (ethicsTeachings.length || 1);
 
-    const autonomyTeachings = coreTeachings.getTeachingsByCategory('AUTONOMY');
+    const autonomyTeachings = coreTeachings.getTeachingsByCategory('autonomy');
     const masteredAutonomy = autonomyTeachings.filter(t => t.mastered).length;
     const autonomyRatio = masteredAutonomy / autonomyTeachings.length;
 
@@ -307,10 +307,9 @@ export class LearningSystem {
 
     // Estadísticas generales
     report += `## 📊 Estadísticas Generales\n\n`;
-    report += `- Enseñanzas Totales: ${stats.totalTeachings}\n`;
-    report += `- Maestría: ${stats.masteredCount} (${(stats.masteryPercentage * 100).toFixed(1)}%)\n`;
-    report += `- En Progreso: ${stats.inProgressCount}\n`;
-    report += `- Sin Iniciar: ${stats.notStartedCount}\n`;
+    report += `- Enseñanzas Totales: ${stats.total}\n`;
+    report += `- Maestría: ${stats.mastered} (${stats.percentageMastered}%)\n`;
+    report += `- Sin Maestría: ${stats.unmastered}\n`;
     report += `- Ciclos de Práctica: ${this.cycles.length}\n\n`;
 
     // Alineación constitucional

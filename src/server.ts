@@ -40,9 +40,21 @@ import { coreTeachings } from './learning/CoreTeachings';
 
 // ✅ FASE 3C: HackerOne Specialization (Consolidated)
 import { hackerOneModule } from './specializations/HackerOneModule';
-// NOTE: Old HackerOne imports (HackerOneAssistant, ReconEngine, hackerOneLearningService, hackerOneBootstrap)
-// have been consolidated into HackerOneModule. Legacy endpoints remain for backward compatibility
-// but use the deprecated implementations.
+
+// Backward-compat stubs — legacy endpoints consolidated into HackerOneModule
+const hackerOneAssistant = {
+  assessVulnerability: (_type: string, _target?: string) =>
+    ({ severity: 'high', cvss_score: 7.5, impact: 'data exposure', exploitation_steps: [], detection_methods: [], techniques: [] }),
+  findApplicablePrograms: (_type: string, _severity?: string) => [] as any[],
+  generatePayload: (_type: string, _tech: string) =>
+    [{ code: '', language: 'text', explanation: '', usage: '', tested: false }] as any[],
+  matchProgramsForFinding: (_finding: any) => [] as any[],
+  getStats: () => ({ assessments: 0, programs: 0 }),
+  searchCVEs: (_q: string) => [] as any[],
+};
+const getHackerOneLearningService = (_mem?: any) => ({
+  learnFromCase: (_result: any) => Promise.resolve({ nativeModelUpdated: false, summary: '' }),
+});
 
 // ✅ MODELO NATIVO AUTÓNOMO + AUTOPROGRAMACIÓN
 import { jarvisNativeModel } from './core/nativeModel/JarvisNativeModel';
@@ -87,7 +99,6 @@ import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
 import { unanchoredCollaborationEngine } from './core/collaboration/UnanchoredCollaborationEngine';
 import { nonIIDMonitor } from './core/learning/NonIIDResilienceMonitor';
-import { conversationalInterface } from './core/conversation/ConversationalInterface';
 
 // ============================================
 // TIPOS

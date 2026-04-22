@@ -197,6 +197,10 @@ export interface TrainingSession {
     currentEpoch: number;
     currentLoss: number;
     validationAccuracy: number;
+    validationLoss?: number;
+    bestValidationAccuracy?: number;
+    trainingTime?: number;
+    estimatedTimeRemaining?: number;
   };
 
   status: 'running' | 'completed' | 'failed' | 'paused';
@@ -249,7 +253,7 @@ export interface MetaLearningState {
   trainingData: TrainingDataPoint[];
   modelVariants: ModelVariant[];
   modelLineage: ModelLineage[];
-  abTests: ABTest[];
+  abTests: any[];
   trainingSessions: TrainingSession[];
   costAnalysis: CostAnalysis;
 

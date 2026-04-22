@@ -201,7 +201,8 @@ export class AutonomousActivation {
         const report = jarvisWebIntelligence.generateReport(analysis);
 
         console.log(`📄 Found ${analysis.forms.length} forms, ${analysis.links.length} links`);
-        console.log(`🎯 Bug bounty relevance: ${analysis.bugBountyRelevance.score.toFixed(2)}/10\n`);
+        const relevanceScore = analysis.bugBountyRelevance.potentialVulnerabilities.length;
+        console.log(`🎯 Bug bounty relevance: ${relevanceScore} potential vulnerabilities\n`);
 
         // Auto-teach Jarvis
         selfProgrammingEngine.addKnowledge({

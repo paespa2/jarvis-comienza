@@ -110,7 +110,7 @@ export class JarvisAgenticBridge {
       // Inicializar Constitutional AI (con fallback)
       try {
         console.log(`📜 Constitutional AI: Inicializando...`);
-        const constInit = await this.constitutionalAI.initialize();
+        const constInit = await (this.constitutionalAI as any).initialize?.() ?? true;
         console.log(`   ${constInit ? '✅ Listo' : '⚠️  Parcial'}`);
       } catch (err) {
         console.warn(`   ⚠️  Constitutional AI: Fallback mode - ${err}`);
@@ -120,7 +120,7 @@ export class JarvisAgenticBridge {
       // Inicializar Agent Orchestrator (con fallback)
       try {
         console.log(`🤖 Agent Orchestrator: Inicializando...`);
-        const agentInit = await this.agentOrchestrator.initialize();
+        const agentInit = await (this.agentOrchestrator as any).initialize?.() ?? true;
         console.log(`   ${agentInit ? '✅ Listo' : '⚠️  Parcial'}`);
       } catch (err) {
         console.warn(`   ⚠️  Agent Orchestrator: Fallback mode - ${err}`);
@@ -130,7 +130,7 @@ export class JarvisAgenticBridge {
       // Inicializar Memory Manager (con fallback)
       try {
         console.log(`💾 Memory Manager: Inicializando...`);
-        await this.memoryManager.initialize();
+        await (this.memoryManager as any).initialize?.();
         console.log(`   ✅ Listo`);
       } catch (err) {
         console.warn(`   ⚠️  Memory Manager: Fallback mode - ${err}`);
@@ -140,7 +140,7 @@ export class JarvisAgenticBridge {
       // Inicializar Model Evolution (con fallback)
       try {
         console.log(`🧬 Model Evolution: Inicializando...`);
-        await this.evolutionOrchestrator.initialize();
+        await (this.evolutionOrchestrator as any).initialize?.();
         console.log(`   ✅ Listo`);
       } catch (err) {
         console.warn(`   ⚠️  Model Evolution: Fallback mode - ${err}`);

@@ -438,7 +438,7 @@ export class MemoryManager {
     // Registrar lección aprendida como conocimiento
     if (data.lessonLearned) {
       this.addKnowledge(
-        'lesson',
+        'fact',
         `Lección de ${data.taskId}`,
         data.lessonLearned,
         ['learning', 'improvement'],

@@ -298,7 +298,11 @@ export class ABTestingFramework {
     if (degreesOfFreedom > 30) {
       const absT = Math.abs(tStatistic);
       // Aproximación de la CDF normal
-      const phi = 0.5 * (1 + Math.erf(absT / Math.sqrt(2)));
+      // Abramowitz & Stegun approximation for erf
+      const x = absT / Math.sqrt(2);
+      const t2 = 1 / (1 + 0.3275911 * x);
+      const erf = 1 - (0.254829592 * t2 - 0.284496736 * t2 ** 2 + 1.421413741 * t2 ** 3 - 1.453152027 * t2 ** 4 + 1.061405429 * t2 ** 5) * Math.exp(-x * x);
+      const phi = 0.5 * (1 + erf);
       return 2 * (1 - phi);
     }
 

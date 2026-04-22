@@ -20,7 +20,7 @@ export interface Teaching {
   keyPoints: string[];
   example: string;
   importance: 'critical' | 'high' | 'medium';
-  mastered: boolean;
+  mastered?: boolean;
   practiceCount: number;
   lastPracticed?: Date;
 }

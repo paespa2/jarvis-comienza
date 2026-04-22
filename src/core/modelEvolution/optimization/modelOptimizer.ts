@@ -246,9 +246,9 @@ export class ModelOptimizer {
     if (analysis.gaps.length > 0) {
       targets.push({
         metric: 'accuracy',
-        currentValue: (
-          (trainingData.length - analysis.gaps.length) / trainingData.length
-        ).valueOf(),
+        currentValue: analysis.gaps.length > 0
+          ? (analysis.totalDataPoints - analysis.gaps.length) / Math.max(analysis.totalDataPoints, 1)
+          : 1.0,
         targetValue: 1.0,
         importance: 7,
         description: `Cubrir ${analysis.gaps.length} categorías con pocos datos`,
