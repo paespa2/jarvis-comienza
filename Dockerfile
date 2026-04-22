@@ -1,4 +1,5 @@
 # Dockerfile para Jarvis IA
+# Force rebuild - Node 24 with build tools for better-sqlite3
 
 FROM node:24-alpine
 
