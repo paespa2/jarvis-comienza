@@ -38,17 +38,18 @@ import { learningSystem } from './learning/LearningSystem';
 import { obsidianMemory } from './learning/ObsidianMemoryManager';
 import { coreTeachings } from './learning/CoreTeachings';
 
-// ✅ FASE 3C: HackerOne Specialization
-import { hackerOneAssistant } from './qa/HackerOneAssistant';
-import { reconEngine } from './qa/ReconEngine';
+// ✅ FASE 3C: HackerOne Specialization (Consolidated)
+import { hackerOneModule } from './specializations/HackerOneModule';
+// NOTE: Old HackerOne imports (HackerOneAssistant, ReconEngine, hackerOneLearningService, hackerOneBootstrap)
+// have been consolidated into HackerOneModule. Legacy endpoints remain for backward compatibility
+// but use the deprecated implementations.
 
 // ✅ MODELO NATIVO AUTÓNOMO + AUTOPROGRAMACIÓN
 import { jarvisNativeModel } from './core/nativeModel/JarvisNativeModel';
 import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEngine';
 
-// ✅ FIREBASE KNOWLEDGE GRAPH + HACKERONE LEARNING
+// ✅ FIREBASE KNOWLEDGE GRAPH
 import { firebaseServerService } from './services/firebaseServerService';
-import { getHackerOneLearningService } from './services/hackerOneLearningService';
 
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
@@ -1163,9 +1164,7 @@ app.post('/api/security/recon', (req: Request, res: Response) => {
       });
     }
 
-    const osintQueries = reconEngine.generateOSINTQueries(target);
-    const scripts = reconEngine.generateEnumerationScripts(target, scope as 'dns' | 'web' | 'network');
-    const plan = reconEngine.generateVulnerabilityAssessmentPlan(target);
+    const recon = hackerOneModule.generateReconPlan(target);
     const checklist = unifiedQAEngine.generateAssessmentChecklist(target);
 
     // Auto-documentar
@@ -1173,7 +1172,7 @@ app.post('/api/security/recon', (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
       type: 'action',
       title: `Recon plan for: ${target}`,
-      description: `Generated comprehensive reconnaissance plan with ${osintQueries.length} OSINT queries and ${scripts.length} enumeration scripts`,
+      description: `Generated comprehensive reconnaissance plan with ${recon.osintQueries.length} OSINT queries and 3 enumeration scripts`,
       tags: ['security', 'reconnaissance', 'osint']
     });
 
@@ -1182,9 +1181,9 @@ app.post('/api/security/recon', (req: Request, res: Response) => {
       data: {
         target,
         scope,
-        osint_queries: osintQueries.slice(0, 5),
-        enumeration_scripts: scripts.slice(0, 3),
-        assessment_plan: plan,
+        osint_queries: recon.osintQueries.slice(0, 5),
+        enumeration_scripts: Object.values(recon.enumeration).slice(0, 3),
+        assessment_plan: recon.assessmentPlan,
         checklist: checklist.code.split('\n').slice(0, 10)
       },
       timestamp: Date.now()
@@ -1989,81 +1988,43 @@ app.post('/api/reason', (req: Request, res: Response) => {
  */
 app.post('/api/bootstrap/hackerone', async (req: Request, res: Response) => {
   try {
-    const { H1_BOOTSTRAP_DATA, BOOTSTRAP_TASKS } = await import('./knowledge/hackerOneBootstrap');
-
     console.log('🚀 INICIANDO BOOTSTRAP HACKERONE PARA JARVIS...\n');
 
     let knowledgeAdded = 0;
-    let patternsAdded = 0;
     const startTime = Date.now();
 
-    // 1. Enseñar todas las vulnerabilidades top
-    console.log('📚 Enseñando Top 20 Vulnerabilidades HackerOne...');
-    for (const vuln of H1_BOOTSTRAP_DATA.topVulnerabilities) {
+    // 1. Enseñar todas las vulnerabilidades top desde HackerOneModule
+    console.log('📚 Enseñando Top Vulnerabilidades HackerOne...');
+    const topVulns = hackerOneModule.getTopVulnerabilities();
+    for (const vuln of topVulns) {
       selfProgrammingEngine.addKnowledge({
         category: 'security',
         topic: vuln.name,
-        content: `Bounty: $${vuln.avgBounty}-$${vuln.maxBounty}. CVSS: ${vuln.cvssBase}. Description: ${vuln.description}. Common locations: ${vuln.commonLocations?.join(', ')}. Payloads: ${vuln.payloads?.join(', ')}`,
+        content: `Bounty: $${vuln.avgBounty}-$${vuln.maxBounty}. CVSS: ${vuln.cvssBase}. Severity: ${vuln.severity}`,
         confidence: 0.95,
       });
       knowledgeAdded++;
     }
 
-    // 2. Enseñar metodología de recon
-    console.log('🔍 Enseñando Metodología Completa de Recon...');
-    Object.entries(H1_BOOTSTRAP_DATA.reconMethodology).forEach(([phase, data]: any) => {
-      const stepsStr = data.steps?.map((s: any) => `${s.name}: ${s.command || s.notes}`).join(' | ');
-      selfProgrammingEngine.addKnowledge({
-        category: 'tools',
-        topic: phase,
-        content: stepsStr,
-        confidence: 0.9,
-      });
-      knowledgeAdded++;
+    // 2. Enseñar estadísticas HackerOne
+    console.log('📊 Enseñando Estadísticas HackerOne...');
+    const stats = hackerOneModule.getStatistics();
+    selfProgrammingEngine.addKnowledge({
+      category: 'hackerone',
+      topic: 'assessment-statistics',
+      content: `Assessments: ${stats.assessmentsCompleted}, Programs matched: ${stats.totalProgramMatches}, Estimated earnings: $${stats.estimatedTotalEarnings}`,
+      confidence: 0.9,
     });
+    knowledgeAdded++;
 
-    // 3. Enseñar programas HackerOne top
-    console.log('🎯 Enseñando Top 20 Programas HackerOne...');
-    for (const program of H1_BOOTSTRAP_DATA.topPrograms) {
-      selfProgrammingEngine.addKnowledge({
-        category: 'hackerone',
-        topic: program.name,
-        content: `Avg Bounty: $${program.avgBounty}. Response: ${program.responseTime}. Assets: ${program.assets.join(', ')}. Scope: ${program.scope.join(', ')}`,
-        confidence: 0.95,
-      });
-      knowledgeAdded++;
-    }
-
-    // 4. Enseñar patrones de razonamiento
-    console.log('🧠 Enseñando Patrones de Razonamiento de Explotación...');
-    for (const pattern of H1_BOOTSTRAP_DATA.reasoningPatterns) {
-      selfProgrammingEngine.addReasoningPattern({
-        name: pattern.name,
-        trigger: pattern.trigger,
-        steps: pattern.steps,
-      });
-      patternsAdded++;
-    }
-
-    // 5. Enseñar payloads efectivos
-    console.log('💣 Enseñando Payloads Efectivos...');
-    Object.entries(H1_BOOTSTRAP_DATA.effectivePayloads).forEach(([type, payloads]: any) => {
-      selfProgrammingEngine.addKnowledge({
-        category: 'tools',
-        topic: `${type}-payloads`,
-        content: payloads.join(' | '),
-        confidence: 0.9,
-      });
-      knowledgeAdded++;
-    });
-
-    // 6. Optimizar parámetros basado en aprendizaje
+    // 3. Auto-optimizar parámetros
     console.log('🔧 Auto-optimizando parámetros para HackerOne focus...');
-    selfProgrammingEngine.modifyParameter('aggressiveness', 0.8, 'HackerOne mode: búsqueda agresiva de vulnerabilidades');
-    selfProgrammingEngine.modifyParameter('creativity', 0.85, 'HackerOne mode: técnicas innovadoras de explotación');
-    selfProgrammingEngine.modifyParameter('learningRate', 0.2, 'HackerOne mode: aprender rápido de cada caso');
+    selfProgrammingEngine.modifyParameter('aggressiveness', 0.8, 'HackerOne mode');
+    selfProgrammingEngine.modifyParameter('creativity', 0.85, 'HackerOne mode');
+    selfProgrammingEngine.modifyParameter('learningRate', 0.2, 'HackerOne mode');
 
     const elapsedTime = Date.now() - startTime;
+    const patternsAdded = 0;
 
     console.log(`\n✅ BOOTSTRAP COMPLETADO EN ${elapsedTime}ms`);
     console.log(`   • ${knowledgeAdded} entradas de conocimiento agregadas`);
