@@ -79,6 +79,9 @@ import { chainOfThoughtVerification } from './core/verification/ChainOfThoughtVe
 // ✅ ADVERSARIAL SELF-CHALLENGE: Find flaws in own reasoning
 import { adversarialSelfChallenge } from './core/adversarial/AdversarialSelfChallenge';
 
+// ✅ CONVERSATIONAL INTERFACE: Natural language intent classification & routing
+import { conversationalInterface } from './core/conversation/ConversationalInterface';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -1738,10 +1741,11 @@ const chatSessions: Map<string, ChatSession> = new Map();
 
 /**
  * POST /api/chat
- * Chat conversacional síncrono con el modelo nativo de Jarvis.
- * Sin task queue, respuesta inmediata, con historial por sesión.
+ * Chat conversacional con intent classification e intelligent routing.
+ * Jarvis entiende la intención del usuario y activa los sistemas apropiados.
+ * Respuesta inmediata, con historial por sesión, aprendizaje automático.
  */
-app.post('/api/chat', (req: Request, res: Response) => {
+app.post('/api/chat', async (req: Request, res: Response) => {
   try {
     const { message, sessionId: providedSessionId } = req.body;
 
@@ -1753,50 +1757,23 @@ app.post('/api/chat', (req: Request, res: Response) => {
     }
 
     const sessionId = providedSessionId || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    let session = chatSessions.get(sessionId);
-    if (!session) {
-      session = {
-        sessionId,
-        history: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      chatSessions.set(sessionId, session);
-    }
-
-    // Agregar mensaje del usuario a la historia
-    session.history.push({ role: 'user', text: message, timestamp: Date.now() });
-
-    // Generar respuesta con modelo nativo (modo chat)
     const startTime = Date.now();
-    const output = jarvisNativeModel.generate({
-      query: message,
-      mode: 'chat',
-      history: session.history.slice(-10), // últimos 10 turnos como contexto
-    });
+
+    // Procesar con ConversationalInterface: intent classification + intelligent routing
+    const response = await conversationalInterface.process(message, sessionId);
     const generationTime = Date.now() - startTime;
 
-    // Agregar respuesta de Jarvis a la historia
-    session.history.push({ role: 'jarvis', text: output.text, timestamp: Date.now() });
-    session.updatedAt = Date.now();
+    // Aprender del intercambio para mejorar respuestas futuras
+    jarvisNativeModel.learn(message, response.message, response.confidence > 0.7, response.intent);
 
-    // Mantener solo los últimos 50 turnos por sesión
-    if (session.history.length > 50) {
-      session.history = session.history.slice(-50);
-    }
-
-    // Aprender del intercambio (sin marcarlo como task success porque es conversación)
-    const domain = output.domainDetected;
-    jarvisNativeModel.learn(message, output.text, true, domain);
-
-    // Auto-documentar en Obsidian si es un mensaje sustancial
+    // Auto-documentar en Obsidian si es sustancial
     if (message.length > 20) {
       obsidianMemory.registerAction({
         timestamp: new Date().toISOString(),
         type: 'action',
         title: `Chat: ${message.substring(0, 50)}`,
-        description: `Intercambio conversacional en dominio ${domain}. Respuesta generada en ${generationTime}ms.`,
-        tags: ['chat', domain],
+        description: `Intent: ${response.intent}. Sistemas: ${response.systemsUsed.join(', ')}. Confianza: ${(response.confidence * 100).toFixed(0)}%.`,
+        tags: ['chat', response.intent, ...response.systemsUsed],
       });
     }
 
@@ -1804,17 +1781,18 @@ app.post('/api/chat', (req: Request, res: Response) => {
       success: true,
       data: {
         sessionId,
-        response: output.text,
-        confidence: output.confidence,
-        domain: output.domainDetected,
-        modelVersion: output.modelVersion,
-        reasoning: output.reasoning,
+        response: response.message,
+        intent: response.intent,
+        confidence: response.confidence,
+        systemsUsed: response.systemsUsed,
+        reasoning: response.reasoning,
+        followUpSuggestions: response.followUpSuggestions,
         generationTime,
-        historyLength: session.history.length,
       },
-      timestamp: Date.now(),
+      timestamp: response.timestamp,
     });
   } catch (error: any) {
+    console.error('[Chat] Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
