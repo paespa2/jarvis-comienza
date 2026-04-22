@@ -67,6 +67,9 @@ import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngin
 import { llmWikiSystem } from './core/wiki/LLMWikiSystem';
 import { wikiAutomation } from './core/wiki/WikiAutomation';
 
+// ✅ AUTONOMOUS ACTIVATION: Tier 2 self-triggered capabilities
+import { autonomousActivation } from './core/automation/AutonomousActivation';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -201,6 +204,16 @@ async function initializeJarvis() {
   console.log(`📚 Initializing LLM Wiki System (personal knowledge base)...`);
   wikiAutomation.startAutomation('./jarvis-wiki/sources');
   console.log(`   ✅ Wiki System ready — Weekly lints, daily ingestion checks\n`);
+
+  // ✅ AUTONOMOUS ACTIVATION: Start Tier 2 self-triggered capabilities
+  console.log(`🤖 Initializing Autonomous Activation (Tier 2)...`);
+  autonomousActivation.startAutonomy();
+  console.log(`   ✅ Autonomous Activation running:`);
+  console.log(`      • Reasoning challenges every 4 hours`);
+  console.log(`      • Evolution cycles every 6 hours`);
+  console.log(`      • Web intelligence hunts every 8 hours`);
+  console.log(`      • Reasoning verification every 2 hours`);
+  console.log(`      • Knowledge synthesis weekly\n`);
 
   console.log(`\n✅ Jarvis inicializado correctamente`);
   console.log(`📍 Escuchando en http://${HOST}:${PORT}`);
@@ -2474,6 +2487,60 @@ app.get('/api/wiki/automation/status', (req: Request, res: Response) => {
       isRunning: status.isRunning,
       lastLintTime: status.lastLintTime,
       lastIngestTime: status.lastIngestTime,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================
+// AUTONOMOUS ACTIVATION ENDPOINTS (Tier 2)
+// ============================================
+
+app.post('/api/autonomous/start', (req: Request, res: Response) => {
+  try {
+    autonomousActivation.startAutonomy();
+
+    res.json({
+      ok: true,
+      message: '🤖 Autonomous activation started',
+      schedule: {
+        reasoningChallenges: 'Every 4 hours',
+        evolutionCycles: 'Every 6 hours',
+        webIntelligenceHunts: 'Every 8 hours',
+        reasoningVerification: 'Every 2 hours',
+        knowledgeSynthesis: 'Every 7 days',
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/autonomous/stop', (req: Request, res: Response) => {
+  try {
+    autonomousActivation.stopAutonomy();
+
+    res.json({ ok: true, message: '⛔ Autonomous activation stopped' });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/autonomous/status', (req: Request, res: Response) => {
+  try {
+    const stats = autonomousActivation.getStats();
+
+    res.json({
+      ok: true,
+      isRunning: stats.isRunning,
+      completedTasks: stats.completedTasks,
+      failedTasks: stats.failedTasks,
+      pendingTasks: stats.pendingTasks,
+      successRate: stats.completedTasks + stats.failedTasks > 0
+        ? ((stats.completedTasks / (stats.completedTasks + stats.failedTasks)) * 100).toFixed(2) + '%'
+        : 'N/A',
+      recentTasks: stats.recentTasks.slice(-3),
     });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
