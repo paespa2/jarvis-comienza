@@ -84,6 +84,10 @@ import { conversationalInterface } from './core/conversation/ConversationalInter
 
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
+import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
+import { unanchoredCollaborationEngine } from './core/collaboration/UnanchoredCollaborationEngine';
+import { nonIIDMonitor } from './core/learning/NonIIDResilienceMonitor';
+import { conversationalInterface } from './core/conversation/ConversationalInterface';
 
 // ============================================
 // TIPOS
@@ -2719,13 +2723,16 @@ app.post('/api/fedfsh/aggregate', async (req: Request, res: Response) => {
       expertResponses.push({ expert, response });
     }
 
-    // Apply FedFish aggregation
-    const result = await fedFishAggregator.aggregateExpertKnowledge(
+    // Apply Enhanced FedFish aggregation with Privacy + Unanchored + Non-IID monitoring
+    const sessionId = (req.query.sessionId as string) || uuidv4();
+    const result = await enhancedFedFishAggregator.aggregateWithEnhancements(
       expertResponses,
-      query
+      query,
+      sessionId
     );
 
-    res.json({
+    // Build response with all enhancements
+    const response: any = {
       ok: true,
       aggregatedResponse: result.aggregatedResponse,
       expertPerspectives: result.expertPerspectives.map(p => ({
@@ -2738,7 +2745,45 @@ app.post('/api/fedfsh/aggregate', async (req: Request, res: Response) => {
         clientServerBarrier: result.aggregationMetrics.clientServerBarrier.toFixed(4),
         weightDistribution: result.aggregationMetrics.weightDistribution,
       },
-    });
+    };
+
+    // Include privacy metrics if available
+    if (result.privacyMetrics) {
+      response.privacy = {
+        dpApplied: result.privacyMetrics.dpApplied,
+        epsilon: result.privacyMetrics.epsilon,
+        budgetRemaining: result.privacyMetrics.budgetRemaining.toFixed(2),
+      };
+    }
+
+    // Include non-IID metrics if available
+    if (result.nonIIDMetrics) {
+      response.nonIID = {
+        score: result.nonIIDMetrics.score.toFixed(2),
+        adaptationLevel: result.nonIIDMetrics.adaptationLevel,
+        estimatedResilience: (result.nonIIDMetrics.estimatedResilience * 100).toFixed(1) + '%',
+      };
+    }
+
+    // Include unanchored response if available
+    if (result.unanchoredResponse) {
+      response.unanchoredPerspectives = {
+        perspective1: {
+          source: result.unanchoredResponse.perspectives[0].source,
+          specialty: result.unanchoredResponse.perspectives[0].specialty,
+          confidence: (result.unanchoredResponse.perspectives[0].confidence * 100).toFixed(1) + '%',
+        },
+        perspective2: {
+          source: result.unanchoredResponse.perspectives[1].source,
+          specialty: result.unanchoredResponse.perspectives[1].specialty,
+          confidence: (result.unanchoredResponse.perspectives[1].confidence * 100).toFixed(1) + '%',
+        },
+        guidance: result.unanchoredResponse.userGuidance,
+        complementarity: (result.unanchoredResponse.complementarityScore * 100).toFixed(1) + '%',
+      };
+    }
+
+    res.json(response);
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -2750,15 +2795,32 @@ app.post('/api/fedfsh/aggregate', async (req: Request, res: Response) => {
  */
 app.get('/api/fedfsh/stats', (req: Request, res: Response) => {
   try {
-    const stats = fedFishAggregator.getStats();
+    // Get enhanced system status
+    const systemStatus = enhancedFedFishAggregator.getSystemStatus();
 
     res.json({
       ok: true,
-      aggregationsPerformed: stats.aggregationsPerformed,
-      averageClientServerBarrier: stats.averageCSB.toFixed(4),
-      averageImprovementOverFedAvg: `${(stats.averageImprovement).toFixed(1)}%`,
-      consensusQuality: `${(stats.consensusQuality * 100).toFixed(2)}%`,
-      lastAggregation: stats.lastMetrics,
+      system: {
+        aggregationsProcessed: systemStatus.aggregationsProcessed,
+        unanchoredModeEnabled: systemStatus.unanchoredMode,
+        differentialPrivacy: {
+          enabled: systemStatus.dpEnabled,
+          epsilon: systemStatus.privacyEpsilon,
+          privacyLevel: systemStatus.privacyEpsilon === 1 ? 'high' :
+                        systemStatus.privacyEpsilon === 5 ? 'moderate' : 'low',
+        },
+        nonIIDMonitoring: {
+          enabled: systemStatus.nonIIDMonitoring,
+          currentScore: systemStatus.nonIIDScore.toFixed(2),
+        },
+      },
+      capabilities: {
+        fisherWeightedAggregation: true,
+        unanchoredCollaboration: systemStatus.unanchoredMode,
+        privacyPreserving: systemStatus.dpEnabled,
+        robustToNonIID: systemStatus.nonIIDMonitoring,
+      },
+      readiness: 'Production-ready with academic enhancements',
     });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
