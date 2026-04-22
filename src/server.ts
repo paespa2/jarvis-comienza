@@ -97,6 +97,10 @@ import { adversarialSelfChallenge } from './core/adversarial/AdversarialSelfChal
 // ✅ CONVERSATIONAL INTERFACE: Natural language intent classification & routing
 import { conversationalInterface } from './core/conversation/ConversationalInterface';
 
+// ✅ AUTONOMOUS WEB NAVIGATION: Browser automation with preview
+import { autonomousWebNavigator } from './autonomy/AutonomousWebNavigator';
+import { navigationCommandHandler } from './core/conversation/NavigationCommandHandler';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -1808,8 +1812,35 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     const sessionId = providedSessionId || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const startTime = Date.now();
 
-    // Procesar con ConversationalInterface: intent classification + intelligent routing
-    const response = await conversationalInterface.process(message, sessionId);
+    // 🌐 DETECCIÓN DE COMANDOS DE NAVEGACIÓN
+    const navCommand = navigationCommandHandler.detectNavigationCommand(message);
+    let response: any;
+    let navigationResult = null;
+
+    if (navCommand) {
+      // Ejecutar comando de navegación
+      navigationResult = await navigationCommandHandler.executeNavigationCommand(navCommand);
+      const navResponse = navigationCommandHandler.generateNavigationResponse(navCommand, navigationResult);
+
+      response = {
+        message: navResponse,
+        intent: 'web-navigation',
+        confidence: navCommand.confidence,
+        systemsUsed: ['AutonomousWebNavigator'],
+        reasoning: `Detecté intención de navegación web. Tipo: ${navCommand.type}`,
+        followUpSuggestions: [
+          'Extrae datos de la página visitada',
+          'Analiza más a profundidad',
+          'Navega a otra URL'
+        ],
+        timestamp: Date.now(),
+        navigationData: navigationResult
+      };
+    } else {
+      // Procesar con ConversationalInterface: intent classification + intelligent routing
+      response = await conversationalInterface.process(message, sessionId);
+    }
+
     const generationTime = Date.now() - startTime;
 
     // Aprender del intercambio para mejorar respuestas futuras
@@ -1837,6 +1868,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         reasoning: response.reasoning,
         followUpSuggestions: response.followUpSuggestions,
         generationTime,
+        ...(navigationResult && { navigationData: navigationResult }),
       },
       timestamp: response.timestamp,
     });
@@ -1865,6 +1897,232 @@ app.get('/api/chat/:sessionId', (req: Request, res: Response) => {
 app.delete('/api/chat/:sessionId', (req: Request, res: Response) => {
   const existed = chatSessions.delete(req.params.sessionId);
   res.json({ success: true, data: { deleted: existed }, timestamp: Date.now() });
+});
+
+// ============================================
+// AUTONOMOUS WEB NAVIGATION ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/navigation/start
+ * Iniciar nueva sesión de navegación autónoma
+ */
+app.post('/api/navigation/start', (req: Request, res: Response) => {
+  try {
+    const { startUrl } = req.body;
+    if (!startUrl || typeof startUrl !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'startUrl es requerido (string)'
+      });
+    }
+
+    const session = autonomousWebNavigator.createSession(startUrl);
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.id,
+        startUrl: session.startUrl,
+        status: session.status,
+        message: `Sesión de navegación iniciada: ${session.id}`
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/navigation/navigate
+ * Navegar a una URL dentro de sesión activa
+ */
+app.post('/api/navigation/navigate', async (req: Request, res: Response) => {
+  try {
+    const { sessionId, url } = req.body;
+    if (!sessionId || !url) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionId y url son requeridos'
+      });
+    }
+
+    const capture = await autonomousWebNavigator.navigateToUrl(sessionId, url);
+    if (!capture) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se pudo navegar a la URL'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        url: capture.url,
+        title: capture.title,
+        screenshotPath: capture.screenshotPath,
+        timestamp: new Date(capture.timestamp).toISOString(),
+        contentLength: capture.htmlContent.length
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/navigation/extract
+ * Extraer datos de la página actual
+ */
+app.post('/api/navigation/extract', async (req: Request, res: Response) => {
+  try {
+    const { sessionId, selectors } = req.body;
+    if (!sessionId || !selectors) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionId y selectors son requeridos'
+      });
+    }
+
+    const data = await autonomousWebNavigator.extractData(sessionId, selectors);
+    if (data === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'Error extrayendo datos'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        extracted: data,
+        selectorsUsed: Object.keys(selectors).length,
+        timestamp: new Date().toISOString()
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/navigation/session/:sessionId
+ * Obtener resumen de sesión de navegación
+ */
+app.get('/api/navigation/session/:sessionId', (req: Request, res: Response) => {
+  try {
+    const summary = autonomousWebNavigator.getSessionSummary(req.params.sessionId);
+    if (!summary) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: summary,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/navigation/session/:sessionId/end
+ * Finalizar sesión de navegación
+ */
+app.post('/api/navigation/session/:sessionId/end', (req: Request, res: Response) => {
+  try {
+    const session = autonomousWebNavigator.endSession(req.params.sessionId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sesión no encontrada'
+      });
+    }
+
+    const report = autonomousWebNavigator.generateNavigationReport(req.params.sessionId);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.id,
+        duration: session.endTime! - session.startTime,
+        actionsCount: session.actions.length,
+        capturesCount: session.captures.length,
+        report: report
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/navigation/history
+ * Obtener historial de todas las sesiones de navegación
+ */
+app.get('/api/navigation/history', (req: Request, res: Response) => {
+  try {
+    const history = autonomousWebNavigator.getSessionHistory();
+    res.json({
+      success: true,
+      data: {
+        sessions: history,
+        count: history.length,
+        activeSessions: autonomousWebNavigator.getActiveSessions().length
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/navigation/status
+ * Obtener estado actual del navegador autónomo
+ */
+app.get('/api/navigation/status', (req: Request, res: Response) => {
+  try {
+    const history = autonomousWebNavigator.getSessionHistory();
+    const activeSessions = autonomousWebNavigator.getActiveSessions();
+
+    res.json({
+      success: true,
+      data: {
+        initialized: true,
+        activeSessions: activeSessions.length,
+        totalSessions: history.length,
+        screenshotsDir: './navigation-previews',
+        capabilities: [
+          'navigate-to-url',
+          'take-screenshots',
+          'extract-data',
+          'click-elements',
+          'type-text',
+          'wait-for-elements',
+          'analyze-page-structure'
+        ],
+        status: 'operational'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Navigation] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ============================================
