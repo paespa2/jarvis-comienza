@@ -67,6 +67,9 @@ import { jarvisLocalDB } from './services/JarvisLocalDB';
 // ✅ PUBLIC DATASET INTEGRATION: Learn from open datasets
 import { publicDatasetIntegration } from './services/PublicDatasetIntegration';
 
+// ✅ ANTHROPIC SKILLS INTEGRATION: Official Claude skills
+import { anthropicSkills } from './services/AnthropicSkillsIntegration';
+
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 
@@ -5796,6 +5799,175 @@ console.log('   GET /api/datasets/catalog');
 console.log('   GET /api/datasets/by-category/:category');
 console.log('   POST /api/datasets/learn/:datasetId');
 console.log('   POST /api/datasets/bootstrap');
+
+// ============================================
+// ANTHROPIC SKILLS ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/skills/catalog
+ * Get catalog of all Anthropic skills
+ */
+app.get('/api/skills/catalog', (req: Request, res: Response) => {
+  try {
+    const skills = anthropicSkills.getAvailableSkills();
+    const summary = anthropicSkills.getSummaryByCategory();
+
+    res.json({
+      success: true,
+      data: {
+        skills,
+        totalSkills: skills.length,
+        summary,
+        categories: Object.keys(summary)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/skills/by-category/:category
+ * Get skills by category
+ */
+app.get('/api/skills/by-category/:category', (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    const skills = anthropicSkills.getSkillsByCategory(category);
+
+    res.json({
+      success: true,
+      data: {
+        category,
+        skills,
+        total: skills.length
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/skills/:skillId
+ * Get detailed skill information
+ */
+app.get('/api/skills/:skillId', (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.params;
+    const skill = anthropicSkills.getSkill(skillId);
+
+    if (!skill) {
+      return res.status(404).json({
+        success: false,
+        error: `Skill ${skillId} not found`
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        skill,
+        capabilities: anthropicSkills.getCapabilities()
+          .filter(c => c.skillId === skillId)
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/skills/capabilities/all
+ * Get all capabilities across all skills
+ */
+app.get('/api/skills/capabilities/all', (req: Request, res: Response) => {
+  try {
+    const capabilities = anthropicSkills.getCapabilities();
+
+    res.json({
+      success: true,
+      data: {
+        totalCapabilities: capabilities.length,
+        capabilities,
+        grouped: capabilities.reduce((acc: any, cap) => {
+          if (!acc[cap.capability]) {
+            acc[cap.capability] = [];
+          }
+          acc[cap.capability].push(cap.skillId);
+          return acc;
+        }, {})
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/skills/activate/:skillId
+ * Activate a skill
+ */
+app.post('/api/skills/activate/:skillId', (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.params;
+    const success = anthropicSkills.activateSkill(skillId);
+
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: `Skill ${skillId} not found`
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Skill ${skillId} activated`,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/skills/deactivate/:skillId
+ * Deactivate a skill
+ */
+app.post('/api/skills/deactivate/:skillId', (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.params;
+    const success = anthropicSkills.deactivateSkill(skillId);
+
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: `Skill ${skillId} not found`
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Skill ${skillId} deactivated`,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+console.log('✅ Anthropic Skills Endpoints registered:');
+console.log('   GET /api/skills/catalog');
+console.log('   GET /api/skills/by-category/:category');
+console.log('   GET /api/skills/:skillId');
+console.log('   GET /api/skills/capabilities/all');
+console.log('   POST /api/skills/activate/:skillId');
+console.log('   POST /api/skills/deactivate/:skillId');
 
 // ============================================
 // INICIAR SERVIDOR
