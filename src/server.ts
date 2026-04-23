@@ -2094,6 +2094,17 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     // Aprender del intercambio para mejorar respuestas futuras
     jarvisNativeModel.learn(message, response.message, response.confidence > 0.7, response.intent);
 
+    // 💾 Registrar en base de datos local (se committea cada 15 minutos)
+    await jarvisLocalDB.recordInteraction({
+      message,
+      response: response.message,
+      intent: response.intent,
+      confidence: response.confidence,
+      systemsUsed: response.systemsUsed || [],
+      responseTime: generationTime,
+      qualityScore: response.confidence
+    });
+
     // 🧠 Registrar respuesta en Context Memory
     contextMemoryHandler.processJarvisResponse(contextSessionId, response.message, response.intent);
 
@@ -6141,6 +6152,96 @@ process.on('SIGINT', async () => {
   console.log('SIGINT recibido, deteniendo servidor...');
   await jarvisLocalDB.cleanup();
   process.exit(0);
+});
+
+// ============================================
+// JARVIS LEARNING ENDPOINTS - Local Database
+// ============================================
+
+/**
+ * GET /api/jarvis/learning-stats
+ * View Jarvis learning statistics from local database
+ */
+app.get('/api/jarvis/learning-stats', async (req: Request, res: Response) => {
+  try {
+    const stats = await jarvisLocalDB.getStats();
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        timestamp: new Date().toISOString(),
+        database: '.jarvis-db/',
+        storage: 'Git repository'
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/jarvis/interactions
+ * View recent interactions (default: last 100)
+ */
+app.get('/api/jarvis/interactions', async (req: Request, res: Response) => {
+  try {
+    const count = parseInt(req.query.count as string) || 100;
+    const interactions = await jarvisLocalDB.getRecentInteractions(count);
+    res.json({
+      success: true,
+      data: {
+        count: interactions.length,
+        interactions,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/jarvis/knowledge
+ * View Jarvis knowledge base (concepts, relationships, skills)
+ */
+app.get('/api/jarvis/knowledge', async (req: Request, res: Response) => {
+  try {
+    const knowledge = await jarvisLocalDB.getKnowledge();
+    res.json({
+      success: true,
+      data: {
+        concepts_count: Object.keys(knowledge.concepts).length,
+        relationships_count: knowledge.relationships.length,
+        skills_count: Object.keys(knowledge.skills).length,
+        concepts: knowledge.concepts,
+        relationships: knowledge.relationships,
+        skills: knowledge.skills,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/jarvis/commit
+ * Manually trigger a commit of current learning state
+ */
+app.post('/api/jarvis/commit', async (req: Request, res: Response) => {
+  try {
+    const result = await jarvisLocalDB.commitToGit();
+    res.json({
+      success: true,
+      data: {
+        message: result,
+        timestamp: new Date().toISOString(),
+        repository: '.jarvis-db/'
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ============================================
