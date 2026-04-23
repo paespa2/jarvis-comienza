@@ -66,6 +66,9 @@ import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEng
 // ✅ FIREBASE KNOWLEDGE GRAPH
 import { firebaseServerService } from './services/firebaseServerService';
 
+// ✅ FIREBASE ADMIN SDK (Server-side operations)
+import { initializeFirebaseAdmin } from './services/firebaseAdminService';
+
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 
@@ -223,6 +226,14 @@ async function initializeJarvis() {
   console.log(`${'='.repeat(70)}\n`);
 
   orchestrator = new IntegrationOrchestrator();
+
+  // ✅ FIREBASE ADMIN: Initialize server-side Firebase operations
+  console.log(`\n🔐 Initializing Firebase Admin SDK...`);
+  try {
+    initializeFirebaseAdmin();
+  } catch (error: any) {
+    console.warn(`⚠️  Firebase Admin initialization not critical: ${error.message}`);
+  }
 
   // Inicializar integraciones existentes
   await orchestrator.initialize({
