@@ -5368,18 +5368,7 @@ app.post('/api/web/scraping-strategy', async (req: Request, res: Response) => {
 });
 
 /**
- * 404
- */
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint no encontrado',
-    path: req.path,
-  });
-});
-
-/**
- * ERROR HANDLER
+ * ERROR HANDLER (moved 404 handler to end)
  */
 app.use((err: any, req: Request, res: Response, next: any) => {
   console.error('Error:', err);
@@ -6135,6 +6124,17 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('SIGINT recibido, deteniendo servidor...');
   process.exit(0);
+});
+
+/**
+ * 404 Handler - MUST be last to catch all unmatched routes
+ */
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint no encontrado',
+    path: req.path,
+  });
 });
 
 startServer();
