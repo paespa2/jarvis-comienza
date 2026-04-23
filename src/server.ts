@@ -73,6 +73,9 @@ import { initializeFirebaseAdmin } from './services/firebaseAdminService';
 import { cloudSQLService } from './services/cloudSQLService';
 import { runMigrations } from './db/runMigrations';
 
+// ✅ FIREBASE FIRESTORE SERVICE: NoSQL for Jarvis data
+import { firebaseFirestoreService } from './services/firebaseFirestoreService';
+
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 
@@ -653,6 +656,29 @@ app.get('/api/health/cloud-sql', async (req: Request, res: Response) => {
       success: result.ok,
       status: result.ok ? 'connected' : 'disconnected',
       message: result.message,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      success: false,
+      status: 'error',
+      message: error.message,
+      timestamp: Date.now(),
+    });
+  }
+});
+
+/**
+ * HEALTH CHECK: Firebase Firestore
+ */
+app.get('/api/health/firestore', async (req: Request, res: Response) => {
+  try {
+    const result = await firebaseFirestoreService.testConnection();
+    res.json({
+      success: result.ok,
+      status: result.ok ? 'connected' : 'disconnected',
+      message: result.message,
+      databaseId: result.databaseId || 'N/A',
       timestamp: Date.now(),
     });
   } catch (error: any) {
