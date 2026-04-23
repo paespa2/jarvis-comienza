@@ -128,6 +128,9 @@ import { aiTrainingKnowledgeManager } from './core/knowledge/AITrainingKnowledge
 // ✅ JARVIS SELF-IMPROVEMENT: Autonomous evolution and optimization
 import { jarvisAutonomousSelfImprovementEngine } from './core/evolution/JarvisAutonomousSelfImprovementEngine';
 
+// ✅ JARVIS STATE PERSISTENCE: Durable state persistence across deployments
+import { jarvisStatePersistenceEngine } from './core/evolution/JarvisStatePersistenceEngine';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -298,6 +301,23 @@ async function initializeJarvis() {
   } else {
     console.log(`   ⚠️  Obsidian no disponible - modo offline\n`);
   }
+
+  // 💾 Initialize State Persistence Engine (CRITICAL for durability)
+  console.log(`💾 Initializing State Persistence Engine (PHASE 12)...`);
+  console.log(`   📍 Persistence Mode: DUAL (Local + GitHub)`);
+  console.log(`   📁 Local Files: ./jarvis-state.json, ./jarvis-evolution-history.json`);
+  console.log(`   🌐 GitHub Backup: jarvis-learning-repo/insights/`);
+
+  const currentState = jarvisStatePersistenceEngine.getCurrentState();
+  if (currentState) {
+    console.log(`   ✅ State Restored: v${currentState.version} (${(currentState.strengthScore * 100).toFixed(1)}%)`);
+    console.log(`   📊 Applied Optimizations: ${currentState.appliedOptimizations.length}`);
+  } else {
+    console.log(`   ✅ No previous state (fresh start)`);
+  }
+
+  const integrityOk = jarvisStatePersistenceEngine.verifyIntegrity();
+  console.log(`   🔐 Integrity Check: ${integrityOk ? '✅ OK' : '⚠️  Needs Verification'}\n`);
 
   console.log(`\n✅ Jarvis inicializado correctamente`);
   console.log(`📍 Escuchando en http://${HOST}:${PORT}`);
@@ -3896,7 +3916,7 @@ app.post('/api/evolution/apply-optimization', async (req: Request, res: Response
  * POST /api/evolution/complete-optimization
  * Completar optimización y medir mejora
  */
-app.post('/api/evolution/complete-optimization', (req: Request, res: Response) => {
+app.post('/api/evolution/complete-optimization', async (req: Request, res: Response) => {
   try {
     const { optimizationName, actualImprovement } = req.body;
 
@@ -3912,12 +3932,19 @@ app.post('/api/evolution/complete-optimization', (req: Request, res: Response) =
 
     const updatedReport = jarvisAutonomousSelfImprovementEngine.generateEvolutionReport();
 
+    // 💾 Save state snapshot after optimization
+    const snapshotSaved = await jarvisStatePersistenceEngine.saveSnapshot();
+
     res.json({
       success: true,
       data: {
         newVersion: updatedReport.currentVersion,
         newStrengthScore: `${(updatedReport.strengthScore * 100).toFixed(1)}%`,
-        totalGain: `+${(updatedReport.performanceGain * 100).toFixed(1)}%`
+        totalGain: `+${(updatedReport.performanceGain * 100).toFixed(1)}%`,
+        persistence: {
+          snapshotSaved: snapshotSaved,
+          status: snapshotSaved ? '✅ Estado persistido (Local + GitHub)' : '⚠️  Error en persistencia'
+        }
       },
       message: `Versión actualizada a ${updatedReport.currentVersion}`,
       timestamp: Date.now()
@@ -3935,9 +3962,20 @@ app.post('/api/evolution/save-progress', async (req: Request, res: Response) => 
   try {
     const saved = await jarvisAutonomousSelfImprovementEngine.saveEvolutionProgress();
 
+    // 💾 Also save state snapshot
+    const snapshotSaved = await jarvisStatePersistenceEngine.saveSnapshot();
+
     res.json({
-      success: saved,
-      message: saved ? 'Progreso de evolución guardado' : 'Error guardando',
+      success: saved && snapshotSaved,
+      data: {
+        evolutionSaved: saved,
+        statePersisted: snapshotSaved
+      },
+      message: saved && snapshotSaved
+        ? 'Progreso de evolución y estado guardados'
+        : saved
+        ? 'Progreso de evolución guardado (⚠️ error en persistencia)'
+        : 'Error guardando',
       timestamp: Date.now()
     });
   } catch (error: any) {
@@ -3955,6 +3993,115 @@ app.get('/api/evolution/full-report', (req: Request, res: Response) => {
     res.json({
       success: true,
       data: report,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// STATE PERSISTENCE ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/persistence/state
+ * Obtener estado actual persistido de Jarvis
+ */
+app.get('/api/persistence/state', (req: Request, res: Response) => {
+  try {
+    const currentState = jarvisStatePersistenceEngine.getCurrentState();
+    res.json({
+      success: true,
+      data: {
+        lastSnapshot: currentState,
+        status: currentState ? '✅ Estado persistido' : '⚠️  Sin estado previo',
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/persistence/history
+ * Obtener historial de evolución persistido
+ */
+app.get('/api/persistence/history', (req: Request, res: Response) => {
+  try {
+    const history = jarvisStatePersistenceEngine.getEvolutionHistory();
+    const timeline = jarvisStatePersistenceEngine.getEvolutionTimeline();
+    res.json({
+      success: true,
+      data: {
+        snapshots: history.snapshots.length,
+        totalOptimizations: history.totalOptimizations,
+        versionProgression: history.versionProgression,
+        strengthProgression: history.strengthProgression,
+        timeline: timeline,
+        status: '✅ Historial completo'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/persistence/durability-report
+ * Obtener reporte de durabilidad de estado
+ */
+app.get('/api/persistence/durability-report', (req: Request, res: Response) => {
+  try {
+    const report = jarvisStatePersistenceEngine.generateDurabilityReport();
+    res.json({
+      success: true,
+      data: {
+        report: report,
+        integrityVerified: jarvisStatePersistenceEngine.verifyIntegrity()
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/persistence/save-snapshot
+ * Guardar snapshot manual del estado actual
+ */
+app.post('/api/persistence/save-snapshot', async (req: Request, res: Response) => {
+  try {
+    const success = await jarvisStatePersistenceEngine.saveSnapshot();
+    res.json({
+      success: success,
+      data: {
+        snapshot: jarvisStatePersistenceEngine.getCurrentState(),
+        status: success ? '✅ Snapshot guardado' : '❌ Error guardando snapshot'
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/persistence/verify
+ * Verificar integridad del estado persistido
+ */
+app.get('/api/persistence/verify', (req: Request, res: Response) => {
+  try {
+    const isValid = jarvisStatePersistenceEngine.verifyIntegrity();
+    res.json({
+      success: true,
+      data: {
+        integrityValid: isValid,
+        status: isValid ? '✅ Integridad verificada' : '❌ Fallos en integridad'
+      },
       timestamp: Date.now()
     });
   } catch (error: any) {
