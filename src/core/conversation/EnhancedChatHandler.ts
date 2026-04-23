@@ -16,6 +16,8 @@ import { ResponseGenerator } from './ResponseGenerator';
 import { ResponseVariationEngine } from './ResponseVariation';
 import { AutoLearningEngine, InteractionRecord } from '../learning/AutoLearningEngine';
 import { JarvisAutoEvaluationEngine, PredictionResult } from '../learning/JarvisAutoEvaluationEngine';
+import { JarvisMultiClassEvaluationEngine } from '../learning/JarvisMultiClassEvaluationEngine';
+import { createComprehensiveAutoImprovementEngine } from '../learning/JarvisComprehensiveAutoImprovementEngine';
 
 export interface EnhancedChatResponse {
   message: string;
@@ -39,6 +41,8 @@ export class EnhancedChatHandler {
   private responseVariation: ResponseVariationEngine;
   private autoLearningEngine: AutoLearningEngine;
   private autoEvaluationEngine: JarvisAutoEvaluationEngine;
+  private multiClassEvaluationEngine: JarvisMultiClassEvaluationEngine;
+  private comprehensiveAutoImprovementEngine: any; // Comprehensive improvement orchestrator
 
   constructor() {
     this.conversationMemory = new ConversationMemory();
@@ -48,9 +52,20 @@ export class EnhancedChatHandler {
     this.responseVariation = new ResponseVariationEngine();
     this.autoLearningEngine = new AutoLearningEngine();
     this.autoEvaluationEngine = new JarvisAutoEvaluationEngine();
+    this.multiClassEvaluationEngine = new JarvisMultiClassEvaluationEngine();
+    this.comprehensiveAutoImprovementEngine = createComprehensiveAutoImprovementEngine(
+      this.autoEvaluationEngine,
+      this.multiClassEvaluationEngine
+    );
 
     console.log("✅ [EnhancedChatHandler] Initialized with all Phase 1 & 2 systems");
     console.log("✅ [EnhancedChatHandler] Auto-Evaluation Engine ready for self-assessment");
+    console.log("✅ [EnhancedChatHandler] Comprehensive Auto-Improvement Engine initialized");
+    console.log("   - Binary Classification Analysis: ✅");
+    console.log("   - Multi-Class Evaluation: ✅");
+    console.log("   - Problem Clustering Detection: ✅");
+    console.log("   - Improvement Path Prediction: ✅");
+    console.log("   - Deep Learning Feedback Loops: ✅");
   }
 
   /**
@@ -487,11 +502,27 @@ export class EnhancedChatHandler {
   }
 
   /**
+   * Get comprehensive auto-improvement plan
+   */
+  getComprehensiveImprovementPlan() {
+    return this.comprehensiveAutoImprovementEngine.performComprehensiveDiagnosis();
+  }
+
+  /**
+   * Print comprehensive improvement plan
+   */
+  printComprehensiveImprovementPlan(): void {
+    this.comprehensiveAutoImprovementEngine.printComprehensiveImprovementPlan();
+  }
+
+  /**
    * Stop learning engine on shutdown
    */
   shutdown(): void {
     this.autoLearningEngine.stop();
     this.printSelfDiagnosisReport();
+    console.log("\n📈 Generating Comprehensive Auto-Improvement Plan...");
+    this.printComprehensiveImprovementPlan();
     console.log("✅ [EnhancedChatHandler] Shutdown complete");
   }
 }
