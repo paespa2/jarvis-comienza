@@ -17,6 +17,7 @@ import { Express, Request, Response } from 'express';
 import { JarvisComprehensiveAutoImprovementEngine } from '../core/learning/JarvisComprehensiveAutoImprovementEngine';
 import { JarvisAutoEvaluationEngine } from '../core/learning/JarvisAutoEvaluationEngine';
 import { JarvisMultiClassEvaluationEngine } from '../core/learning/JarvisMultiClassEvaluationEngine';
+import { cloudSQLService } from '../services/cloudSQLService';
 import { firebaseServerService } from '../services/firebaseServerService';
 
 export function registerSelfImproveEndpoint(app: Express) {
@@ -32,13 +33,9 @@ export function registerSelfImproveEndpoint(app: Express) {
 
       console.log(`\n🚀 [Self-Improve] Starting daily analysis (last ${days} days)...`);
 
-      // 1. Fetch recent learnings from Firebase (available method)
-      console.log('📊 [Self-Improve] Fetching recent interactions...');
-      const learnings = await firebaseServerService.getHackerOneLearnings(100);
-
-      // Filter by days if needed
-      const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
-      const recentInteractions = learnings.filter(l => l.learnedAt > cutoffTime);
+      // 1. Fetch recent interactions from Cloud SQL
+      console.log('📊 [Self-Improve] Fetching recent interactions from Cloud SQL...');
+      const recentInteractions = await cloudSQLService.getRecentInteractions(days);
 
       if (recentInteractions.length === 0) {
         return res.json({
@@ -49,7 +46,7 @@ export function registerSelfImproveEndpoint(app: Express) {
         });
       }
 
-      console.log(`   Found ${recentInteractions.length} interactions`);
+      console.log(`   Found ${recentInteractions.length} interactions in last ${days} day(s)`);
 
       // 2. Run comprehensive diagnosis
       console.log('🧠 [Self-Improve] Running comprehensive diagnosis...');
@@ -76,16 +73,29 @@ export function registerSelfImproveEndpoint(app: Express) {
       const commitHash = await commitImprovements(appliedImprovements, diagnosis);
       console.log(`   Committed: ${commitHash}`);
 
-      // 6. Record improvement event
-      await firebaseServerService.saveDailyMetrics({
-        improvements: appliedImprovements.length,
-        commitHash,
-        strategies: improvements.map(s => ({
-          dimension: s.targetDimension,
-          priority: s.priority,
-          impact: s.expectedImpact
-        }))
+      // 6. Record improvement event in Cloud SQL
+      await cloudSQLService.saveDailyMetrics({
+        metricDate: new Date(),
+        binaryAccuracy: diagnosis.binaryMetrics?.accuracy,
+        multiClassQuality: diagnosis.multiClassMetrics?.quality,
+        multiClassRelevance: diagnosis.multiClassMetrics?.relevance,
+        multiClassCoherence: diagnosis.multiClassMetrics?.coherence,
+        multiClassCompleteness: diagnosis.multiClassMetrics?.completeness,
+        totalInteractions: recentInteractions.length
       });
+
+      // Record improvements in improvement history
+      for (const improvement of appliedImprovements) {
+        await cloudSQLService.recordImprovement({
+          commitHash,
+          type: improvement.type,
+          targetDimension: improvement.type,
+          priority: 3,
+          expectedImpact: 0.15,
+          files: improvement.files || [],
+          action: improvement.action
+        });
+      }
 
       const executionTime = Date.now() - startTime;
 

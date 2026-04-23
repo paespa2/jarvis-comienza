@@ -69,6 +69,10 @@ import { firebaseServerService } from './services/firebaseServerService';
 // ✅ FIREBASE ADMIN SDK (Server-side operations)
 import { initializeFirebaseAdmin } from './services/firebaseAdminService';
 
+// ✅ CLOUD SQL SERVICE: PostgreSQL for persistent knowledge graph
+import { cloudSQLService } from './services/cloudSQLService';
+import { runMigrations } from './db/runMigrations';
+
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 
@@ -239,6 +243,21 @@ async function initializeJarvis() {
     initializeFirebaseAdmin();
   } catch (error: any) {
     console.warn(`⚠️  Firebase Admin initialization not critical: ${error.message}`);
+  }
+
+  // ✅ CLOUD SQL: Initialize PostgreSQL database
+  console.log(`\n🗄️  Initializing Cloud SQL (PostgreSQL)...`);
+  try {
+    await runMigrations();
+    const connTest = await cloudSQLService.testConnection();
+    if (connTest.ok) {
+      console.log(`✅ Cloud SQL connected and ready`);
+    } else {
+      console.warn(`⚠️  Cloud SQL warning: ${connTest.message}`);
+    }
+  } catch (error: any) {
+    console.warn(`⚠️  Cloud SQL initialization not critical: ${error.message}`);
+    console.warn(`   Falling back to Firebase Realtime Database`);
   }
 
   // Inicializar integraciones existentes
