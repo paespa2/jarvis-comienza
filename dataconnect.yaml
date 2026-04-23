@@ -1,0 +1,386 @@
+specVersion: v1
+serviceId: asistente-jarvis-1741893602789-service
+location: us-east4
+displayName: Jarvis Knowledge Graph
+
+# GraphQL Schema for Jarvis Knowledge Base
+schema:
+  # ============================================
+  # NODE TYPES (Tipos de conceptos)
+  # ============================================
+
+  type NodeType {
+    id: String! @id
+    name: String!
+    description: String
+    createdAt: Time!
+  }
+
+  # ============================================
+  # RELATIONSHIP TYPES
+  # ============================================
+
+  type RelationshipType {
+    id: String! @id
+    name: String!
+    description: String
+    directed: Boolean
+    createdAt: Time!
+  }
+
+  # ============================================
+  # NODES (Instancias de conceptos)
+  # ============================================
+
+  type Node {
+    id: String! @id
+    nodeTypeId: String! @foreign(table: "node_types", column: "id")
+    externalId: String
+    label: String!
+    createdAt: Time!
+    properties: [NodeProperty!]! @back(field: "node")
+    outgoingEdges: [Edge!]! @back(field: "sourceNode")
+    incomingEdges: [Edge!]! @back(field: "targetNode")
+  }
+
+  # ============================================
+  # NODE PROPERTIES
+  # ============================================
+
+  type NodeProperty {
+    id: String! @id
+    nodeId: String! @foreign(table: "nodes", column: "id")
+    node: Node! @back(field: "properties")
+    propertyKey: String!
+    propertyValue: String!
+    createdAt: Time!
+  }
+
+  # ============================================
+  # EDGES (Relaciones)
+  # ============================================
+
+  type Edge {
+    id: String! @id
+    relationshipTypeId: String! @foreign(table: "relationship_types", column: "id")
+    sourceNodeId: String! @foreign(table: "nodes", column: "id")
+    targetNodeId: String! @foreign(table: "nodes", column: "id")
+    sourceNode: Node! @back(field: "outgoingEdges")
+    targetNode: Node! @back(field: "incomingEdges")
+    weight: Float
+    createdAt: Time!
+    properties: [EdgeProperty!]! @back(field: "edge")
+  }
+
+  # ============================================
+  # EDGE PROPERTIES
+  # ============================================
+
+  type EdgeProperty {
+    id: String! @id
+    edgeId: String! @foreign(table: "edges", column: "id")
+    edge: Edge! @back(field: "properties")
+    propertyKey: String!
+    propertyValue: String!
+    createdAt: Time!
+  }
+
+  # ============================================
+  # INTERACTIONS
+  # ============================================
+
+  type Interaction {
+    id: String! @id
+    sessionId: String!
+    userQuery: String!
+    jarvisResponse: String!
+    intent: String
+    emotion: String
+    confidence: Float
+    userSatisfaction: Float
+    executionTimeMs: Int
+    systemsUsed: String
+    createdAt: Time!
+  }
+
+  # ============================================
+  # IMPROVEMENTS
+  # ============================================
+
+  type Improvement {
+    id: String! @id
+    commitHash: String! @unique
+    improvementType: String
+    targetDimension: String
+    priority: Int
+    expectedImpact: Float
+    appliedAt: Time!
+    filesChanged: String
+    description: String
+  }
+
+  # ============================================
+  # DAILY METRICS
+  # ============================================
+
+  type DailyMetric {
+    id: String! @id
+    metricDate: Date! @unique
+    binaryAccuracy: Float
+    multiClassQuality: Float
+    multiClassRelevance: Float
+    multiClassCoherence: Float
+    multiClassCompleteness: Float
+    responseVariation: Float
+    contextRetention: Float
+    totalInteractions: Int
+    avgConfidence: Float
+    avgSatisfaction: Float
+    createdAt: Time!
+  }
+
+  # ============================================
+  # H1 LEARNINGS
+  # ============================================
+
+  type H1Learning {
+    id: String! @id
+    vulnerabilityType: String
+    technique: String
+    toolUsed: String
+    successRate: Float
+    severity: String
+    caseStudy: String
+    learnedAt: Time!
+    createdAt: Time!
+  }
+
+# Connectors (GraphQL Operations)
+connectors:
+  # ============================================
+  # NODE OPERATIONS
+  # ============================================
+
+  - name: CreateNode
+    action: MUTATE
+    query: |
+      mutation CreateNode(
+        $nodeTypeName: String!
+        $label: String!
+        $externalId: String
+      ) {
+        nodeInsert(input: {
+          node_type: $nodeTypeName
+          label: $label
+          external_id: $externalId
+        }) {
+          id
+          label
+          createdAt
+        }
+      }
+
+  - name: GetNodesByType
+    action: QUERY
+    query: |
+      query GetNodesByType($nodeTypeName: String!) {
+        nodeList(where: { node_type: { name: { equals: $nodeTypeName } } }) {
+          id
+          label
+          externalId
+          createdAt
+          properties {
+            propertyKey
+            propertyValue
+          }
+        }
+      }
+
+  # ============================================
+  # INTERACTION OPERATIONS
+  # ============================================
+
+  - name: RecordInteraction
+    action: MUTATE
+    query: |
+      mutation RecordInteraction(
+        $sessionId: String!
+        $userQuery: String!
+        $jarvisResponse: String!
+        $intent: String
+        $emotion: String
+        $confidence: Float
+        $userSatisfaction: Float
+        $systemsUsed: String
+      ) {
+        interactionInsert(input: {
+          session_id: $sessionId
+          user_query: $userQuery
+          jarvis_response: $jarvisResponse
+          intent: $intent
+          emotion: $emotion
+          confidence: $confidence
+          user_satisfaction: $userSatisfaction
+          systems_used: $systemsUsed
+        }) {
+          id
+          sessionId
+          createdAt
+        }
+      }
+
+  - name: GetRecentInteractions
+    action: QUERY
+    query: |
+      query GetRecentInteractions($days: Int = 1) {
+        interactionList(
+          where: {
+            createdAt: {
+              greaterThanOrEquals: "now - interval '$days days'"
+            }
+          }
+          orderBy: [{ createdAt: DESC }]
+          limit: 1000
+        ) {
+          id
+          sessionId
+          userQuery
+          jarvisResponse
+          intent
+          emotion
+          confidence
+          userSatisfaction
+          createdAt
+        }
+      }
+
+  # ============================================
+  # METRIC OPERATIONS
+  # ============================================
+
+  - name: SaveDailyMetrics
+    action: MUTATE
+    query: |
+      mutation SaveDailyMetrics(
+        $metricDate: Date!
+        $binaryAccuracy: Float
+        $multiClassQuality: Float
+        $multiClassRelevance: Float
+        $multiClassCoherence: Float
+        $multiClassCompleteness: Float
+        $totalInteractions: Int
+        $avgConfidence: Float
+        $avgSatisfaction: Float
+      ) {
+        dailyMetricUpsert(input: {
+          metric_date: $metricDate
+          binary_accuracy: $binaryAccuracy
+          multi_class_quality: $multiClassQuality
+          multi_class_relevance: $multiClassRelevance
+          multi_class_coherence: $multiClassCoherence
+          multi_class_completeness: $multiClassCompleteness
+          total_interactions: $totalInteractions
+          avg_confidence: $avgConfidence
+          avg_satisfaction: $avgSatisfaction
+        }) {
+          id
+          metricDate
+          createdAt
+        }
+      }
+
+  - name: GetMetricsTrend
+    action: QUERY
+    query: |
+      query GetMetricsTrend($days: Int = 30) {
+        dailyMetricList(
+          where: {
+            metricDate: {
+              greaterThanOrEquals: "today - interval '$days days'"
+            }
+          }
+          orderBy: [{ metricDate: DESC }]
+        ) {
+          id
+          metricDate
+          binaryAccuracy
+          multiClassQuality
+          multiClassRelevance
+          multiClassCoherence
+          multiClassCompleteness
+          totalInteractions
+        }
+      }
+
+  # ============================================
+  # IMPROVEMENT OPERATIONS
+  # ============================================
+
+  - name: RecordImprovement
+    action: MUTATE
+    query: |
+      mutation RecordImprovement(
+        $commitHash: String!
+        $improvementType: String
+        $targetDimension: String
+        $priority: Int
+        $expectedImpact: Float
+        $filesChanged: String
+        $description: String
+      ) {
+        improvementInsert(input: {
+          commit_hash: $commitHash
+          improvement_type: $improvementType
+          target_dimension: $targetDimension
+          priority: $priority
+          expected_impact: $expectedImpact
+          files_changed: $filesChanged
+          description: $description
+        }) {
+          id
+          commitHash
+          appliedAt
+        }
+      }
+
+  - name: GetImprovementHistory
+    action: QUERY
+    query: |
+      query GetImprovementHistory($limit: Int = 30) {
+        improvementList(
+          orderBy: [{ appliedAt: DESC }]
+          limit: $limit
+        ) {
+          id
+          commitHash
+          improvementType
+          targetDimension
+          priority
+          expectedImpact
+          appliedAt
+          description
+        }
+      }
+
+# Authorization Rules
+authorizationRules:
+  # Public read for knowledge graph (learning is public)
+  - name: PublicReadNodes
+    table: nodes
+    condition: "true"
+    role: public
+    operations: [READ]
+
+  # Authenticated write for interactions
+  - name: AuthenticatedInteractions
+    table: interactions
+    condition: "auth.uid != null"
+    role: authenticated
+    operations: [CREATE, READ]
+
+  # Admin-only improvements
+  - name: AdminImprovements
+    table: improvements
+    condition: "auth.customClaims.admin == true"
+    role: admin
+    operations: [CREATE, READ, UPDATE]
