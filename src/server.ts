@@ -97,6 +97,9 @@ import { adversarialSelfChallenge } from './core/adversarial/AdversarialSelfChal
 // ✅ CONVERSATIONAL INTERFACE: Natural language intent classification & routing
 import { conversationalInterface } from './core/conversation/ConversationalInterface';
 
+// ✅ ENHANCED CHAT HANDLER: Phase 1 & 2 integrated conversation system
+import { enhancedChatHandler } from './core/conversation/EnhancedChatHandler';
+
 // ✅ AUTONOMOUS WEB NAVIGATION: Browser automation with preview
 import { autonomousWebNavigator } from './autonomy/AutonomousWebNavigator';
 import { navigationCommandHandler } from './core/conversation/NavigationCommandHandler';
@@ -1968,8 +1971,8 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         navigationData: navigationResult
       };
     } else {
-      // 🧠 CONVERSACIÓN NORMAL
-      response = await conversationalInterface.process(message, sessionId);
+      // 🧠 CONVERSACIÓN MEJORADA (Phase 1 + 2 Integration)
+      response = await enhancedChatHandler.process(message, sessionId);
     }
 
     const generationTime = Date.now() - startTime;
