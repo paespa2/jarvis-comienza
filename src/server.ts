@@ -620,6 +620,52 @@ app.get('/api/status', (req: Request, res: Response) => {
 });
 
 /**
+ * HEALTH CHECK: Firebase SQL Connect
+ */
+app.get('/api/health/sql-connect', async (req: Request, res: Response) => {
+  try {
+    const { sqlConnectService } = await import('./services/sqlConnectService');
+    const result = await sqlConnectService.testConnection();
+    res.json({
+      success: result.ok,
+      status: result.ok ? 'connected' : 'disconnected',
+      message: result.message,
+      endpoint: result.ok ? sqlConnectService.config.endpoint : 'N/A',
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      success: false,
+      status: 'error',
+      message: error.message,
+      timestamp: Date.now(),
+    });
+  }
+});
+
+/**
+ * HEALTH CHECK: Cloud SQL PostgreSQL
+ */
+app.get('/api/health/cloud-sql', async (req: Request, res: Response) => {
+  try {
+    const result = await cloudSQLService.testConnection?.() || { ok: false, message: 'Service not available' };
+    res.json({
+      success: result.ok,
+      status: result.ok ? 'connected' : 'disconnected',
+      message: result.message,
+      timestamp: Date.now(),
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      success: false,
+      status: 'error',
+      message: error.message,
+      timestamp: Date.now(),
+    });
+  }
+});
+
+/**
  * CREAR TAREA
  */
 app.post('/api/tasks', async (req: Request, res: Response) => {
