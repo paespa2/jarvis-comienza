@@ -6030,9 +6030,15 @@ app.post('/api/self-improve', async (req: Request, res: Response) => {
 
     console.log(`\n🚀 [Self-Improve] Starting daily analysis (last ${days} days)...`);
 
-    // 1. Fetch recent interactions
+    // 1. Fetch recent interactions (try Cloud SQL, fallback to empty array)
     console.log('📊 [Self-Improve] Fetching recent interactions...');
-    const recentInteractions = await cloudSQLService.getRecentInteractions?.(days) || [];
+    let recentInteractions: any[] = [];
+    try {
+      recentInteractions = await cloudSQLService.getRecentInteractions?.(days) || [];
+    } catch (dbError) {
+      console.log('⚠️  [Self-Improve] Cloud SQL unavailable, proceeding with analysis');
+      // Fallback: continue analysis with empty interactions
+    }
 
     if (recentInteractions.length === 0) {
       console.log('⚠️  [Self-Improve] No interactions found to analyze');
