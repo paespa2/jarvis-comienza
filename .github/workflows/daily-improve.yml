@@ -76,7 +76,7 @@ jobs:
 
       - name: Save improvement results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: improvement-results-${{ steps.time.outputs.timestamp }}
           path: improvement_result.json
