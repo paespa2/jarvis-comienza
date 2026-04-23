@@ -79,6 +79,9 @@ import { jarvisWebIntelligence } from './core/web/JarvisWebIntelligence';
 // ✅ EVOLUTION ENGINE: Autonomous continuous learning & improvement
 import { evolutionEngine } from './core/evolution/EvolutionEngine';
 
+// ✅ JARVIS-GEMMA FUSION: Reprogrammed model with complete Jarvis identity
+import { jarvisGemmaFusion } from './core/models/JarvisGemmaFusion';
+
 // ✅ ADVANCED REASONING ENGINE: Multi-strategy reasoning & inference
 import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngine';
 
@@ -6092,6 +6095,149 @@ app.post('/api/jarvis/commit', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// JARVIS-GEMMA FUSION ENDPOINTS
+// ============================================
+
+/**
+ * POST /api/gemma/reason
+ * Main reasoning endpoint using JarvisGemmaFusion
+ * Uses Gemma reasoning + KIMI patterns + Jarvis identity
+ */
+app.post('/api/gemma/reason', async (req: Request, res: Response) => {
+  try {
+    const { query, context } = req.body;
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query required'
+      });
+    }
+
+    console.log(`\n🧠 [Gemma/Reason] Processing: "${query}"`);
+    const response = await jarvisGemmaFusion.reason(query, context);
+
+    res.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error(`❌ Gemma reasoning error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/gemma/identity
+ * Get Jarvis-Gemma fusion identity information
+ */
+app.get('/api/gemma/identity', (req: Request, res: Response) => {
+  try {
+    const identity = jarvisGemmaFusion.getIdentity();
+    res.json({
+      success: true,
+      data: {
+        identity,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/gemma/constitution
+ * Get the complete Jarvis constitution (values, constraints, permissions)
+ */
+app.get('/api/gemma/constitution', (req: Request, res: Response) => {
+  try {
+    const constitution = jarvisGemmaFusion.getConstitution();
+    res.json({
+      success: true,
+      data: {
+        constitution,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/gemma/capabilities
+ * Get all Jarvis-Gemma fusion capabilities
+ */
+app.get('/api/gemma/capabilities', (req: Request, res: Response) => {
+  try {
+    const capabilities = jarvisGemmaFusion.getCapabilities();
+    res.json({
+      success: true,
+      data: {
+        capabilities,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/gemma/complex-reasoning
+ * Advanced multi-step reasoning for complex problems
+ * Uses all KIMI patterns + Gemma architecture
+ */
+app.post('/api/gemma/complex-reasoning', async (req: Request, res: Response) => {
+  try {
+    const { problem, domain, constraints } = req.body;
+
+    if (!problem) {
+      return res.status(400).json({
+        success: false,
+        error: 'Problem required'
+      });
+    }
+
+    console.log(`\n🧠 [Gemma/ComplexReasoning] Domain: ${domain}, Problem: "${problem}"`);
+
+    // Use all patterns for complex reasoning
+    const context = { domain, constraints };
+    const response = await jarvisGemmaFusion.reason(problem, context);
+
+    res.json({
+      success: true,
+      data: {
+        ...response,
+        complexReasoning: true,
+        domain: domain,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Complex reasoning error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
