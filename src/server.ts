@@ -920,6 +920,17 @@ app.post('/api/qa/ask', async (req: Request, res: Response) => {
     const answer = await unifiedQAEngine.answer(query);
     const responseTime = Date.now() - startTime;
 
+    // 💾 Registrar en base de datos local
+    await jarvisLocalDB.recordInteraction({
+      message: query,
+      response: answer.answer,
+      intent: 'knowledge-question',
+      confidence: answer.confidence,
+      systemsUsed: ['UnifiedQAEngine'],
+      responseTime,
+      qualityScore: answer.confidence
+    });
+
     // Registrar en memoria
     obsidianMemory.registerAction({
       timestamp: new Date().toISOString(),
@@ -976,6 +987,17 @@ app.post('/api/qa/generate-code', async (req: Request, res: Response) => {
         error: 'Could not generate code for that request. Try: "Generate SQL injection test script" or "Create XSS payload tester"'
       });
     }
+
+    // 💾 Registrar en base de datos local
+    await jarvisLocalDB.recordInteraction({
+      message: query,
+      response: `Generated ${response.code.language} code`,
+      intent: 'code-generation',
+      confidence: response.confidence,
+      systemsUsed: ['CodeGenerator'],
+      responseTime,
+      qualityScore: response.confidence
+    });
 
     // Registrar en memoria
     obsidianMemory.registerImprovement(
