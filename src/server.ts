@@ -119,6 +119,9 @@ import { contextMemoryHandler } from './core/memory/ContextMemoryHandler';
 import { namedEntityRecognition } from './core/nlp/NamedEntityRecognition';
 import { entityTracker } from './core/nlp/EntityTracker';
 
+// ✅ ANTHROPIC KNOWLEDGE: Claude/Anthropic capability understanding
+import { anthropicKnowledgeManager } from './core/knowledge/AnthropicKnowledgeManager';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -3283,6 +3286,215 @@ app.get('/api/ner/status', (req: Request, res: Response) => {
           commonVulnerabilities: 20,
           technologyPatterns: 20
         }
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// ANTHROPIC KNOWLEDGE MANAGER ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/knowledge/anthropic/models
+ * Obtener lista de modelos Claude disponibles
+ */
+app.get('/api/knowledge/anthropic/models', (req: Request, res: Response) => {
+  try {
+    const models = anthropicKnowledgeManager.getAllModels();
+    res.json({
+      success: true,
+      data: {
+        models: models.map(m => ({
+          id: m.id,
+          name: m.name,
+          contextWindow: m.context_window,
+          maxTokens: m.max_tokens,
+          releaseDate: m.release_date,
+          strengths: m.strengths,
+          weaknesses: m.weaknesses,
+          recommendedFor: m.recommended_for
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/knowledge/anthropic/model-recommendation
+ * Obtener recomendación de modelo para una tarea
+ */
+app.post('/api/knowledge/anthropic/model-recommendation', (req: Request, res: Response) => {
+  try {
+    const { task } = req.body;
+    if (!task) {
+      return res.status(400).json({ success: false, error: 'task is required' });
+    }
+
+    const recommended = anthropicKnowledgeManager.getModelRecommendation(task);
+    res.json({
+      success: true,
+      data: {
+        task,
+        recommended: recommended ? {
+          id: recommended.id,
+          name: recommended.name,
+          contextWindow: recommended.context_window,
+          recommendedFor: recommended.recommended_for
+        } : null
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/anthropic/capabilities
+ * Obtener lista de capacidades de Claude
+ */
+app.get('/api/knowledge/anthropic/capabilities', (req: Request, res: Response) => {
+  try {
+    const capabilities = anthropicKnowledgeManager.getCapabilities();
+    res.json({
+      success: true,
+      data: {
+        capabilities: capabilities.map(c => ({
+          name: c.name,
+          description: c.description,
+          examples: c.examples,
+          limitations: c.limitations,
+          recommendedUseCases: c.recommended_use_cases,
+          confidence: c.confidence
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/anthropic/patterns
+ * Obtener patrones de prompt engineering
+ */
+app.get('/api/knowledge/anthropic/patterns', (req: Request, res: Response) => {
+  try {
+    const { category } = req.query;
+    let patterns;
+
+    if (category) {
+      patterns = anthropicKnowledgeManager.getPatternsByCategory(category as string);
+    } else {
+      patterns = Array.from(anthropicKnowledgeManager['knowledgeBase'].promptPatterns.values());
+    }
+
+    res.json({
+      success: true,
+      data: {
+        category: category || 'all',
+        patterns: patterns.map(p => ({
+          name: p.name,
+          category: p.category,
+          description: p.description,
+          example: p.example,
+          effectivenessScore: p.effectiveness_score,
+          useCases: p.use_cases
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/anthropic/best-practices
+ * Obtener best practices
+ */
+app.get('/api/knowledge/anthropic/best-practices', (req: Request, res: Response) => {
+  try {
+    const practices: Record<string, string> = {};
+    const allPractices = Array.from(anthropicKnowledgeManager['knowledgeBase'].bestPractices.entries());
+
+    for (const [topic, practice] of allPractices) {
+      practices[topic] = practice;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        bestPractices: practices
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/knowledge/anthropic/recommendations
+ * Obtener recomendaciones contextuales
+ */
+app.post('/api/knowledge/anthropic/recommendations', (req: Request, res: Response) => {
+  try {
+    const { task, budget, speed } = req.body;
+
+    const recommendations = anthropicKnowledgeManager.getContextualRecommendations({
+      task,
+      budget: budget || 'medium',
+      speed: speed || 'balanced'
+    });
+
+    res.json({
+      success: true,
+      data: {
+        context: { task, budget, speed },
+        recommendations
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/knowledge/anthropic/save-snapshot
+ * Guardar snapshot de conocimiento
+ */
+app.post('/api/knowledge/anthropic/save-snapshot', async (req: Request, res: Response) => {
+  try {
+    const saved = await anthropicKnowledgeManager.saveKnowledgeSnapshot();
+    res.json({
+      success: saved,
+      message: saved ? 'Snapshot guardado exitosamente' : 'Error guardando snapshot',
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/anthropic/report
+ * Obtener reporte completo de conocimiento
+ */
+app.get('/api/knowledge/anthropic/report', (req: Request, res: Response) => {
+  try {
+    const report = anthropicKnowledgeManager.generateKnowledgeReport();
+    res.json({
+      success: true,
+      data: {
+        report
       },
       timestamp: Date.now()
     });
