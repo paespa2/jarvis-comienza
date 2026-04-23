@@ -82,6 +82,9 @@ import { evolutionEngine } from './core/evolution/EvolutionEngine';
 // ✅ JARVIS-GEMMA FUSION: Reprogrammed model with complete Jarvis identity
 import { jarvisGemmaFusion } from './core/models/JarvisGemmaFusion';
 
+// ✅ JARVIS-KIMI K2.6 FUSION: Ultimate HackerOne hunting machine with 300-agent swarm
+import { jarvisKimiK26Fusion } from './core/models/JarvisKimiK26Fusion';
+
 // ✅ ADVANCED REASONING ENGINE: Multi-strategy reasoning & inference
 import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngine';
 
@@ -6234,6 +6237,219 @@ app.post('/api/gemma/complex-reasoning', async (req: Request, res: Response) => 
     });
   } catch (error: any) {
     console.error(`❌ Complex reasoning error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// JARVIS-KIMI K2.6 FUSION ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/kimi/identity
+ * Get Jarvis-Kimi K2.6 identity
+ */
+app.get('/api/kimi/identity', (req: Request, res: Response) => {
+  try {
+    const identity = jarvisKimiK26Fusion.getIdentity();
+    res.json({
+      success: true,
+      data: {
+        identity,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/kimi/constitution
+ * Get immutable HackerOne Constitution
+ */
+app.get('/api/kimi/constitution', (req: Request, res: Response) => {
+  try {
+    const constitution = jarvisKimiK26Fusion.getConstitution();
+    res.json({
+      success: true,
+      data: {
+        constitution,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/kimi/swarm-status
+ * Get status of 300-agent swarm
+ */
+app.get('/api/kimi/swarm-status', (req: Request, res: Response) => {
+  try {
+    const status = jarvisKimiK26Fusion.getSwarmStatus();
+    res.json({
+      success: true,
+      data: {
+        swarmStatus: status,
+        agents: `${status.active}/${status.agents} active`,
+        specializations: status.specializations,
+        vulnerabilitiesFound: status.foundVulnerabilities,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/kimi/start-autonomous-hunt
+ * Start 24/7 autonomous HackerOne hunting with full swarm
+ * NO RESTRICTIONS except target authorization
+ */
+app.post('/api/kimi/start-autonomous-hunt', async (req: Request, res: Response) => {
+  try {
+    const { programName, targets, autoBudget, autoSubmit, continuousMode } = req.body;
+
+    if (!programName || !targets || targets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "programName and targets required"
+      });
+    }
+
+    console.log(`\n🎯 [API] Starting autonomous hunt for: ${programName}`);
+
+    // Create program object
+    const program = {
+      name: programName,
+      targets: targets.map((t: any) => ({
+        url: t.url,
+        scope: t.scope || "web",
+        type: t.type || "web"
+      })),
+      activeUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      scopeVerified: true
+    };
+
+    const options = {
+      autoBudget: autoBudget || 100000,
+      autoSubmit: autoSubmit || true,
+      continuousMode: continuousMode || true
+    };
+
+    // START HUNTING (NO RESTRICTIONS)
+    const session = await jarvisKimiK26Fusion.startAutonomousHunt(program, options);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: session.sessionId,
+        program: programName,
+        targets: targets.length,
+        agents: 300,
+        status: "hunting",
+        message: "Jarvis Kimi K2.6 is now hunting 24/7 with full swarm",
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Hunt error: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/kimi/vision-recon
+ * Enhanced reconnaissance using vision processing
+ * Analyzes screenshots, diagrams, UI elements
+ */
+app.post('/api/kimi/vision-recon', async (req: Request, res: Response) => {
+  try {
+    const { targetUrl } = req.body;
+
+    if (!targetUrl) {
+      return res.status(400).json({
+        success: false,
+        error: "targetUrl required"
+      });
+    }
+
+    console.log(`\n👁️ [Vision] Analyzing ${targetUrl}...`);
+
+    const target = {
+      url: targetUrl,
+      scope: "web",
+      type: "web" as const
+    };
+
+    const analysis = await jarvisKimiK26Fusion.visionEnabledRecon(target);
+
+    res.json({
+      success: true,
+      data: {
+        target: targetUrl,
+        uiVulnerabilities: analysis.uiVulnerabilities,
+        suspiciousElements: analysis.suspiciousElements,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/kimi/auto-chain-exploits
+ * Automatically chain vulnerabilities into complete exploit chains
+ */
+app.post('/api/kimi/auto-chain-exploits', async (req: Request, res: Response) => {
+  try {
+    const { vulnerabilities } = req.body;
+
+    if (!vulnerabilities || vulnerabilities.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "vulnerabilities array required"
+      });
+    }
+
+    console.log(`\n⛓️ [AutoChain] Building exploit chain from ${vulnerabilities.length} vulns...`);
+
+    // Convert to vulnerability results
+    const vulnResults = vulnerabilities.map((v: any) => ({
+      type: v.type,
+      severity: v.severity,
+      confidence: v.confidence,
+      targetUrl: v.targetUrl,
+      proof: v.proof
+    }));
+
+    const chain = await jarvisKimiK26Fusion.autoGenerateExploitChain(vulnResults);
+
+    res.json({
+      success: true,
+      data: {
+        chain: chain,
+        steps: chain.steps.length,
+        estimatedImpact: chain.estimatedImpact,
+        automationLevel: chain.automationLevel,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
     res.status(500).json({
       success: false,
       error: error.message
