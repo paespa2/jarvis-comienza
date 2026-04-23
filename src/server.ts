@@ -6126,6 +6126,13 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+// ============================================
+// TEST ENDPOINT - Debug routing
+// ============================================
+app.post('/api/test-endpoint', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Test endpoint works!' });
+});
+
 /**
  * 404 Handler - MUST be last to catch all unmatched routes
  */
