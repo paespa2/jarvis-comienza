@@ -125,6 +125,9 @@ import { anthropicKnowledgeManager } from './core/knowledge/AnthropicKnowledgeMa
 // ✅ AI TRAINING KNOWLEDGE: Advanced AI architectures and optimization
 import { aiTrainingKnowledgeManager } from './core/knowledge/AITrainingKnowledgeManager';
 
+// ✅ JARVIS SELF-IMPROVEMENT: Autonomous evolution and optimization
+import { jarvisAutonomousSelfImprovementEngine } from './core/evolution/JarvisAutonomousSelfImprovementEngine';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -3719,6 +3722,239 @@ app.get('/api/knowledge/ai-training/report', (req: Request, res: Response) => {
     res.json({
       success: true,
       data: { report },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// JARVIS AUTONOMOUS SELF-IMPROVEMENT ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/evolution/status
+ * Obtener estado actual de evolución de Jarvis
+ */
+app.get('/api/evolution/status', (req: Request, res: Response) => {
+  try {
+    const report = jarvisAutonomousSelfImprovementEngine.generateEvolutionReport();
+    res.json({
+      success: true,
+      data: {
+        currentVersion: report.currentVersion,
+        strengthScore: `${(report.strengthScore * 100).toFixed(1)}%`,
+        totalWeaknesses: report.weaknesses.length,
+        criticalWeaknesses: report.weaknesses.filter(w => w.severity === 'critical').length,
+        nextSteps: report.nextEvolutionSteps.length,
+        appliedOptimizations: report.appliedOptimizations.length,
+        performanceGain: `+${(report.performanceGain * 100).toFixed(1)}%`
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/evolution/weaknesses
+ * Obtener debilidades identificadas
+ */
+app.get('/api/evolution/weaknesses', (req: Request, res: Response) => {
+  try {
+    const report = jarvisAutonomousSelfImprovementEngine.generateEvolutionReport();
+    res.json({
+      success: true,
+      data: {
+        weaknesses: report.weaknesses.map(w => ({
+          name: w.name,
+          description: w.description,
+          severity: w.severity,
+          affectedAreas: w.affectedAreas,
+          rootCause: w.rootCause,
+          suggestedOptimization: w.suggestedOptimization
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/evolution/improvement-plan
+ * Obtener plan detallado de mejora
+ */
+app.get('/api/evolution/improvement-plan', (req: Request, res: Response) => {
+  try {
+    const plan = jarvisAutonomousSelfImprovementEngine.generateDetailedImprovementPlan();
+    res.json({
+      success: true,
+      data: { plan },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/evolution/next-objective
+ * Obtener próximo objetivo de mejora
+ */
+app.get('/api/evolution/next-objective', (req: Request, res: Response) => {
+  try {
+    const objective = jarvisAutonomousSelfImprovementEngine.getNextEvolutionObjective();
+    res.json({
+      success: true,
+      data: { objective },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/evolution/register-metric
+ * Registrar métrica de desempeño
+ */
+app.post('/api/evolution/register-metric', (req: Request, res: Response) => {
+  try {
+    const { name, value, category } = req.body;
+
+    if (!name || value === undefined || !category) {
+      return res.status(400).json({
+        success: false,
+        error: 'name, value, and category are required'
+      });
+    }
+
+    jarvisAutonomousSelfImprovementEngine.registerPerformanceMetric(name, value, category);
+
+    res.json({
+      success: true,
+      message: 'Métrica registrada exitosamente',
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/evolution/propose-optimization
+ * Proponer siguiente optimización
+ */
+app.post('/api/evolution/propose-optimization', (req: Request, res: Response) => {
+  try {
+    const optimization = jarvisAutonomousSelfImprovementEngine.proposeOptimization();
+
+    res.json({
+      success: true,
+      data: optimization ? {
+        technique: optimization.technique,
+        expectedGain: `+${(optimization.expectedGain * 100).toFixed(1)}%`,
+        implementation: optimization.implementation
+      } : null,
+      message: optimization ? 'Optimización propuesta' : 'No hay optimizaciones pendientes',
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/evolution/apply-optimization
+ * Aplicar optimización propuesta
+ */
+app.post('/api/evolution/apply-optimization', async (req: Request, res: Response) => {
+  try {
+    const { optimizationName } = req.body;
+
+    if (!optimizationName) {
+      return res.status(400).json({ success: false, error: 'optimizationName is required' });
+    }
+
+    const applied = await jarvisAutonomousSelfImprovementEngine.applyOptimization(optimizationName);
+
+    res.json({
+      success: applied,
+      message: applied ? `Aplicando ${optimizationName}` : 'Error aplicando optimización',
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/evolution/complete-optimization
+ * Completar optimización y medir mejora
+ */
+app.post('/api/evolution/complete-optimization', (req: Request, res: Response) => {
+  try {
+    const { optimizationName, actualImprovement } = req.body;
+
+    if (!optimizationName || actualImprovement === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'optimizationName and actualImprovement are required'
+      });
+    }
+
+    jarvisAutonomousSelfImprovementEngine.completeOptimization(optimizationName, actualImprovement);
+    jarvisAutonomousSelfImprovementEngine.updateVersion();
+
+    const updatedReport = jarvisAutonomousSelfImprovementEngine.generateEvolutionReport();
+
+    res.json({
+      success: true,
+      data: {
+        newVersion: updatedReport.currentVersion,
+        newStrengthScore: `${(updatedReport.strengthScore * 100).toFixed(1)}%`,
+        totalGain: `+${(updatedReport.performanceGain * 100).toFixed(1)}%`
+      },
+      message: `Versión actualizada a ${updatedReport.currentVersion}`,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/evolution/save-progress
+ * Guardar progreso de evolución
+ */
+app.post('/api/evolution/save-progress', async (req: Request, res: Response) => {
+  try {
+    const saved = await jarvisAutonomousSelfImprovementEngine.saveEvolutionProgress();
+
+    res.json({
+      success: saved,
+      message: saved ? 'Progreso de evolución guardado' : 'Error guardando',
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/evolution/full-report
+ * Obtener reporte completo de evolución
+ */
+app.get('/api/evolution/full-report', (req: Request, res: Response) => {
+  try {
+    const report = jarvisAutonomousSelfImprovementEngine.generateEvolutionReport();
+    res.json({
+      success: true,
+      data: report,
       timestamp: Date.now()
     });
   } catch (error: any) {
