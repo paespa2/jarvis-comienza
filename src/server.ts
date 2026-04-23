@@ -122,6 +122,9 @@ import { entityTracker } from './core/nlp/EntityTracker';
 // ✅ ANTHROPIC KNOWLEDGE: Claude/Anthropic capability understanding
 import { anthropicKnowledgeManager } from './core/knowledge/AnthropicKnowledgeManager';
 
+// ✅ AI TRAINING KNOWLEDGE: Advanced AI architectures and optimization
+import { aiTrainingKnowledgeManager } from './core/knowledge/AITrainingKnowledgeManager';
+
 // ✅ FEDFSH AGGREGATION: Fisher-weighted expert knowledge synthesis
 import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
@@ -3496,6 +3499,226 @@ app.get('/api/knowledge/anthropic/report', (req: Request, res: Response) => {
       data: {
         report
       },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// AI TRAINING KNOWLEDGE MANAGER ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/knowledge/ai-training/moe-architectures
+ * Obtener arquitecturas Mixture of Experts
+ */
+app.get('/api/knowledge/ai-training/moe-architectures', (req: Request, res: Response) => {
+  try {
+    const architectures = aiTrainingKnowledgeManager.getAllMoEArchitectures();
+    res.json({
+      success: true,
+      data: {
+        architectures: architectures.map(a => ({
+          name: a.name,
+          description: a.description,
+          totalParameters: a.totalParameters,
+          activeParameters: a.activeParameters,
+          topK: a.topK,
+          advantages: a.advantages,
+          challenges: a.challenges,
+          loadBalancing: a.loadBalancing,
+          efficiencyGain: `${(a.efficiencyGain * 100).toFixed(0)}%`
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/ai-training/optimization-techniques
+ * Obtener técnicas de optimización
+ */
+app.get('/api/knowledge/ai-training/optimization-techniques', (req: Request, res: Response) => {
+  try {
+    const { category } = req.query;
+    let techniques;
+
+    if (category) {
+      techniques = aiTrainingKnowledgeManager.getOptimizationsByCategory(category as string);
+    } else {
+      techniques = Array.from(aiTrainingKnowledgeManager['optimizationTechniques'].values());
+    }
+
+    res.json({
+      success: true,
+      data: {
+        category: category || 'all',
+        techniques: techniques.map(t => ({
+          name: t.name,
+          category: t.category,
+          description: t.description,
+          mathematicalFormulation: t.mathematicalFormulation,
+          implementation: t.implementation,
+          benefits: t.benefits,
+          tradeoffs: t.tradeoffs,
+          applicableTo: t.applicableTo,
+          complexity: t.complexity
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/ai-training/advanced-models
+ * Obtener modelos avanzados
+ */
+app.get('/api/knowledge/ai-training/advanced-models', (req: Request, res: Response) => {
+  try {
+    const models = aiTrainingKnowledgeManager.getAllAdvancedModels();
+    res.json({
+      success: true,
+      data: {
+        models: models.map(m => ({
+          name: m.name,
+          creator: m.creator,
+          releaseDate: m.releaseDate,
+          parameters: m.parameters,
+          architecture: m.architecture,
+          capabilities: m.capabilities,
+          benchmarks: m.benchmarks,
+          specialization: m.specialization,
+          innovations: m.innovations
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/ai-training/training-strategies
+ * Obtener estrategias de entrenamiento
+ */
+app.get('/api/knowledge/ai-training/training-strategies', (req: Request, res: Response) => {
+  try {
+    const { stage } = req.query;
+    let strategies;
+
+    if (stage && ['pretraining', 'fine-tuning', 'alignment', 'deployment'].includes(stage as string)) {
+      strategies = aiTrainingKnowledgeManager.getStrategiesByStage(stage as any);
+    } else {
+      strategies = Array.from(aiTrainingKnowledgeManager['trainingStrategies'].values());
+    }
+
+    res.json({
+      success: true,
+      data: {
+        stage: stage || 'all',
+        strategies: strategies.map(s => ({
+          name: s.name,
+          stage: s.stage,
+          description: s.description,
+          methodology: s.methodology,
+          expectedOutcome: s.expectedOutcome,
+          metrics: s.metrics,
+          risks: s.risks,
+          bestPractices: s.bestPractices
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/knowledge/ai-training/architecture-recommendation
+ * Obtener recomendación de arquitectura
+ */
+app.post('/api/knowledge/ai-training/architecture-recommendation', (req: Request, res: Response) => {
+  try {
+    const { scalability, efficiency, reasoning } = req.body;
+
+    const recommended = aiTrainingKnowledgeManager.getArchitectureRecommendation({
+      scalability,
+      efficiency,
+      reasoning
+    });
+
+    res.json({
+      success: true,
+      data: {
+        requirements: { scalability, efficiency, reasoning },
+        recommended: recommended ? {
+          name: recommended.name,
+          description: recommended.description,
+          totalParameters: recommended.totalParameters,
+          activeParameters: recommended.activeParameters,
+          efficiencyGain: `${(recommended.efficiencyGain * 100).toFixed(0)}%`
+        } : null
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/ai-training/training-pipeline
+ * Obtener pipeline de entrenamiento completo
+ */
+app.get('/api/knowledge/ai-training/training-pipeline', (req: Request, res: Response) => {
+  try {
+    const pipeline = aiTrainingKnowledgeManager.generateTrainingPipeline();
+    res.json({
+      success: true,
+      data: { pipeline },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/knowledge/ai-training/save-knowledge
+ * Guardar conocimiento en repositorio
+ */
+app.post('/api/knowledge/ai-training/save-knowledge', async (req: Request, res: Response) => {
+  try {
+    const saved = await aiTrainingKnowledgeManager.saveTrainingKnowledge();
+    res.json({
+      success: saved,
+      message: saved ? 'Conocimiento de entrenamiento guardado' : 'Error guardando',
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/knowledge/ai-training/report
+ * Obtener reporte completo de conocimiento de IA
+ */
+app.get('/api/knowledge/ai-training/report', (req: Request, res: Response) => {
+  try {
+    const report = aiTrainingKnowledgeManager.generateKnowledgeReport();
+    res.json({
+      success: true,
+      data: { report },
       timestamp: Date.now()
     });
   } catch (error: any) {
