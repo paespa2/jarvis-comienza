@@ -162,6 +162,9 @@ import { fedFishAggregator } from './core/aggregation/FedFishAggregator';
 import { enhancedFedFishAggregator } from './core/aggregation/EnhancedFedFishAggregator';
 import { unanchoredCollaborationEngine } from './core/collaboration/UnanchoredCollaborationEngine';
 import { nonIIDMonitor } from './core/learning/NonIIDResilienceMonitor';
+import { JarvisAutoEvaluationEngine } from './core/learning/JarvisAutoEvaluationEngine';
+import { JarvisMultiClassEvaluationEngine } from './core/learning/JarvisMultiClassEvaluationEngine';
+import { JarvisComprehensiveAutoImprovementEngine } from './core/learning/JarvisComprehensiveAutoImprovementEngine';
 
 // ============================================
 // TIPOS
