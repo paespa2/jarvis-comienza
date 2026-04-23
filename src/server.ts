@@ -166,6 +166,9 @@ import { JarvisAutoEvaluationEngine } from './core/learning/JarvisAutoEvaluation
 import { JarvisMultiClassEvaluationEngine } from './core/learning/JarvisMultiClassEvaluationEngine';
 import { JarvisComprehensiveAutoImprovementEngine } from './core/learning/JarvisComprehensiveAutoImprovementEngine';
 
+// ✅ JARVIS LOCAL DATABASE: Git-based persistence with auto-commits
+import { jarvisLocalDB } from './services/JarvisLocalDB';
+
 // ============================================
 // TIPOS
 // ============================================
@@ -6078,8 +6081,7 @@ app.post('/api/self-improve', async (req: Request, res: Response) => {
         strategy: imp.strategy || imp.targetDimension,
         targetDimension: imp.targetDimension,
         priority: imp.priority,
-        expectedImpact: imp.expectedImpact,
-        description: imp.description || `Improve ${imp.targetDimension}`
+        expectedImpact: imp.expectedImpact
       })),
       diagnosis: {
         binaryAccuracy: diagnosis.binaryMetrics?.accuracy || 0,
@@ -6111,7 +6113,11 @@ console.log('✅ Self-Improve Endpoint registered: /api/self-improve');
 
 async function startServer() {
   try {
+    // Initialize Jarvis systems
     await initializeJarvis();
+
+    // Initialize Jarvis Local Database with auto-commit timer
+    await jarvisLocalDB.initialize();
 
     app.listen(PORT, HOST, () => {
       console.log(`✅ Servidor iniciado en http://${HOST}:${PORT}`);
@@ -6125,13 +6131,15 @@ async function startServer() {
 }
 
 // Manejar señales de terminación
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM recibido, deteniendo servidor...');
+  await jarvisLocalDB.cleanup();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('SIGINT recibido, deteniendo servidor...');
+  await jarvisLocalDB.cleanup();
   process.exit(0);
 });
 

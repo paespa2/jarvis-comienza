@@ -1,0 +1,12 @@
+{
+  "initialized_at": "2026-04-23T00:00:00Z",
+  "version": "1.0.0",
+  "total_interactions": 0,
+  "total_concepts": 0,
+  "total_improvements": 0,
+  "last_commit": null,
+  "last_commit_summary": "Database initialized",
+  "db_path": "./.jarvis-db",
+  "commit_interval_minutes": 15,
+  "auto_commit_enabled": true
+}

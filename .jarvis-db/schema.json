@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-04-23T00:00:00Z",
+  "description": "Jarvis Local Database Schema - Complete learning and knowledge persistence",
+  "structure": {
+    "interactions": {
+      "description": "Line-delimited JSON file with all interactions",
+      "format": "JSONL",
+      "fields": {
+        "timestamp": "ISO 8601 timestamp",
+        "id": "Unique interaction identifier",
+        "message": "User message",
+        "response": "Jarvis response",
+        "intent": "Classified intent",
+        "confidence": "Intent confidence score",
+        "systemsUsed": "Array of systems involved",
+        "responseTime": "Response time in ms",
+        "qualityScore": "Quality assessment 0-1"
+      }
+    },
+    "knowledge": {
+      "concepts.json": "Dictionary of concepts learned",
+      "relationships.json": "Array of concept relationships",
+      "skills.json": "Dictionary of skills and mastery levels",
+      "patterns.json": "Learned patterns and heuristics"
+    },
+    "improvements": {
+      "pending.json": "Improvements identified but not yet applied",
+      "applied.json": "Successfully applied improvements with results"
+    },
+    "metrics": {
+      "daily/": "Daily performance summaries",
+      "weekly/": "Weekly aggregates",
+      "lifetime.json": "Lifetime statistics"
+    },
+    "security-learnings": {
+      "h1_findings.json": "HackerOne security findings",
+      "cves.json": "CVE knowledge base",
+      "vulnerabilities.json": "Vulnerability patterns"
+    },
+    "domain-knowledge": {
+      "kali-techniques.json": "Kali Linux techniques",
+      "coding-patterns.json": "Code patterns learned",
+      "ethics.json": "Ethical considerations",
+      "security.json": "Security principles"
+    },
+    "decisions": {
+      "format": "Daily JSON files with major decisions"
+    },
+    "genome": {
+      "generations.json": "AI model generation history",
+      "current-genome.json": "Current model parameters",
+      "evaluations.json": "Evaluation results"
+    }
+  }
+}
