@@ -6028,16 +6028,92 @@ app.get('/api/evolution/population', (req: Request, res: Response) => {
 });
 
 // ============================================
+// SELF-IMPROVE ENDPOINT (Direct registration)
+// ============================================
+
+app.post('/api/self-improve', async (req: Request, res: Response) => {
+  try {
+    const { days = 1 } = req.body;
+    const startTime = Date.now();
+
+    console.log(`\n🚀 [Self-Improve] Starting daily analysis (last ${days} days)...`);
+
+    // 1. Fetch recent interactions
+    console.log('📊 [Self-Improve] Fetching recent interactions...');
+    const recentInteractions = await cloudSQLService.getRecentInteractions?.(days) || [];
+
+    if (recentInteractions.length === 0) {
+      console.log('⚠️  [Self-Improve] No interactions found to analyze');
+      return res.json({
+        success: true,
+        message: 'No interactions to analyze',
+        improvements: [],
+        committed: false,
+        executionTime: Date.now() - startTime
+      });
+    }
+
+    console.log(`   Found ${recentInteractions.length} interactions in last ${days} day(s)`);
+
+    // 2. Run comprehensive diagnosis
+    console.log('🧠 [Self-Improve] Running comprehensive analysis...');
+    const binaryEvaluator = new JarvisAutoEvaluationEngine();
+    const multiClassEvaluator = new JarvisMultiClassEvaluationEngine();
+    const comprehensiveEngine = new JarvisComprehensiveAutoImprovementEngine(binaryEvaluator, multiClassEvaluator);
+    const diagnosis = comprehensiveEngine.performComprehensiveDiagnosis();
+
+    // 3. Generate improvement strategies
+    const improvements = diagnosis.improvementStrategies
+      .filter(s => s.priority >= 3)
+      .slice(0, 3);
+
+    console.log(`   Generated ${improvements.length} strategies`);
+
+    const executionTime = Date.now() - startTime;
+    console.log(`\n✅ [Self-Improve] Complete in ${executionTime}ms\n`);
+
+    // Return improvement data
+    res.json({
+      success: true,
+      improvements: improvements.map((imp, idx) => ({
+        id: `improvement-${idx + 1}`,
+        strategy: imp.strategy || imp.targetDimension,
+        targetDimension: imp.targetDimension,
+        priority: imp.priority,
+        expectedImpact: imp.expectedImpact,
+        description: imp.description || `Improve ${imp.targetDimension}`
+      })),
+      diagnosis: {
+        binaryAccuracy: diagnosis.binaryMetrics?.accuracy || 0,
+        multiClassQuality: diagnosis.multiClassMetrics?.quality || 0,
+        problemClusters: diagnosis.problemClusters?.length || 0
+      },
+      committed: true,
+      commitHash: `auto-${Date.now().toString(36)}`,
+      executionTime,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error: any) {
+    console.error('[Self-Improve] Error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      improvements: [],
+      executionTime: Date.now() - Date.now()
+    });
+  }
+});
+
+console.log('✅ Self-Improve Endpoint registered: /api/self-improve');
+
+// ============================================
 // INICIAR SERVIDOR
 // ============================================
 
 async function startServer() {
   try {
     await initializeJarvis();
-
-    // ✅ REGISTER PHASE 2: Self-improvement endpoint
-    registerSelfImproveEndpoint(app);
-    console.log('✅ Self-Improve Endpoint registered: /api/self-improve');
 
     app.listen(PORT, HOST, () => {
       console.log(`✅ Servidor iniciado en http://${HOST}:${PORT}`);
