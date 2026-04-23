@@ -15,6 +15,7 @@ import { EmotionalIntelligenceEngine, EmotionalState } from './EmotionalIntellig
 import { ResponseGenerator } from './ResponseGenerator';
 import { ResponseVariationEngine } from './ResponseVariation';
 import { AutoLearningEngine, InteractionRecord } from '../learning/AutoLearningEngine';
+import { JarvisAutoEvaluationEngine, PredictionResult } from '../learning/JarvisAutoEvaluationEngine';
 
 export interface EnhancedChatResponse {
   message: string;
@@ -37,6 +38,7 @@ export class EnhancedChatHandler {
   private responseGenerator: ResponseGenerator;
   private responseVariation: ResponseVariationEngine;
   private autoLearningEngine: AutoLearningEngine;
+  private autoEvaluationEngine: JarvisAutoEvaluationEngine;
 
   constructor() {
     this.conversationMemory = new ConversationMemory();
@@ -45,8 +47,10 @@ export class EnhancedChatHandler {
     this.responseGenerator = new ResponseGenerator();
     this.responseVariation = new ResponseVariationEngine();
     this.autoLearningEngine = new AutoLearningEngine();
+    this.autoEvaluationEngine = new JarvisAutoEvaluationEngine();
 
     console.log("✅ [EnhancedChatHandler] Initialized with all Phase 1 & 2 systems");
+    console.log("✅ [EnhancedChatHandler] Auto-Evaluation Engine ready for self-assessment");
   }
 
   /**
@@ -312,7 +316,7 @@ export class EnhancedChatHandler {
   }
 
   /**
-   * Record interaction for auto-learning engine
+   * Record interaction for auto-learning engine and self-evaluation
    */
   private recordInteraction(
     userMessage: string,
@@ -333,6 +337,20 @@ export class EnhancedChatHandler {
     };
 
     this.autoLearningEngine.recordInteraction(record);
+
+    // Record for self-evaluation (binary classification: success=1, failure=0)
+    const evaluationRecord: PredictionResult = {
+      timestamp: Date.now(),
+      userQuery: userMessage,
+      jarvisResponse: response,
+      predictedClass: success ? 1 : 0,
+      actualClass: success ? 1 : 0, // Will be updated with user feedback
+      confidence: classification.confidence,
+      intent: classification.intent,
+      emotion: emotionAnalysis?.primaryEmotion || 'neutral'
+    };
+
+    this.autoEvaluationEngine.recordPrediction(evaluationRecord);
   }
 
   /**
@@ -441,10 +459,39 @@ export class EnhancedChatHandler {
   }
 
   /**
+   * Get self-diagnosis summary
+   */
+  getSelfDiagnosisSummary() {
+    return this.autoEvaluationEngine.getDiagnosisSummary();
+  }
+
+  /**
+   * Perform comprehensive self-evaluation
+   */
+  performSelfEvaluation() {
+    return this.autoEvaluationEngine.performSelfDiagnosis();
+  }
+
+  /**
+   * Print full self-diagnosis report
+   */
+  printSelfDiagnosisReport(): void {
+    this.autoEvaluationEngine.printSelfDiagnosisReport();
+  }
+
+  /**
+   * Analyze performance on specific intent
+   */
+  analyzeIntent(intent: string) {
+    return this.autoEvaluationEngine.analyzeIntent(intent);
+  }
+
+  /**
    * Stop learning engine on shutdown
    */
   shutdown(): void {
     this.autoLearningEngine.stop();
+    this.printSelfDiagnosisReport();
     console.log("✅ [EnhancedChatHandler] Shutdown complete");
   }
 }
