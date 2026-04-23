@@ -103,6 +103,12 @@ import { conversationalInterface } from './core/conversation/ConversationalInter
 // ✅ ENHANCED CHAT HANDLER: Phase 1 & 2 integrated conversation system
 import { enhancedChatHandler } from './core/conversation/EnhancedChatHandler';
 
+// ✅ ENHANCED CHAT HANDLER V2: Phase 2 advanced reasoning systems
+import { enhancedChatHandlerV2 } from './core/conversation/EnhancedChatHandlerV2';
+
+// ✅ SELF-IMPROVE ENDPOINT: Daily autonomous improvements via GitHub
+import { registerSelfImproveEndpoint } from './api/self-improve-endpoint';
+
 // ✅ AUTONOMOUS WEB NAVIGATION: Browser automation with preview
 import { autonomousWebNavigator } from './autonomy/AutonomousWebNavigator';
 import { navigationCommandHandler } from './core/conversation/NavigationCommandHandler';
@@ -5937,6 +5943,10 @@ app.get('/api/evolution/population', (req: Request, res: Response) => {
 async function startServer() {
   try {
     await initializeJarvis();
+
+    // ✅ REGISTER PHASE 2: Self-improvement endpoint
+    registerSelfImproveEndpoint(app);
+    console.log('✅ Self-Improve Endpoint registered: /api/self-improve');
 
     app.listen(PORT, HOST, () => {
       console.log(`✅ Servidor iniciado en http://${HOST}:${PORT}`);
