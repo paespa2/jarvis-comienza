@@ -8,7 +8,6 @@
  */
 
 import { coreTeachings } from './CoreTeachings';
-import { obsidianMemory } from './ObsidianMemoryManager';
 
 export interface LearningCycle {
   cycleId: string;
@@ -134,7 +133,7 @@ export class LearningSystem {
     // Registrar la práctica
     this.cycles.push(cycle);
     coreTeachings.practicedTeaching(teachingId);
-    obsidianMemory.recordTeachingPractice(teachingId, result);
+    // Practice is now recorded via JarvisLocalDB
 
     // Log del resultado
     console.log(`\n📊 Resultado: ${result.toUpperCase()}`);

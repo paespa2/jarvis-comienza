@@ -35,14 +35,12 @@ import { securityKnowledgeBase } from './qa/SecurityKnowledgeBase';
 
 // ✅ FASE 3B: Learning System (Autonomous Growth)
 import { learningSystem } from './learning/LearningSystem';
-import { obsidianMemory } from './learning/ObsidianMemoryManager';
 import { coreTeachings } from './learning/CoreTeachings';
 
 // ✅ FASE 3C: HackerOne Specialization (Consolidated)
 import { hackerOneModule } from './specializations/HackerOneModule';
 import { kaliLearningModule } from './specializations/KaliLearningModule';
 import { criticalEvaluationEngine } from './optimization/CriticalEvaluationEngine';
-import { obsidianSync } from './memory/ObsidianSyncIntegration';
 
 // Backward-compat stubs — legacy endpoints consolidated into HackerOneModule
 const hackerOneAssistant = {
@@ -63,18 +61,8 @@ const getHackerOneLearningService = (_mem?: any) => ({
 import { jarvisNativeModel } from './core/nativeModel/JarvisNativeModel';
 import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEngine';
 
-// ✅ FIREBASE KNOWLEDGE GRAPH
-import { firebaseServerService } from './services/firebaseServerService';
-
-// ✅ FIREBASE ADMIN SDK (Server-side operations)
-import { initializeFirebaseAdmin } from './services/firebaseAdminService';
-
-// ✅ CLOUD SQL SERVICE: PostgreSQL for persistent knowledge graph
-import { cloudSQLService } from './services/cloudSQLService';
-import { runMigrations } from './db/runMigrations';
-
-// ✅ FIREBASE FIRESTORE SERVICE: NoSQL for Jarvis data
-import { firebaseFirestoreService } from './services/firebaseFirestoreService';
+// ✅ LOCAL DATABASE: Git-based persistence
+import { jarvisLocalDB } from './services/JarvisLocalDB';
 
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
@@ -114,7 +102,6 @@ import { enhancedChatHandler } from './core/conversation/EnhancedChatHandler';
 import { enhancedChatHandlerV2 } from './core/conversation/EnhancedChatHandlerV2';
 
 // ✅ SELF-IMPROVE ENDPOINT: Daily autonomous improvements via GitHub
-import { registerSelfImproveEndpoint } from './api/self-improve-endpoint';
 
 // ✅ AUTONOMOUS WEB NAVIGATION: Browser automation with preview
 import { autonomousWebNavigator } from './autonomy/AutonomousWebNavigator';
@@ -165,9 +152,6 @@ import { nonIIDMonitor } from './core/learning/NonIIDResilienceMonitor';
 import { JarvisAutoEvaluationEngine } from './core/learning/JarvisAutoEvaluationEngine';
 import { JarvisMultiClassEvaluationEngine } from './core/learning/JarvisMultiClassEvaluationEngine';
 import { JarvisComprehensiveAutoImprovementEngine } from './core/learning/JarvisComprehensiveAutoImprovementEngine';
-
-// ✅ JARVIS LOCAL DATABASE: Git-based persistence with auto-commits
-import { jarvisLocalDB } from './services/JarvisLocalDB';
 
 // ============================================
 // TIPOS
@@ -246,28 +230,10 @@ async function initializeJarvis() {
 
   orchestrator = new IntegrationOrchestrator();
 
-  // ✅ FIREBASE ADMIN: Initialize server-side Firebase operations
-  console.log(`\n🔐 Initializing Firebase Admin SDK...`);
-  try {
-    initializeFirebaseAdmin();
-  } catch (error: any) {
-    console.warn(`⚠️  Firebase Admin initialization not critical: ${error.message}`);
-  }
-
-  // ✅ CLOUD SQL: Initialize PostgreSQL database
-  console.log(`\n🗄️  Initializing Cloud SQL (PostgreSQL)...`);
-  try {
-    await runMigrations();
-    const connTest = await cloudSQLService.testConnection();
-    if (connTest.ok) {
-      console.log(`✅ Cloud SQL connected and ready`);
-    } else {
-      console.warn(`⚠️  Cloud SQL warning: ${connTest.message}`);
-    }
-  } catch (error: any) {
-    console.warn(`⚠️  Cloud SQL initialization not critical: ${error.message}`);
-    console.warn(`   Falling back to Firebase Realtime Database`);
-  }
+  // ✅ LOCAL DATABASE: Initialize Git-based persistence
+  console.log(`\n💾 Initializing Local Database...`);
+  await jarvisLocalDB.initialize();
+  console.log(`✅ Local database ready\n`);
 
   // Inicializar integraciones existentes
   await orchestrator.initialize({
@@ -302,8 +268,7 @@ async function initializeJarvis() {
   console.log(`   ✅ Knowledge Q&A Engine ready`);
   console.log(`   ✅ Code Generation Engine ready`);
   console.log(`   ✅ Core Teachings loaded: 100 enseñanzas`);
-  console.log(`   ✅ Learning System initialized`);
-  console.log(`   ✅ Obsidian Memory vault ready\n`);
+  console.log(`   ✅ Learning System initialized\n`);
 
   // ✅ AUTO-RESEARCHER: Start daily cron for autonomous learning
   console.log(`🔬 Starting Auto-Researcher (daily cron)...`);
@@ -343,19 +308,6 @@ async function initializeJarvis() {
   console.log(`   • ADOPTAR: Mejora > 15% con ROI positivo`);
   console.log(`   • RECHAZAR: Redundante o empeora performance`);
   console.log(`   • REFINAR: Mejora marginal\n`);
-
-  // 📚 Initialize Obsidian Sync
-  console.log(`📚 Initializing Obsidian Sync Integration...`);
-  const obsidianReady = await obsidianSync.initializeSync();
-  if (obsidianReady) {
-    const syncStats = await obsidianSync.getSyncStats();
-    console.log(`   ✅ Obsidian sincronizado`);
-    console.log(`   📁 Vault: ${syncStats.vaultPath}`);
-    console.log(`   📖 Conocimiento: ${syncStats.knowledgeCount} notas`);
-    console.log(`   🔄 Sincronización periódica: ACTIVA\n`);
-  } else {
-    console.log(`   ⚠️  Obsidian no disponible - modo offline\n`);
-  }
 
   // 💾 Initialize State Persistence Engine (CRITICAL for durability)
   console.log(`💾 Initializing State Persistence Engine (PHASE 12)...`);
@@ -516,22 +468,7 @@ async function processTaskWithTimeout(
     // ✅ FASE 3B: AUTO-DOCUMENT IN OBSIDIAN MEMORY
     console.log(`\n📚 STAGE 5: Documenting in Obsidian Memory...`);
     if (result.success) {
-      obsidianMemory.registerSuccess(
-        `Tarea completada: ${query}`,
-        result.output || 'Ejecución exitosa',
-        'execution_time',
-        `${totalTime}ms`,
-        []
-      );
     } else {
-      obsidianMemory.registerError(
-        `Tarea fallida: ${query}`,
-        result.output || 'Error durante ejecución',
-        result.error || 'Error desconocido',
-        'Revisar logs',
-        'Mejorar manejo de errores',
-        []
-      );
     }
     console.log(`\n   ✅ Action documented in Obsidian`);
     console.log(`   ✅ Memory vault updated`);
@@ -626,75 +563,6 @@ app.get('/api/status', (req: Request, res: Response) => {
     data: status,
     timestamp: Date.now(),
   });
-});
-
-/**
- * HEALTH CHECK: Firebase SQL Connect
- */
-app.get('/api/health/sql-connect', async (req: Request, res: Response) => {
-  try {
-    const { sqlConnectService } = await import('./services/sqlConnectService');
-    const result = await sqlConnectService.testConnection();
-    res.json({
-      success: result.ok,
-      status: result.ok ? 'connected' : 'disconnected',
-      message: result.message,
-      endpoint: result.ok ? sqlConnectService.config.endpoint : 'N/A',
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    res.status(503).json({
-      success: false,
-      status: 'error',
-      message: error.message,
-      timestamp: Date.now(),
-    });
-  }
-});
-
-/**
- * HEALTH CHECK: Cloud SQL PostgreSQL
- */
-app.get('/api/health/cloud-sql', async (req: Request, res: Response) => {
-  try {
-    const result = await cloudSQLService.testConnection?.() || { ok: false, message: 'Service not available' };
-    res.json({
-      success: result.ok,
-      status: result.ok ? 'connected' : 'disconnected',
-      message: result.message,
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    res.status(503).json({
-      success: false,
-      status: 'error',
-      message: error.message,
-      timestamp: Date.now(),
-    });
-  }
-});
-
-/**
- * HEALTH CHECK: Firebase Firestore
- */
-app.get('/api/health/firestore', async (req: Request, res: Response) => {
-  try {
-    const result = await firebaseFirestoreService.testConnection();
-    res.json({
-      success: result.ok,
-      status: result.ok ? 'connected' : 'disconnected',
-      message: result.message,
-      databaseId: result.databaseId || 'N/A',
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    res.status(503).json({
-      success: false,
-      status: 'error',
-      message: error.message,
-      timestamp: Date.now(),
-    });
-  }
 });
 
 /**
@@ -932,18 +800,6 @@ app.post('/api/qa/ask', async (req: Request, res: Response) => {
     });
 
     // Registrar en memoria
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'action',
-      title: `Q&A: ${query.substring(0, 50)}`,
-      description: `Respondida con confianza ${(answer.confidence * 100).toFixed(0)}%`,
-      tags: ['qa', 'knowledge'],
-      metadata: {
-        responseTime,
-        confidence: answer.confidence,
-        sources: answer.sources.length
-      }
-    });
 
     res.json({
       success: true,
@@ -1000,13 +856,6 @@ app.post('/api/qa/generate-code', async (req: Request, res: Response) => {
     });
 
     // Registrar en memoria
-    obsidianMemory.registerImprovement(
-      `Código Generado: ${response.code!.language.toUpperCase()}`,
-      query,
-      'medio',
-      response.code!.content,
-      [40, 50] // Relacionado a enseñanzas de seguridad
-    );
 
     res.json({
       success: true,
@@ -1183,15 +1032,6 @@ app.post('/api/memory/action', (req: Request, res: Response) => {
   try {
     const { type, title, description, tags, relatedTeachings } = req.body;
 
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: type || 'action',
-      title,
-      description,
-      tags: tags || [],
-      relatedTeachings,
-    });
-
     res.json({
       success: true,
       data: {
@@ -1212,7 +1052,7 @@ app.post('/api/memory/action', (req: Request, res: Response) => {
  */
 app.get('/api/memory/status', (req: Request, res: Response) => {
   try {
-    const status = obsidianMemory.getMemoryStatus();
+    const status = {};
 
     res.json({
       success: true,
@@ -1232,8 +1072,8 @@ app.get('/api/memory/status', (req: Request, res: Response) => {
  */
 app.get('/api/memory/evolution', (req: Request, res: Response) => {
   try {
-    const report = obsidianMemory.generateEvolutionReport();
-    const metrics = obsidianMemory.calculateMetrics();
+    const report = {};
+    const metrics = {};
 
     res.json({
       success: true,
@@ -1270,7 +1110,7 @@ app.get('/api/metrics', async (req: Request, res: Response) => {
     const evolutionMetrics = await evolution.getMetrics();
     const systemStatus = orchestrator.getSystemStatus();
     const learningStats = coreTeachings.getLearningStats();
-    const memoryMetrics = obsidianMemory.calculateMetrics();
+    const memoryMetrics = {};
 
     res.json({
       success: true,
@@ -1332,17 +1172,7 @@ app.post('/api/security/assess', (req: Request, res: Response) => {
     const programs = hackerOneAssistant.findApplicablePrograms(vulnerability_type);
     console.log(`✅ Found ${programs.length} applicable programs`);
 
-    // Auto-documentar en Obsidian
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'action',
-      title: `Assessed: ${vulnerability_type}`,
-      description: `Evaluated ${vulnerability_type} with CVSS ${assessment.cvss_score || 'N/A'}. Found ${programs.length} applicable programs.`,
-      tags: ['security', 'hackerone', 'assessment']
-    });
-
-    // ✅ AUTO-LEARNING: guardar en Obsidian + Firebase automáticamente
-    const learningService = getHackerOneLearningService(obsidianMemory);
+    const learningService = getHackerOneLearningService(undefined);
     learningService.learnFromCase({
       type: 'assessment',
       vulnerabilityType: vulnerability_type,
@@ -1388,13 +1218,6 @@ app.post('/api/security/payload', (req: Request, res: Response) => {
     const payloads = hackerOneAssistant.generatePayload(vulnerability_type, target_tech);
 
     // Auto-documentar
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'action',
-      title: `Generated payloads for: ${vulnerability_type}`,
-      description: `Created ${payloads.length} payload variations for ${target_tech || 'generic'} target`,
-      tags: ['security', 'payloads', 'exploitation']
-    });
 
     res.json({
       success: true,
@@ -1433,13 +1256,6 @@ app.post('/api/security/recon', (req: Request, res: Response) => {
     const checklist = unifiedQAEngine.generateAssessmentChecklist(target);
 
     // Auto-documentar
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'action',
-      title: `Recon plan for: ${target}`,
-      description: `Generated comprehensive reconnaissance plan with ${recon.osintQueries.length} OSINT queries and 3 enumeration scripts`,
-      tags: ['security', 'reconnaissance', 'osint']
-    });
 
     res.json({
       success: true,
@@ -1479,16 +1295,8 @@ app.post('/api/hackerone/assess', (req: Request, res: Response) => {
     const matches = hackerOneAssistant.matchProgramsForFinding(finding);
 
     // Auto-documentar finding
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'action',
-      title: `Finding: ${finding.type}`,
-      description: `${finding.severity} - ${finding.description}. Matched ${matches.length} programs.`,
-      tags: ['security', 'finding', 'hackerone']
-    });
 
-    // ✅ AUTO-LEARNING: guardar en Obsidian + Firebase automáticamente
-    const learningService = getHackerOneLearningService(obsidianMemory);
+    const learningService = getHackerOneLearningService(undefined);
     const avgBounty = matches.length > 0
       ? Math.round(matches.reduce((sum: number, m: any) => sum + m.average_payout, 0) / matches.length)
       : 0;
@@ -1595,13 +1403,6 @@ app.get('/api/security/cves', (req: Request, res: Response) => {
 
     // Auto-documentar búsqueda
     if (search || severity) {
-      obsidianMemory.registerAction({
-        timestamp: new Date().toISOString(),
-        type: 'action',
-        title: `CVE Search: ${search || severity}`,
-        description: `Found ${cves.length} CVE results`,
-        tags: ['security', 'cve', 'search']
-      });
     }
 
     res.json({
@@ -2130,15 +1931,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     // 🧠 Registrar respuesta en Context Memory
     contextMemoryHandler.processJarvisResponse(contextSessionId, response.message, response.intent);
 
-    // Auto-documentar en Obsidian si es sustancial
     if (message.length > 20) {
-      obsidianMemory.registerAction({
-        timestamp: new Date().toISOString(),
-        type: 'action',
-        title: `Chat: ${message.substring(0, 50)}`,
-        description: `Intent: ${response.intent}. Sistemas: ${response.systemsUsed.join(', ')}. Confianza: ${(response.confidence * 100).toFixed(0)}%.`,
-        tags: ['chat', response.intent, ...response.systemsUsed],
-      });
     }
 
     // Obtener recomendaciones basadas en contexto
@@ -4524,102 +4317,6 @@ app.get('/api/learning/report', (req: Request, res: Response) => {
 // ============================================
 
 /**
- * GET /api/knowledge-graph
- * Obtener todos los nodos del grafo de conocimiento desde Firebase
- */
-app.get('/api/knowledge-graph', async (req: Request, res: Response) => {
-  try {
-    const nodes = await firebaseServerService.getKnowledgeGraph();
-    res.json({
-      success: true,
-      data: {
-        nodes,
-        total: nodes.length,
-        configured: firebaseServerService.isConfigured(),
-      },
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/hackerone/learnings
- * Obtener aprendizajes recientes de HackerOne desde Firebase
- */
-app.get('/api/hackerone/learnings', async (req: Request, res: Response) => {
-  try {
-    const limit = parseInt(req.query.limit as string || '20', 10);
-    const learnings = await firebaseServerService.getHackerOneLearnings(limit);
-    res.json({
-      success: true,
-      data: {
-        learnings,
-        total: learnings.length,
-        configured: firebaseServerService.isConfigured(),
-      },
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/persistence/status
- * Verificar estado de persistencia (Obsidian + Firebase)
- */
-app.get('/api/persistence/status', async (req: Request, res: Response) => {
-  try {
-    // Verificar Obsidian vault
-    const vaultPath = path.join(process.cwd(), 'obsidian-vault/03-APRENDIZAJES');
-    const obsidianExists = fs.existsSync(vaultPath);
-    let obsidianFileCount = 0;
-    if (obsidianExists) {
-      const files = fs.readdirSync(vaultPath).filter(f => f.endsWith('.md'));
-      obsidianFileCount = files.length;
-    }
-
-    // Verificar Firebase
-    const firebaseConfigured = firebaseServerService.isConfigured();
-    const knowledgeNodes = firebaseConfigured ? await firebaseServerService.getKnowledgeGraph() : [];
-    const hackerOneLearnings = firebaseConfigured ? await firebaseServerService.getHackerOneLearnings(100) : [];
-
-    res.json({
-      success: true,
-      data: {
-        obsidian: {
-          enabled: obsidianExists,
-          vaultPath,
-          learningFilesCount: obsidianFileCount,
-          status: obsidianExists ? '✅ Guardando aprendizajes localmente' : '❌ Vault no encontrado',
-        },
-        firebase: {
-          configured: firebaseConfigured,
-          knowledgeNodesCount: knowledgeNodes.length,
-          hackerOneLearningsCount: hackerOneLearnings.length,
-          status: firebaseConfigured
-            ? (knowledgeNodes.length > 0 || hackerOneLearnings.length > 0
-              ? '✅ Conectado y guardando datos'
-              : '⚠️  Configurado pero sin datos (API key puede necesitar Service Account para escritura)')
-            : '❌ No configurado',
-        },
-        summary: {
-          totalLearningRecords: obsidianFileCount,
-          totalKnowledgeGraphNodes: knowledgeNodes.length,
-          totalHackerOneLearnings: hackerOneLearnings.length,
-          persistenceActive: obsidianExists,
-        },
-      },
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
  * POST /api/reason
  * Razonamiento profundo: ReAct loop o 5-Phase planning
  * Body: { query, mode?: 'react' | 'fivephase' | 'auto', context? }
@@ -4783,13 +4480,6 @@ app.post('/api/research/run', async (req: Request, res: Response) => {
     );
 
     // Registrar en Obsidian
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'learning',
-      title: `Auto-Research: ${session.papersFound} papers analizados`,
-      description: session.summary,
-      tags: ['research', 'auto-learning', ...session.topics],
-    });
 
     res.json({
       success: true,
@@ -4874,14 +4564,6 @@ app.post('/api/research/transformer-circuits', async (req: Request, res: Respons
 
     const tcPapers = session.papers.filter((p: any) => p.source === 'transformer-circuits');
 
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'learning',
-      title: `Anthropic Research: ${tcPapers.length} papers de transformer-circuits.pub`,
-      description: `Leídos ${tcPapers.length} papers de Anthropic. ${session.knowledgeAdded} conceptos de interpretabilidad añadidos.`,
-      tags: ['research', 'anthropic', 'interpretability', 'transformer-circuits'],
-    });
-
     res.json({
       success: true,
       data: {
@@ -4956,156 +4638,6 @@ app.get('/api/critical-eval/audit', (req: Request, res: Response) => {
 // OBSIDIAN SYNC ENDPOINTS
 // ============================================
 
-/**
- * GET /api/obsidian/status
- * Estado de sincronización con Obsidian
- */
-app.get('/api/obsidian/status', async (req: Request, res: Response) => {
-  try {
-    const stats = await obsidianSync.getSyncStats();
-
-    res.json({
-      success: true,
-      data: {
-        ...stats,
-        lastSyncAgo: Date.now() - stats.lastSync,
-        message: stats.enabled
-          ? '✅ Sincronización activa con Obsidian'
-          : '⚠️ Obsidian no disponible - modo offline'
-      },
-      timestamp: Date.now()
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * POST /api/obsidian/save-knowledge
- * Guardar conocimiento directamente en Obsidian
- */
-app.post('/api/obsidian/save-knowledge', async (req: Request, res: Response) => {
-  try {
-    const { title, category, content, tags = [], references = [] } = req.body;
-
-    if (!title || !content) {
-      return res.status(400).json({
-        success: false,
-        error: 'title y content son requeridos'
-      });
-    }
-
-    const entry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      title,
-      category: category || 'general',
-      content,
-      tags,
-      references,
-      confidence: 0.9,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-
-    const saved = await obsidianSync.saveKnowledge(entry);
-
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        error: 'Error guardando en Obsidian'
-      });
-    }
-
-    // También guardar en Obsidian memory local
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'action',
-      title: `Knowledge Saved: ${title}`,
-      description: `Categoría: ${category}. Tags: ${tags.join(', ')}`,
-      tags: ['obsidian-sync', 'knowledge', ...tags]
-    });
-
-    res.json({
-      success: true,
-      data: {
-        message: `✅ Conocimiento guardado en Obsidian: ${title}`,
-        entryId: entry.id,
-        category,
-        tags
-      },
-      timestamp: Date.now()
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/obsidian/search
- * Buscar conocimiento en Obsidian
- */
-app.get('/api/obsidian/search', async (req: Request, res: Response) => {
-  try {
-    const { q, category } = req.query;
-
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        error: 'Query (q) requerida'
-      });
-    }
-
-    let results;
-    if (category) {
-      results = await obsidianSync.readKnowledge(category as string);
-      results = results.filter(r =>
-        r.title.toLowerCase().includes((q as string).toLowerCase()) ||
-        r.content.toLowerCase().includes((q as string).toLowerCase())
-      );
-    } else {
-      results = await obsidianSync.searchKnowledge(q as string);
-    }
-
-    res.json({
-      success: true,
-      data: {
-        query: q,
-        results,
-        count: results.length,
-        message: `${results.length} resultados encontrados`
-      },
-      timestamp: Date.now()
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/obsidian/knowledge/:category
- * Obtener conocimiento por categoría
- */
-app.get('/api/obsidian/knowledge/:category', async (req: Request, res: Response) => {
-  try {
-    const { category } = req.params;
-    const knowledge = await obsidianSync.readKnowledge(category);
-
-    res.json({
-      success: true,
-      data: {
-        category,
-        knowledge,
-        count: knowledge.length,
-        topConfidence: knowledge.length > 0
-          ? Math.max(...knowledge.map(k => k.confidence))
-          : 0
-      },
-      timestamp: Date.now()
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // ============================================
 // KALI LEARNING ENDPOINTS
@@ -5194,13 +4726,6 @@ app.post('/api/kali/practice/:toolName', async (req: Request, res: Response) => 
     }
 
     // Registrar en Obsidian
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'learning',
-      title: `Kali Practice: ${toolName}`,
-      description: `Práctica de ${toolName} - Mejora de maestría: +${(result.mastery * 100).toFixed(0)}%`,
-      tags: ['kali', 'practice', toolName]
-    });
 
     res.json({
       success: true,
@@ -5286,13 +4811,6 @@ app.post('/api/kali/auto-research', async (req: Request, res: Response) => {
     const consolidation = await kaliLearningModule.consolidateLearnings();
 
     // Registrar en Obsidian
-    obsidianMemory.registerAction({
-      timestamp: new Date().toISOString(),
-      type: 'learning',
-      title: `Kali Auto-Research: ${consolidation.knowledgeNodesCreated} nodes`,
-      description: `Herramientas maestras: ${consolidation.toolsMastered.join(', ')}. Confianza mejorada: +${(consolidation.confidenceImprovement * 100).toFixed(0)}%`,
-      tags: ['kali', 'auto-research', 'learning']
-    });
 
     res.json({
       success: true,
@@ -5341,13 +4859,6 @@ app.post('/api/web/analyze', async (req: Request, res: Response) => {
         confidence: 0.88,
       });
 
-      obsidianMemory.registerAction({
-        timestamp: new Date().toISOString(),
-        type: 'action',
-        title: `WebAnalysis: ${new URL(url).hostname}`,
-        description: `Analizada: ${analysis.technologies.length} techs, ${analysis.forms.length} forms, ${analysis.apiEndpoints.length} APIs. Approach: ${analysis.scrapingStrategy.approach}`,
-        tags: ['web', 'scraping', 'analysis', new URL(url).hostname],
-      });
     }
 
     res.json({

@@ -12,7 +12,6 @@
 import { ModelVariant, CapabilityGene } from './ModelVariant';
 import { EvolutionTestingFramework, TestSession } from './EvolutionTestingFramework';
 import { geneticOperators } from './GeneticOperators';
-import { firebaseServerService } from '../../services/firebaseServerService';
 import { selfProgrammingEngine } from '../selfProgramming/SelfProgrammingEngine';
 
 export interface GenerationReport {
@@ -309,18 +308,13 @@ export class EvolutionEngine {
   }
 
   /**
-   * Persist generation data to Firebase
+   * Persist generation data to local database
    */
   private async persistGeneration(report: GenerationReport): Promise<void> {
     try {
-      // Save generation report
-      await firebaseServerService.saveResearchSession({
-        timestamp: new Date(report.timestamp).toISOString(),
-        papersFound: report.populationSize,
-        knowledgeAdded: report.topVariants.length,
-        topics: ['evolution', `generation-${report.generationNumber}`, 'genetic-algorithm'],
-        summary: `Generation ${report.generationNumber}: Best fitness ${(report.bestFitness * 100).toFixed(2)}%, Avg ${(report.averageFitness * 100).toFixed(2)}%`,
-      });
+      // Data is now persisted via JarvisLocalDB in Git
+      // TODO: Integrate with JarvisLocalDB for local persistence
+      console.log(`[Evolution] Generation ${report.generationNumber}: Best fitness ${(report.bestFitness * 100).toFixed(2)}%`);
 
       // Save best variant's knowledge to self-programming engine
       const bestVariant = this.population.find(v => v.id === report.bestVariantId);

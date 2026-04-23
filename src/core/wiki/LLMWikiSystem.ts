@@ -16,7 +16,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { jarvisNativeModel } from '../nativeModel/JarvisNativeModel';
 import { selfProgrammingEngine } from '../selfProgramming/SelfProgrammingEngine';
-import { firebaseServerService } from '../../services/firebaseServerService';
 
 export interface WikiSource {
   id: string;
