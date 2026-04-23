@@ -64,6 +64,9 @@ import { selfProgrammingEngine } from './core/selfProgramming/SelfProgrammingEng
 // ✅ LOCAL DATABASE: Git-based persistence
 import { jarvisLocalDB } from './services/JarvisLocalDB';
 
+// ✅ PUBLIC DATASET INTEGRATION: Learn from open datasets
+import { publicDatasetIntegration } from './services/PublicDatasetIntegration';
+
 // ✅ AUTO-RESEARCHER: Daily academic research & self-improvement
 import { jarvisAutoResearcher } from './core/research/JarvisAutoResearcher';
 
@@ -5676,6 +5679,123 @@ app.post('/api/self-improve', async (req: Request, res: Response) => {
 });
 
 console.log('✅ Self-Improve Endpoint registered: /api/self-improve');
+
+// ============================================
+// PUBLIC DATASET INTEGRATION ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/datasets/catalog
+ * Get catalog of available public datasets
+ */
+app.get('/api/datasets/catalog', (req: Request, res: Response) => {
+  try {
+    const catalog = publicDatasetIntegration.getCatalog();
+    res.json({
+      success: true,
+      data: {
+        datasets: catalog,
+        total: catalog.length,
+        categories: Array.from(new Set(catalog.map(d => d.category)))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/datasets/by-category/:category
+ * Get datasets by category (cybersecurity, machine-learning, biology, etc.)
+ */
+app.get('/api/datasets/by-category/:category', (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    const datasets = publicDatasetIntegration.getDatasetsByCategory(category);
+    res.json({
+      success: true,
+      data: {
+        category,
+        datasets,
+        total: datasets.length
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/datasets/learn/:datasetId
+ * Learn from a specific public dataset and record insights
+ */
+app.post('/api/datasets/learn/:datasetId', async (req: Request, res: Response) => {
+  try {
+    const { datasetId } = req.params;
+    console.log(`\n🎓 Starting learning from dataset: ${datasetId}`);
+
+    const insights = await publicDatasetIntegration.learnFromDataset(datasetId);
+
+    res.json({
+      success: true,
+      data: {
+        datasetId,
+        insightsExtracted: insights.length,
+        insights: insights.map(i => ({
+          insight: i.insight,
+          category: i.category,
+          importance: i.importance,
+          applications: i.applications,
+          confidence: i.confidence
+        }))
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/datasets/bootstrap
+ * Bootstrap Jarvis with knowledge from all public datasets
+ */
+app.post('/api/datasets/bootstrap', async (req: Request, res: Response) => {
+  try {
+    console.log(`\n🚀 BOOTSTRAP REQUEST: Learning from all public datasets`);
+    const startTime = Date.now();
+
+    const result = await publicDatasetIntegration.bootstrapFromPublicDatasets();
+
+    const duration = Date.now() - startTime;
+
+    res.json({
+      success: true,
+      data: {
+        message: '✅ Successfully bootstrapped from public datasets',
+        totalDatasets: result.totalDatasets,
+        totalInsights: result.totalInsights,
+        duration: `${(duration / 1000).toFixed(2)}s`,
+        nextSteps: [
+          'View learning stats: /api/jarvis/learning-stats',
+          'Check interactions: /api/jarvis/interactions',
+          'See knowledge: /api/jarvis/knowledge'
+        ]
+      },
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+console.log('✅ Dataset Integration Endpoints registered:');
+console.log('   GET /api/datasets/catalog');
+console.log('   GET /api/datasets/by-category/:category');
+console.log('   POST /api/datasets/learn/:datasetId');
+console.log('   POST /api/datasets/bootstrap');
 
 // ============================================
 // INICIAR SERVIDOR
