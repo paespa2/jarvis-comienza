@@ -2,9 +2,9 @@
   "metadata": {
     "dataset": "security-kg",
     "name": "Security Knowledge Graph",
-    "downloadedAt": 1776991199833,
+    "downloadedAt": 1777046846625,
     "format": "parquet",
-    "recordCount": 58917
+    "recordCount": 16566
   },
   "status": "mock-downloaded",
   "message": "This is a mock dataset for development. In production, real HuggingFace data would be downloaded here."

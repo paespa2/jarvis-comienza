@@ -2107,12 +2107,12 @@ app.post('/api/vault/note', async (req: Request, res: Response) => {
       });
     }
 
-    const note = await vaultService.saveNote({
+    const note = await vaultService.saveNote(
       title,
       content,
-      tags: tags || [],
-      type: type || 'learning'
-    });
+      type || 'learning',
+      tags || []
+    );
 
     res.json({
       success: true,

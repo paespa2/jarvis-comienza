@@ -23,7 +23,7 @@ export interface SearchResult {
   context: string;
 }
 
-class ObsidianVault {
+export class ObsidianVault {
   private vaultPath: string;
   private notesPath: string;
 
