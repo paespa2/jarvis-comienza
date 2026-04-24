@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "dataset": "mitre-attack",
+    "name": "MITRE ATT&CK Framework",
+    "downloadedAt": 1776991199836,
+    "format": "json",
+    "recordCount": 20045
+  },
+  "status": "mock-downloaded",
+  "message": "This is a mock dataset for development. In production, real HuggingFace data would be downloaded here."
+}

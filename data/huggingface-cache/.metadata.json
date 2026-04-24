@@ -1,0 +1,32 @@
+{
+  "security-kg": {
+    "id": "security-kg",
+    "name": "Security Knowledge Graph",
+    "downloadedAt": 1776991199833,
+    "version": "1.0.0",
+    "sizeBytes": 282,
+    "checksumSha256": "a922bd60e0f1e263f1dbadf27e0bb2c222604fd51ad3788f3085d48be38aba26",
+    "status": "cached",
+    "processingStatus": "pending"
+  },
+  "code-vulnerability-dpo": {
+    "id": "code-vulnerability-dpo",
+    "name": "Code Vulnerability Security DPO",
+    "downloadedAt": 1776991199835,
+    "version": "1.0.0",
+    "sizeBytes": 297,
+    "checksumSha256": "0a6185c799e61f983fde67c2b05728702a3d9f047fb6bc53469567171bdb65c3",
+    "status": "cached",
+    "processingStatus": "pending"
+  },
+  "mitre-attack": {
+    "id": "mitre-attack",
+    "name": "MITRE ATT&CK Framework",
+    "downloadedAt": 1776991199836,
+    "version": "1.0.0",
+    "sizeBytes": 278,
+    "checksumSha256": "e6824998b083d6571636eb97b7e8d9464585f927736baba69282c36a8c05a596",
+    "status": "cached",
+    "processingStatus": "pending"
+  }
+}

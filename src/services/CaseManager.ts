@@ -30,7 +30,7 @@ class CaseManager {
 
   async initialize() {
     // Load from JarvisLocalDB
-    const stored = await jarvisLocalDB.getInteractions(100);
+    const stored = await jarvisLocalDB.getRecentInteractions(100);
     console.log('[CaseManager] Initialized with local DB');
   }
 
