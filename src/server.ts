@@ -91,6 +91,12 @@ import { caseManager } from './services/CaseManager';
 // ✅ HACKERONE EXPORTER: Direct submission to HackerOne
 import { hackerOneExporter } from './services/HackerOneExporter';
 
+// ✅ REAL AI CLIENT: Ollama/Gemma integration (replaces mock chat)
+import { jarvisAIClient, AIMessage } from './services/JarvisAIClient';
+
+// In-memory AI chat history (per sessionId -> message list for context)
+const aiChatHistory = new Map<string, AIMessage[]>();
+
 // ✅ ADVANCED REASONING ENGINE: Multi-strategy reasoning & inference
 import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngine';
 
@@ -6480,119 +6486,45 @@ app.post('/api/jarvis-chat', async (req: Request, res: Response) => {
       });
     }
 
-    const msg = message.toLowerCase();
-    const response: any = {
-      success: true,
-      sessionId: sessionId || uuidv4(),
-      response: '',
-      findings: [],
-      metrics: { vulns: 0, pocs: 0, targets: 0 },
-      nextAction: '',
-      caseIds: [] // Track created cases
-    };
+    const session = sessionId || uuidv4();
+    const history = aiChatHistory.get(session) || [];
 
-    // ANALYZE TARGET
-    if (msg.includes('analiza') || msg.includes('analyze')) {
-      const targetMatch = message.match(/(?:analiza|analyze)\s+(\S+)/i);
-      const target = targetMatch ? targetMatch[1] : 'example.com';
+    const intentResult = await jarvisAIClient.classifyIntent(message);
 
-      response.response = `**Análisis de Target: ${target}**
-
-🔍 **Reconocimiento Completado**
-• Subdomios: 24 encontrados (API, admin, staging, etc)
-• Endpoints: 156 mapeados
-• Tecnologías: Node.js, Express, PostgreSQL, Redis
-• Headers: X-Powered-By revelado
-• Vulnerabilidades previas: 3 CVEs conocidos
-
-🎯 **Vulnerabilidades Preliminares**
-• SQL Injection en /api/users (CVSS 8.6 - Alta)
-• XSS Reflejado en /search (CVSS 5.8 - Media)
-• JWT Débil en /auth (CVSS 8.1 - Alta)
-• Información Sensible en /config (CVSS 5.3 - Media)
-
-📋 **Siguientes Pasos**
-Generando exploits para cada vulnerabilidad. Los POCs estarán listos en 2-3 minutos.`;
-
-      response.findings = [
-        { type: 'SQLi', severity: 'Alta', location: '/api/users', cvss: 8.6, bounty: 2500 },
-        { type: 'XSS', severity: 'Media', location: '/search', cvss: 5.8, bounty: 500 },
-        { type: 'JWT Bypass', severity: 'Alta', location: '/auth', cvss: 8.1, bounty: 3000 }
-      ];
-      response.metrics = { vulns: 3, pocs: 0, targets: 1 };
-      response.nextAction = 'Generando exploits automáticos para todas las vulnerabilidades...';
-
-      // Auto-save findings to case manager
-      for (const finding of response.findings) {
-        const newCase = await caseManager.createCase({
-          target,
-          type: finding.type,
-          severity: finding.severity as any,
-          cvss: finding.cvss,
-          location: finding.location,
-          bountyEstimate: finding.bounty,
-          impact: `Vulnerabilidad ${finding.type} encontrada en ${finding.location}`,
-          payload: `[${finding.type} payload]`,
-          status: 'discovered'
-        });
-        response.caseIds.push(newCase.id);
-      }
-    }
-    // START HUNT
-    else if (msg.includes('hunt') || msg.includes('hunts') || msg.includes('iniciar')) {
-      response.response = `**Hunt Autónoma Iniciada** 🚀
-
-⚡ Swarm de 300 agentes desplegado inmediatamente
-• 30 agentes: Web Injection (SQLi, Template Injection, etc)
-• 30 agentes: Authentication Bypass (JWT, OAuth, Session)
-• 30 agentes: API Enumeration & Testing
-• 30 agentes: Database Testing & Extraction
-• 30 agentes: Cache Poisoning & Logic Flaws
-• 30 agentes: Race Conditions & Timing Attacks
-• 30 agentes: Cryptography Analysis
-• 30 agentes: Infrastructure Scanning
-• 30 agentes: Supply Chain Vulnerability Detection
-• Y 30 más en especialidades avanzadas
-
-🎬 Estado: HUNTING 24/7
-Tiempo transcurrido: Ahora mismo
-Seguimiento en tiempo real en el panel derecho →
-
-**Estadísticas en vivo:**
-• Agentes activos: 300/300
-• Targets siendo atacados: 5 simultáneamente
-• Endpoints probados: 847
-• Vulnerabilidades encontradas: 12
-• POCs generados: 8`;
-
-      response.metrics = { vulns: 12, pocs: 8, targets: 5 };
-      response.nextAction = 'Hunt running - 300 agents actively testing targets';
-    }
-    // LIST CASES
-    else if (msg.includes('caso') || msg.includes('vulnerabilidad') || msg.includes('encontra') || msg.includes('dashboard')) {
+    let context = '';
+    if (intentResult.intent === 'show_cases') {
       const allCases = caseManager.getAllCases();
       const stats = caseManager.getStatistics();
+      context = `\n\nCONTEXTO DE CASOS ACTUALES:\n- Total de casos: ${stats.total}\n- Por severidad: Críticas=${stats.bySeverity.critica}, Altas=${stats.bySeverity.alta}, Medias=${stats.bySeverity.media}, Bajas=${stats.bySeverity.baja}\n- Bounty total estimado: $${stats.totalBounty.toLocaleString()}\n- CVSS promedio: ${stats.averageCVSS}\n\nCasos recientes:\n${allCases.slice(0, 5).map((c, i) => `${i + 1}. ${c.type} (${c.severity}) en ${c.target} — ${c.location}`).join('\n') || 'Sin casos aún.'}`;
+    }
 
-      let casesList = '📋 **Vulnerabilidades Almacenadas**\n\n';
-      if (allCases.length === 0) {
-        casesList += 'Sin casos registrados aún.';
-      } else {
-        casesList += allCases.slice(0, 5).map((c, i) =>
-          `${i+1}. **${c.type}** (${c.severity}) - ${c.target}\n   Ubicación: ${c.location} | Bounty: $${c.bountyEstimate}`
-        ).join('\n\n');
-      }
+    const userMessage = context ? `${message}${context}` : message;
+    const aiResponse = await jarvisAIClient.chat(userMessage, history);
 
-      casesList += `\n\n**📊 Estadísticas Generales**
-• Total de casos: ${stats.total}
-• Críticas: ${stats.bySeverity.critica}
-• Altas: ${stats.bySeverity.alta}
-• Bounty total: $${stats.totalBounty.toLocaleString()}
-• CVSS promedio: ${stats.averageCVSS}
+    history.push({ role: 'user', content: message });
+    history.push({ role: 'assistant', content: aiResponse.content });
+    if (history.length > 20) history.splice(0, history.length - 20);
+    aiChatHistory.set(session, history);
 
-👉 Ver dashboard completo: [Dashboard](/dashboard.html)`;
+    const response: any = {
+      success: true,
+      sessionId: session,
+      response: aiResponse.content,
+      model: aiResponse.model,
+      responseTime: aiResponse.responseTime,
+      tokensUsed: aiResponse.tokensUsed,
+      intent: intentResult.intent,
+      target: intentResult.target,
+      findings: [],
+      metrics: { vulns: 0, pocs: 0, targets: 0 },
+      caseIds: [],
+      aiStatus: jarvisAIClient.getStatus()
+    };
 
-      response.response = casesList;
-      response.findings = allCases.map(c => ({
+    if (intentResult.intent === 'show_cases') {
+      const allCases = caseManager.getAllCases();
+      const stats = caseManager.getStatistics();
+      response.findings = allCases.map((c) => ({
         type: c.type,
         severity: c.severity,
         location: c.location,
@@ -6602,49 +6534,23 @@ Seguimiento en tiempo real en el panel derecho →
       response.metrics = {
         vulns: stats.total,
         pocs: stats.byStatus.documented,
-        targets: new Set(allCases.map(c => c.target)).size
+        targets: new Set(allCases.map((c) => c.target)).size
       };
-    }
-    // DEFAULT
-    else {
-      response.response = `Como asistente autónomo de **Jarvis v2.0-Kimi-K26**, puedo ayudarte con:
-
-🔍 **Análisis de Targets**
-   Escribe: "analiza example.com"
-   Obtendrás: Recon automático, endpoints, vulns preliminares
-
-🎯 **Hunt Automáticas**
-   Escribe: "inicia hunt" o "automática 24/7"
-   Obtendrás: 300 agentes atacando 24/7, reportes en vivo
-
-📋 **Ver Vulnerabilidades**
-   Escribe: "muestra casos" o "vulnerabilidades encontradas"
-   Obtendrás: Listado de vulns con bounty, screenshots, POCs
-
-🛠️ **Generar Exploits**
-   Escribe: "genera exploit para SQLi"
-   Obtendrás: POC listo, payload obfuscado, instrucciones
-
-📊 **Dashboard**
-   Escribe: "dashboard" o "ver casos"
-   Obtendrás: Acceso al gestor completo de casos
-
-📄 **Documentación**
-   Escribe: "crea reporte" o "documento"
-   Obtendrás: Reporte HTML con todas las vulns, screenshots
-
-¿Qué necesitas?`;
-      response.nextAction = 'Esperando instrucciones del usuario';
     }
 
     return res.json(response);
-
   } catch (error: any) {
     return res.status(500).json({
       success: false,
       error: error.message
     });
   }
+});
+
+// AI status endpoint — check if Ollama/model is reachable
+app.get('/api/ai/status', async (_req: Request, res: Response) => {
+  await jarvisAIClient.checkAvailability();
+  res.json({ success: true, data: jarvisAIClient.getStatus() });
 });
 
 // ============================================
