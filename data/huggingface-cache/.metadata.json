@@ -2,41 +2,51 @@
   "security-kg": {
     "id": "security-kg",
     "name": "Security Knowledge Graph",
-    "downloadedAt": 1777046846626,
+    "downloadedAt": 1777047887987,
     "version": "1.0.0",
     "sizeBytes": 282,
-    "checksumSha256": "3ce45bf8b07eb56c26f0b0a94466384b142d4f640aaba8768c11e744c34a5dd5",
+    "checksumSha256": "504ee27c251dd3fd80b20951aca0b96f3409104a3ad4655cf2bb1e010c170979",
     "status": "cached",
-    "processingStatus": "pending"
+    "processingStatus": "complete"
   },
   "code-vulnerability-dpo": {
     "id": "code-vulnerability-dpo",
     "name": "Code Vulnerability Security DPO",
-    "downloadedAt": 1776991199835,
+    "downloadedAt": 1777047952134,
     "version": "1.0.0",
     "sizeBytes": 297,
-    "checksumSha256": "0a6185c799e61f983fde67c2b05728702a3d9f047fb6bc53469567171bdb65c3",
+    "checksumSha256": "e42592b1ee58a71bbec7266f7d5b36f83c4dd0243c627b59f36c4e14a8637dc5",
     "status": "cached",
-    "processingStatus": "complete"
+    "processingStatus": "pending"
   },
   "mitre-attack": {
     "id": "mitre-attack",
     "name": "MITRE ATT&CK Framework",
-    "downloadedAt": 1776991199836,
+    "downloadedAt": 1777047952136,
     "version": "1.0.0",
     "sizeBytes": 278,
-    "checksumSha256": "e6824998b083d6571636eb97b7e8d9464585f927736baba69282c36a8c05a596",
+    "checksumSha256": "5da91eea1cecd6fb3a3076fb8abf8a396f416c0903d67dc9e2842e98440fa892",
     "status": "cached",
-    "processingStatus": "complete"
+    "processingStatus": "pending"
   },
   "white-hat-security-prompts": {
     "id": "white-hat-security-prompts",
     "name": "White-Hat Security Agent Prompts",
-    "downloadedAt": 1777046828078,
+    "downloadedAt": 1777047887986,
     "version": "1.0.0",
     "sizeBytes": 302,
-    "checksumSha256": "46fbd77c088a1efcc9f5aa6a88bfcedf4fb3b43a947f2ac6ebf53f4c074020d4",
+    "checksumSha256": "05ab07736a1e276abf118347ea7760eb11d1358cec286320a966af5c31d38bbe",
     "status": "cached",
     "processingStatus": "complete"
+  },
+  "nvd-security-instructions": {
+    "id": "nvd-security-instructions",
+    "name": "NVD Security Instructions",
+    "downloadedAt": 1777047952135,
+    "version": "1.0.0",
+    "sizeBytes": 294,
+    "checksumSha256": "b3ea199613782ecab207821df3d0546354b762ee9009bc1e7998899ab7c811e9",
+    "status": "cached",
+    "processingStatus": "pending"
   }
 }

@@ -841,7 +841,7 @@
             addMessage('Procesando tu mensaje...', 'loading');
 
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/jarvis/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -858,12 +858,15 @@
                 // Remove loading message
                 chatMessages.removeChild(chatMessages.lastChild);
 
+                // Extract response from various possible formats
+                const responseText = data.data?.response || data.response || data.data?.message || data.message || 'Sin respuesta del servidor';
+
                 // Add assistant response
-                addMessage(data.response, 'assistant');
+                addMessage(responseText, 'assistant');
 
                 // Store in history
                 appState.messages.push({ role: 'user', content: message });
-                appState.messages.push({ role: 'assistant', content: data.response });
+                appState.messages.push({ role: 'assistant', content: responseText });
 
             } catch (error) {
                 console.error('Chat error:', error);

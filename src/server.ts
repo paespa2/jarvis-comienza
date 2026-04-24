@@ -2017,6 +2017,101 @@ app.delete('/api/chat/:sessionId', (req: Request, res: Response) => {
 });
 
 // ============================================
+// JARVIS DIRECT CHAT (Ollama/Gemma Integration)
+// ============================================
+
+/**
+ * POST /api/jarvis/chat
+ * Direct chat with JARVIS using Ollama/Gemma model
+ * Uses jarvisAIClient for real AI responses (not templates)
+ */
+app.post('/api/jarvis/chat', async (req: Request, res: Response) => {
+  try {
+    const { message, sessionId: providedSessionId, conversationHistory } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'message is required (string)'
+      });
+    }
+
+    const sessionId = providedSessionId || `jarvis-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // Get or initialize history for this session
+    let history: AIMessage[] = aiChatHistory.get(sessionId) || [];
+
+    // If client sends history, use it (overrides server memory)
+    if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+      history = conversationHistory;
+    }
+
+    // Call the real AI client (Ollama/Gemma)
+    const aiResponse = await jarvisAIClient.chat(message, history);
+
+    // Update history
+    history.push({ role: 'user', content: message });
+    history.push({ role: 'assistant', content: aiResponse.content });
+
+    // Keep last 20 messages to prevent context overflow
+    if (history.length > 20) {
+      history = history.slice(-20);
+    }
+
+    aiChatHistory.set(sessionId, history);
+
+    res.json({
+      success: true,
+      sessionId,
+      response: aiResponse.content,
+      model: aiResponse.model,
+      tokensUsed: aiResponse.tokensUsed,
+      responseTime: aiResponse.responseTime,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('[JarvisChat] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: Date.now()
+    });
+  }
+});
+
+/**
+ * GET /api/jarvis/status
+ * Check if the real AI (Ollama) is available
+ */
+app.get('/api/jarvis/status', async (req: Request, res: Response) => {
+  try {
+    const isAvailable = await jarvisAIClient.checkAvailability();
+    const status = jarvisAIClient.getStatus();
+
+    res.json({
+      success: true,
+      isAvailable,
+      ...status,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * DELETE /api/jarvis/chat/:sessionId
+ * Reset a conversation session
+ */
+app.delete('/api/jarvis/chat/:sessionId', (req: Request, res: Response) => {
+  const existed = aiChatHistory.delete(req.params.sessionId);
+  res.json({ success: true, deleted: existed, timestamp: Date.now() });
+});
+
+// ============================================
 // VAULT API ENDPOINTS
 // ============================================
 

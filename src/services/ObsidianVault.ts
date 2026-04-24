@@ -229,15 +229,28 @@ export class ObsidianVault {
       cases: 0,
       skills: 0,
       findings: 0,
+      techniques: 0,
       learnings: 0,
       memories: 0
+    };
+
+    const typeToKey: Record<string, string> = {
+      case: 'cases',
+      skill: 'skills',
+      finding: 'findings',
+      technique: 'techniques',
+      learning: 'learnings',
+      memory: 'memories'
     };
 
     for (const file of files) {
       const filepath = path.join(this.notesPath, file);
       const content = fs.readFileSync(filepath, 'utf-8');
       const note = this.parseMarkdown(content);
-      if (stats[note.type]) stats[note.type]++;
+      const key = typeToKey[note.type];
+      if (key && stats[key] !== undefined) {
+        stats[key]++;
+      }
     }
 
     return stats;
