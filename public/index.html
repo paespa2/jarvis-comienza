@@ -714,26 +714,29 @@
                         <div class="form-group">
                             <label class="form-label">Proveedor IA</label>
                             <select class="form-select" id="ai-provider">
+                                <option value="lmstudio">LM Studio (Recomendado - Local)</option>
                                 <option value="ollama">Ollama (Local)</option>
                                 <option value="openrouter">OpenRouter (Cloud)</option>
                             </select>
-                            <div class="form-description">Selecciona el proveedor de IA a usar</div>
+                            <div class="form-description">LM Studio: mejor rendimiento y modelos más capaces (Qwen3.5 9B con vision + tools)</div>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">URL de Ollama</label>
-                            <input type="text" class="form-input" id="ollama-url" value="http://localhost:11434">
-                            <div class="form-description">Dirección del servidor Ollama</div>
+                            <label class="form-label">URL del Servidor</label>
+                            <input type="text" class="form-input" id="server-url" value="http://localhost:1234/v1">
+                            <div class="form-description">LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434</div>
                         </div>
 
                         <div class="form-group">
                             <label class="form-label">Modelo IA</label>
                             <select class="form-select" id="ai-model">
-                                <option value="jarvis:latest">jarvis:latest (Recomendado)</option>
-                                <option value="gemma3:4b">gemma3:4b</option>
-                                <option value="mistral:7b">mistral:7b</option>
+                                <option value="qwen/qwen3.5-9b">qwen/qwen3.5-9b (Recomendado - vision + tools + 262K ctx)</option>
+                                <option value="qwen/qwen2.5-coder-14b">qwen/qwen2.5-coder-14b (especialista en código)</option>
+                                <option value="meta-llama/llama-3.3-8b">llama-3.3-8b (general)</option>
+                                <option value="mistralai/mistral-small">mistral-small (seguridad)</option>
+                                <option value="gemma3:4b">gemma3:4b (Ollama)</option>
                             </select>
-                            <div class="form-description">Modelo de IA a utilizar</div>
+                            <div class="form-description">Modelo cargado en LM Studio/Ollama</div>
                         </div>
 
                         <div class="form-group">
@@ -742,7 +745,12 @@
                             <div class="form-description">Creatividad de las respuestas (0=determinístico, 1=creativo)</div>
                         </div>
 
+                        <div id="connection-status" style="padding: 12px; background: var(--bg2); border-radius: 6px; margin-bottom: 16px; font-size: 12px; color: var(--text3);">
+                            Estado de conexión: <span id="conn-status-text">Verificando...</span>
+                        </div>
+
                         <button class="btn" id="btn-save-settings">GUARDAR CAMBIOS</button>
+                        <button class="btn" id="btn-test-connection" style="margin-left: 8px; background: var(--cyan); color: var(--bg0);">PROBAR CONEXIÓN</button>
                     </div>
                 </div>
             </div>
@@ -757,9 +765,9 @@
             messages: [],
             vaultNotes: [],
             settings: {
-                aiProvider: localStorage.getItem('aiProvider') || 'ollama',
-                ollamaUrl: localStorage.getItem('ollamaUrl') || 'http://localhost:11434',
-                aiModel: localStorage.getItem('aiModel') || 'jarvis:latest',
+                aiProvider: localStorage.getItem('aiProvider') || 'lmstudio',
+                serverUrl: localStorage.getItem('serverUrl') || 'http://localhost:1234/v1',
+                aiModel: localStorage.getItem('aiModel') || 'qwen/qwen3.5-9b',
                 temperature: parseFloat(localStorage.getItem('temperature') || '0.7')
             }
         };
@@ -1044,25 +1052,51 @@
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SETTINGS ━
         function loadSettings() {
             document.getElementById('ai-provider').value = appState.settings.aiProvider;
-            document.getElementById('ollama-url').value = appState.settings.ollamaUrl;
+            document.getElementById('server-url').value = appState.settings.serverUrl;
             document.getElementById('ai-model').value = appState.settings.aiModel;
             document.getElementById('temperature').value = appState.settings.temperature;
 
             document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+            document.getElementById('btn-test-connection').addEventListener('click', testConnection);
+
+            // Auto-test connection on load
+            testConnection();
+        }
+
+        async function testConnection() {
+            const statusEl = document.getElementById('conn-status-text');
+            statusEl.textContent = 'Verificando...';
+            statusEl.style.color = 'var(--text3)';
+
+            try {
+                const res = await fetch('/api/jarvis/status');
+                const data = await res.json();
+
+                if (data.isAvailable) {
+                    statusEl.textContent = `✅ Conectado (${data.provider} - ${data.model})`;
+                    statusEl.style.color = 'var(--green)';
+                } else {
+                    statusEl.textContent = `❌ No conectado. Verifica que LM Studio/Ollama esté corriendo.`;
+                    statusEl.style.color = 'var(--red)';
+                }
+            } catch (error) {
+                statusEl.textContent = `❌ Error: ${error.message}`;
+                statusEl.style.color = 'var(--red)';
+            }
         }
 
         function saveSettings() {
             appState.settings.aiProvider = document.getElementById('ai-provider').value;
-            appState.settings.ollamaUrl = document.getElementById('ollama-url').value;
+            appState.settings.serverUrl = document.getElementById('server-url').value;
             appState.settings.aiModel = document.getElementById('ai-model').value;
             appState.settings.temperature = parseFloat(document.getElementById('temperature').value);
 
             localStorage.setItem('aiProvider', appState.settings.aiProvider);
-            localStorage.setItem('ollamaUrl', appState.settings.ollamaUrl);
+            localStorage.setItem('serverUrl', appState.settings.serverUrl);
             localStorage.setItem('aiModel', appState.settings.aiModel);
             localStorage.setItem('temperature', appState.settings.temperature);
 
-            alert('✅ Configuración guardada correctamente');
+            alert('✅ Configuración guardada localmente.\n\nNota: Para cambiar el provider del servidor, edita el archivo .env y reinicia JARVIS.');
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ INITIALIZATION ━

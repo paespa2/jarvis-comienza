@@ -2,9 +2,9 @@
   "metadata": {
     "dataset": "white-hat-security-prompts",
     "name": "White-Hat Security Agent Prompts",
-    "downloadedAt": 1777047887986,
+    "downloadedAt": 1777048739497,
     "format": "json",
-    "recordCount": 21321
+    "recordCount": 47099
   },
   "status": "mock-downloaded",
   "message": "This is a mock dataset for development. In production, real HuggingFace data would be downloaded here."

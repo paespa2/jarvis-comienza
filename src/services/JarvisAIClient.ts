@@ -22,7 +22,9 @@ export interface AIResponse {
 }
 
 export interface AIClientConfig {
-  provider: 'ollama' | 'openrouter' | 'mock';
+  provider: 'lmstudio' | 'ollama' | 'openrouter' | 'mock';
+  lmstudioUrl?: string;
+  lmstudioModel?: string;
   ollamaUrl?: string;
   ollamaModel?: string;
   openrouterKey?: string;
@@ -36,7 +38,9 @@ class JarvisAIClient {
 
   constructor() {
     this.config = {
-      provider: (process.env.AI_PROVIDER as any) || 'ollama',
+      provider: (process.env.AI_PROVIDER as any) || 'lmstudio',
+      lmstudioUrl: process.env.LMSTUDIO_URL || 'http://localhost:1234/v1',
+      lmstudioModel: process.env.LMSTUDIO_MODEL || 'qwen/qwen3.5-9b',
       ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
       ollamaModel: process.env.OLLAMA_MODEL || 'gemma3:1b',
       openrouterKey: process.env.OPENROUTER_API_KEY,
@@ -84,6 +88,19 @@ ESTILO DE RESPUESTA:
    */
   async checkAvailability(): Promise<boolean> {
     try {
+      if (this.config.provider === 'lmstudio') {
+        const response = await axios.get(`${this.config.lmstudioUrl}/models`, {
+          timeout: 3000
+        });
+        this.isAvailable = response.status === 200;
+        if (this.isAvailable) {
+          console.log(`[JarvisAIClient] ✅ LM Studio connected: ${this.config.lmstudioUrl}`);
+          const models = response.data?.data || [];
+          console.log(`[JarvisAIClient] Loaded models: ${models.map((m: any) => m.id).join(', ') || 'none'}`);
+        }
+        return this.isAvailable;
+      }
+
       if (this.config.provider === 'ollama') {
         const response = await axios.get(`${this.config.ollamaUrl}/api/tags`, {
           timeout: 3000
@@ -133,6 +150,10 @@ ESTILO DE RESPUESTA:
       { role: 'user', content: userMessage }
     ];
 
+    if (this.config.provider === 'lmstudio' && this.isAvailable) {
+      return this.chatWithLMStudio(messages, startTime);
+    }
+
     if (this.config.provider === 'ollama' && this.isAvailable) {
       return this.chatWithOllama(messages, startTime);
     }
@@ -147,6 +168,43 @@ ESTILO DE RESPUESTA:
       model: 'fallback-no-ai',
       responseTime: Date.now() - startTime
     };
+  }
+
+  /**
+   * LM Studio (local, OpenAI-compatible) inference
+   */
+  private async chatWithLMStudio(messages: AIMessage[], startTime: number): Promise<AIResponse> {
+    try {
+      const response = await axios.post(
+        `${this.config.lmstudioUrl}/chat/completions`,
+        {
+          model: this.config.lmstudioModel,
+          messages,
+          temperature: 0.7,
+          max_tokens: 1024,
+          stream: false
+        },
+        {
+          timeout: 180000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const choice = response.data?.choices?.[0];
+      return {
+        content: choice?.message?.content || 'Respuesta vacía del modelo',
+        model: response.data?.model || this.config.lmstudioModel || 'lmstudio',
+        tokensUsed: response.data?.usage?.total_tokens,
+        responseTime: Date.now() - startTime
+      };
+    } catch (e: any) {
+      this.isAvailable = false;
+      return {
+        content: `⚠️ Error al contactar LM Studio en ${this.config.lmstudioUrl}.\n\nVerifica:\n1. LM Studio está abierto\n2. El servidor está activado (pestaña "Developer" → "Start Server")\n3. El modelo \`${this.config.lmstudioModel}\` está cargado\n4. El puerto 1234 está accesible\n\nError: ${e.message}`,
+        model: 'lmstudio-error',
+        responseTime: Date.now() - startTime
+      };
+    }
   }
 
   /**
@@ -230,19 +288,29 @@ ESTILO DE RESPUESTA:
 
 Actualmente no hay un modelo de IA disponible. Para habilitar respuestas reales:
 
-**Opción 1 — Ollama (recomendado, local):**
+**Opción 1 — LM Studio (RECOMENDADO, local):**
+\`\`\`
+1. Descarga LM Studio: https://lmstudio.ai
+2. Carga un modelo (ej: qwen/qwen3.5-9b con visión + tools + 262K ctx)
+3. Ve a la pestaña "Developer" → Click "Start Server"
+4. Verifica que corre en http://localhost:1234
+5. En tu .env: AI_PROVIDER=lmstudio
+6. Reinicia este servidor
+\`\`\`
+
+**Opción 2 — Ollama (local alternativo):**
 \`\`\`
 1. Instala Ollama: https://ollama.com/download
-2. Descarga el modelo: ollama pull gemma3:4b
-3. Verifica: ollama list
+2. Descarga modelo: ollama pull gemma3:4b
+3. En .env: AI_PROVIDER=ollama
 4. Reinicia este servidor
 \`\`\`
 
-**Opción 2 — OpenRouter (cloud):**
+**Opción 3 — OpenRouter (cloud):**
 \`\`\`
-1. Crea cuenta: https://openrouter.ai
+1. Crea cuenta gratis: https://openrouter.ai
 2. Obtén API key
-3. En tu .env: OPENROUTER_API_KEY=tu_key, AI_PROVIDER=openrouter
+3. En .env: OPENROUTER_API_KEY=tu_key, AI_PROVIDER=openrouter
 4. Reinicia este servidor
 \`\`\`
 
@@ -284,17 +352,26 @@ Una vez conectes un modelo, podré razonar sobre tu solicitud en lugar de mostra
    * Get current AI backend status
    */
   getStatus() {
+    const { provider } = this.config;
+    let model: string | undefined;
+    let endpoint: string | undefined;
+
+    if (provider === 'lmstudio') {
+      model = this.config.lmstudioModel;
+      endpoint = this.config.lmstudioUrl;
+    } else if (provider === 'ollama') {
+      model = this.config.ollamaModel;
+      endpoint = this.config.ollamaUrl;
+    } else if (provider === 'openrouter') {
+      model = this.config.openrouterModel;
+      endpoint = 'https://openrouter.ai/api/v1';
+    }
+
     return {
-      provider: this.config.provider,
+      provider,
       isAvailable: this.isAvailable,
-      model:
-        this.config.provider === 'ollama'
-          ? this.config.ollamaModel
-          : this.config.openrouterModel,
-      endpoint:
-        this.config.provider === 'ollama'
-          ? this.config.ollamaUrl
-          : 'openrouter.ai'
+      model,
+      endpoint
     };
   }
 

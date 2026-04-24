@@ -2,10 +2,10 @@
   "security-kg": {
     "id": "security-kg",
     "name": "Security Knowledge Graph",
-    "downloadedAt": 1777047887987,
+    "downloadedAt": 1777048694531,
     "version": "1.0.0",
     "sizeBytes": 282,
-    "checksumSha256": "504ee27c251dd3fd80b20951aca0b96f3409104a3ad4655cf2bb1e010c170979",
+    "checksumSha256": "5aa543e3158373debb4fc1dcb96d3329c4ba2387d75da5daf0c80b59c147cf16",
     "status": "cached",
     "processingStatus": "complete"
   },
@@ -17,36 +17,36 @@
     "sizeBytes": 297,
     "checksumSha256": "e42592b1ee58a71bbec7266f7d5b36f83c4dd0243c627b59f36c4e14a8637dc5",
     "status": "cached",
-    "processingStatus": "pending"
+    "processingStatus": "complete"
   },
   "mitre-attack": {
     "id": "mitre-attack",
     "name": "MITRE ATT&CK Framework",
-    "downloadedAt": 1777047952136,
+    "downloadedAt": 1777048694533,
     "version": "1.0.0",
     "sizeBytes": 278,
-    "checksumSha256": "5da91eea1cecd6fb3a3076fb8abf8a396f416c0903d67dc9e2842e98440fa892",
+    "checksumSha256": "ef993af172177d0e56b5567a332255d775eeca4860fdc2acdf2c038e6619e0b9",
     "status": "cached",
-    "processingStatus": "pending"
+    "processingStatus": "complete"
   },
   "white-hat-security-prompts": {
     "id": "white-hat-security-prompts",
     "name": "White-Hat Security Agent Prompts",
-    "downloadedAt": 1777047887986,
+    "downloadedAt": 1777048739497,
     "version": "1.0.0",
     "sizeBytes": 302,
-    "checksumSha256": "05ab07736a1e276abf118347ea7760eb11d1358cec286320a966af5c31d38bbe",
+    "checksumSha256": "1ce9d9392a755c8b0451b8ba066eee1e5e6a61343a2a8956a76d9c44c2ed100e",
     "status": "cached",
-    "processingStatus": "complete"
+    "processingStatus": "pending"
   },
   "nvd-security-instructions": {
     "id": "nvd-security-instructions",
     "name": "NVD Security Instructions",
-    "downloadedAt": 1777047952135,
+    "downloadedAt": 1777048628877,
     "version": "1.0.0",
     "sizeBytes": 294,
-    "checksumSha256": "b3ea199613782ecab207821df3d0546354b762ee9009bc1e7998899ab7c811e9",
+    "checksumSha256": "39a64bae1a449afe330a59cd54decad13654e315dc0bb2c8a7128a8a778e0a63",
     "status": "cached",
-    "processingStatus": "pending"
+    "processingStatus": "complete"
   }
 }
