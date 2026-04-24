@@ -85,6 +85,12 @@ import { jarvisGemmaFusion } from './core/models/JarvisGemmaFusion';
 // ✅ JARVIS-KIMI K2.6 FUSION: Ultimate HackerOne hunting machine with 300-agent swarm
 import { jarvisKimiK26Fusion } from './core/models/JarvisKimiK26Fusion';
 
+// ✅ CASE MANAGER: Vulnerability case tracking & documentation
+import { caseManager } from './services/CaseManager';
+
+// ✅ HACKERONE EXPORTER: Direct submission to HackerOne
+import { hackerOneExporter } from './services/HackerOneExporter';
+
 // ✅ ADVANCED REASONING ENGINE: Multi-strategy reasoning & inference
 import { advancedReasoningEngine } from './core/reasoning/AdvancedReasoningEngine';
 
@@ -6481,7 +6487,8 @@ app.post('/api/jarvis-chat', async (req: Request, res: Response) => {
       response: '',
       findings: [],
       metrics: { vulns: 0, pocs: 0, targets: 0 },
-      nextAction: ''
+      nextAction: '',
+      caseIds: [] // Track created cases
     };
 
     // ANALYZE TARGET
@@ -6514,6 +6521,22 @@ Generando exploits para cada vulnerabilidad. Los POCs estarán listos en 2-3 min
       ];
       response.metrics = { vulns: 3, pocs: 0, targets: 1 };
       response.nextAction = 'Generando exploits automáticos para todas las vulnerabilidades...';
+
+      // Auto-save findings to case manager
+      for (const finding of response.findings) {
+        const newCase = await caseManager.createCase({
+          target,
+          type: finding.type,
+          severity: finding.severity as any,
+          cvss: finding.cvss,
+          location: finding.location,
+          bountyEstimate: finding.bounty,
+          impact: `Vulnerabilidad ${finding.type} encontrada en ${finding.location}`,
+          payload: `[${finding.type} payload]`,
+          status: 'discovered'
+        });
+        response.caseIds.push(newCase.id);
+      }
     }
     // START HUNT
     else if (msg.includes('hunt') || msg.includes('hunts') || msg.includes('iniciar')) {
@@ -6546,44 +6569,41 @@ Seguimiento en tiempo real en el panel derecho →
       response.nextAction = 'Hunt running - 300 agents actively testing targets';
     }
     // LIST CASES
-    else if (msg.includes('caso') || msg.includes('vulnerabilidad') || msg.includes('encontra')) {
-      response.response = `**Vulnerabilidades Encontradas (Sesión Actual)** 📋
+    else if (msg.includes('caso') || msg.includes('vulnerabilidad') || msg.includes('encontra') || msg.includes('dashboard')) {
+      const allCases = caseManager.getAllCases();
+      const stats = caseManager.getStatistics();
 
-**1. SQL Injection - CRÍTICA** 🔴
-   Ubicación: POST /api/users/create
-   Parámetro: email
-   Payload: \`admin' OR '1'='1\`
-   Impacto: Acceso completo a base de datos (50K usuarios)
-   Status: Exploit chain generado
-   Bounty estimado: $5,000
-   Screenshot: ✓ Adjunto
+      let casesList = '📋 **Vulnerabilidades Almacenadas**\n\n';
+      if (allCases.length === 0) {
+        casesList += 'Sin casos registrados aún.';
+      } else {
+        casesList += allCases.slice(0, 5).map((c, i) =>
+          `${i+1}. **${c.type}** (${c.severity}) - ${c.target}\n   Ubicación: ${c.location} | Bounty: $${c.bountyEstimate}`
+        ).join('\n\n');
+      }
 
-**2. Authentication Bypass - ALTA** 🟠
-   Ubicación: /auth/verify
-   Método: JWT tampering
-   Vulnerabilidad: No valida firma correctamente
-   Impacto: Impersonar cualquier usuario
-   Bounty estimado: $3,000
+      casesList += `\n\n**📊 Estadísticas Generales**
+• Total de casos: ${stats.total}
+• Críticas: ${stats.bySeverity.critica}
+• Altas: ${stats.bySeverity.alta}
+• Bounty total: $${stats.totalBounty.toLocaleString()}
+• CVSS promedio: ${stats.averageCVSS}
 
-**3. XSS Reflejado - MEDIA** 🟡
-   Ubicación: /search
-   Parámetro: q
-   Payload: \`<img src=x onerror=alert('xss')>\`
-   Bounty estimado: $750
+👉 Ver dashboard completo: [Dashboard](/dashboard.html)`;
 
-**4. Path Traversal - ALTA** 🟠
-   Ubicación: /file/download
-   Parámetro: path
-   Impacto: Leer archivos del servidor
-   Bounty estimado: $2,500`;
-
-      response.findings = [
-        { type: 'SQLi', severity: 'Crítica', location: '/api/users/create', bounty: 5000, screenshot: true },
-        { type: 'Auth Bypass', severity: 'Alta', location: '/auth/verify', bounty: 3000, screenshot: true },
-        { type: 'XSS', severity: 'Media', location: '/search', bounty: 750 },
-        { type: 'Path Traversal', severity: 'Alta', location: '/file/download', bounty: 2500 }
-      ];
-      response.metrics = { vulns: 4, pocs: 3, targets: 2 };
+      response.response = casesList;
+      response.findings = allCases.map(c => ({
+        type: c.type,
+        severity: c.severity,
+        location: c.location,
+        bounty: c.bountyEstimate,
+        cvss: c.cvss
+      }));
+      response.metrics = {
+        vulns: stats.total,
+        pocs: stats.byStatus.documented,
+        targets: new Set(allCases.map(c => c.target)).size
+      };
     }
     // DEFAULT
     else {
@@ -6605,6 +6625,10 @@ Seguimiento en tiempo real en el panel derecho →
    Escribe: "genera exploit para SQLi"
    Obtendrás: POC listo, payload obfuscado, instrucciones
 
+📊 **Dashboard**
+   Escribe: "dashboard" o "ver casos"
+   Obtendrás: Acceso al gestor completo de casos
+
 📄 **Documentación**
    Escribe: "crea reporte" o "documento"
    Obtendrás: Reporte HTML con todas las vulns, screenshots
@@ -6620,6 +6644,146 @@ Seguimiento en tiempo real en el panel derecho →
       success: false,
       error: error.message
     });
+  }
+});
+
+// ============================================
+// CASE MANAGEMENT ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/cases
+ * Get all vulnerability cases
+ */
+app.get('/api/cases', (req: Request, res: Response) => {
+  try {
+    const cases = caseManager.getAllCases();
+    const stats = caseManager.getStatistics();
+    res.json({
+      success: true,
+      data: {
+        cases,
+        statistics: stats,
+        total: cases.length
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/cases
+ * Create a new vulnerability case
+ */
+app.post('/api/cases', async (req: Request, res: Response) => {
+  try {
+    const caseData = req.body;
+    const newCase = await caseManager.createCase(caseData);
+    res.json({
+      success: true,
+      data: newCase
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/cases/:caseId
+ * Get specific case
+ */
+app.get('/api/cases/:caseId', (req: Request, res: Response) => {
+  try {
+    const cases = caseManager.getAllCases();
+    const caseData = cases.find(c => c.id === req.params.caseId);
+    if (!caseData) {
+      return res.status(404).json({ success: false, error: 'Case not found' });
+    }
+    res.json({ success: true, data: caseData });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/cases/:caseId/report
+ * Generate HTML report for case
+ */
+app.get('/api/cases/:caseId/report', (req: Request, res: Response) => {
+  try {
+    const report = caseManager.generateCaseReport(req.params.caseId);
+    if (!report) {
+      return res.status(404).json({ success: false, error: 'Case not found' });
+    }
+    res.setHeader('Content-Type', 'text/html');
+    res.send(report);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/cases/:caseId/export-ho
+ * Export case to HackerOne
+ */
+app.post('/api/cases/:caseId/export-ho', async (req: Request, res: Response) => {
+  try {
+    const { programHandle } = req.body;
+    if (!programHandle) {
+      return res.status(400).json({
+        success: false,
+        error: 'programHandle required'
+      });
+    }
+
+    const cases = caseManager.getAllCases();
+    const caseData = cases.find(c => c.id === req.params.caseId);
+    if (!caseData) {
+      return res.status(404).json({ success: false, error: 'Case not found' });
+    }
+
+    const result = await hackerOneExporter.submitReport(caseData, programHandle);
+
+    if (result.success) {
+      await caseManager.updateCaseStatus(caseData.id, 'submitted');
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/cases/stats
+ * Get case statistics
+ */
+app.get('/api/cases/stats', (req: Request, res: Response) => {
+  try {
+    const stats = caseManager.getStatistics();
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/cases/by-target/:target
+ * Get cases by target
+ */
+app.get('/api/cases/by-target/:target', (req: Request, res: Response) => {
+  try {
+    const cases = caseManager.getCasesByTarget(req.params.target);
+    res.json({
+      success: true,
+      data: cases
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
