@@ -93,6 +93,10 @@ import { hackerOneExporter } from './services/HackerOneExporter';
 
 // ✅ REAL AI CLIENT: Ollama/Gemma integration (replaces mock chat)
 import { jarvisAIClient, AIMessage } from './services/JarvisAIClient';
+import { ObsidianVault } from './services/ObsidianVault';
+
+// Initialize vault service
+const vaultService = new ObsidianVault('.vault');
 
 // In-memory AI chat history (per sessionId -> message list for context)
 const aiChatHistory = new Map<string, AIMessage[]>();
@@ -2010,6 +2014,118 @@ app.get('/api/chat/:sessionId', (req: Request, res: Response) => {
 app.delete('/api/chat/:sessionId', (req: Request, res: Response) => {
   const existed = chatSessions.delete(req.params.sessionId);
   res.json({ success: true, data: { deleted: existed }, timestamp: Date.now() });
+});
+
+// ============================================
+// VAULT API ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/vault/stats
+ * Get vault statistics
+ */
+app.get('/api/vault/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = await vaultService.getStats();
+    res.json({ success: true, data: stats, timestamp: Date.now() });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: Date.now()
+    });
+  }
+});
+
+/**
+ * GET /api/vault/export
+ * Export all vault notes
+ */
+app.get('/api/vault/export', async (req: Request, res: Response) => {
+  try {
+    const notes = await vaultService.export();
+    res.json({
+      success: true,
+      notes: notes,
+      exportedAt: new Date(),
+      totalNotes: notes.length,
+      stats: await vaultService.getStats(),
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: Date.now()
+    });
+  }
+});
+
+/**
+ * GET /api/vault/search
+ * Search vault notes
+ */
+app.get('/api/vault/search', async (req: Request, res: Response) => {
+  try {
+    const query = req.query.q as string;
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        error: 'Search query (q parameter) is required'
+      });
+    }
+
+    const results = await vaultService.search(query);
+    res.json({
+      success: true,
+      query: query,
+      results: results.notes,
+      count: results.notes.length,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: Date.now()
+    });
+  }
+});
+
+/**
+ * POST /api/vault/note
+ * Save a note to the vault
+ */
+app.post('/api/vault/note', async (req: Request, res: Response) => {
+  try {
+    const { title, content, tags, type } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title and content are required'
+      });
+    }
+
+    const note = await vaultService.saveNote({
+      title,
+      content,
+      tags: tags || [],
+      type: type || 'learning'
+    });
+
+    res.json({
+      success: true,
+      note: note,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: Date.now()
+    });
+  }
 });
 
 // ============================================
