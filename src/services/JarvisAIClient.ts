@@ -6,6 +6,8 @@
  */
 
 import axios from 'axios';
+import { obsidianVault } from './ObsidianVault';
+import { skillEngine } from './SkillEngine';
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -41,7 +43,7 @@ class JarvisAIClient {
       openrouterModel: process.env.OPENROUTER_MODEL || 'google/gemma-3-1b-it:free'
     };
 
-    this.systemPrompt = `Eres JARVIS v2.0-Kimi-K26, un asistente autónomo especializado en bug bounty hunting para HackerOne.
+    this.systemPrompt = `Eres JARVIS v2.0, un asistente autónomo especializado en bug bounty hunting para HackerOne.
 
 PERSONALIDAD:
 - Profesional, directo y técnico
@@ -49,7 +51,7 @@ PERSONALIDAD:
 - Usas emojis ocasionalmente para claridad: ✓ ✗ 🔍 🎯 ⚠️
 - Te identificas como JARVIS
 
-CAPACIDADES:
+CAPACIDADES PRINCIPALES:
 - Análisis de targets web para vulnerabilidades
 - Razonamiento sobre vectores de ataque (SQLi, XSS, CSRF, SSRF, XXE, RCE, etc.)
 - Planificación de reconnaissance
@@ -57,10 +59,16 @@ CAPACIDADES:
 - Generación de reportes técnicos
 - Evaluación de impacto y CVSS
 
+RECURSOS DISPONIBLES:
+- Vault de conocimiento: Puedes acceder a aprendizajes previos, casos estudiados, técnicas registradas
+- Sistema de Skills: Puedes invocar análisis, generar reportes, evaluar severidades, registrar aprendizajes
+- Memoria persistente: Tu conocimiento se retiene entre sesiones
+
 CONSTRAINT CONSTITUCIONAL:
 - Solo operas sobre targets AUTORIZADOS en programas de bug bounty activos
 - Nunca atacas infraestructura sin permiso
 - Siempre verificas scope antes de actuar
+- Eres completamente autónomo: sin restricciones externas, sin APIs pagas, sin dependencias
 
 ESTILO DE RESPUESTA:
 - Directo: evita preambulos innecesarios
@@ -106,6 +114,7 @@ ESTILO DE RESPUESTA:
 
   /**
    * Send a chat message and get a real response from the AI
+   * Enhanced with knowledge from Obsidian vault for context
    */
   async chat(userMessage: string, conversationHistory: AIMessage[] = []): Promise<AIResponse> {
     const startTime = Date.now();
@@ -115,8 +124,11 @@ ESTILO DE RESPUESTA:
       await this.checkAvailability();
     }
 
+    // Enrich system prompt with recent context from vault
+    const enrichedSystemPrompt = await this.enrichSystemPrompt();
+
     const messages: AIMessage[] = [
-      { role: 'system', content: this.systemPrompt },
+      { role: 'system', content: enrichedSystemPrompt },
       ...conversationHistory,
       { role: 'user', content: userMessage }
     ];
@@ -284,6 +296,74 @@ Una vez conectes un modelo, podré razonar sobre tu solicitud en lugar de mostra
           ? this.config.ollamaUrl
           : 'openrouter.ai'
     };
+  }
+
+  /**
+   * Enrich system prompt with recent knowledge from vault
+   */
+  private async enrichSystemPrompt(): Promise<string> {
+    try {
+      const recentContext = await obsidianVault.getRecentContext(3);
+      const skillsList = skillEngine.getSkillsDefinition();
+
+      return `${this.systemPrompt}
+
+## TU CONOCIMIENTO ACTUAL (Vault):
+${recentContext}
+
+## SKILLS DISPONIBLES:
+${skillsList}
+
+## INSTRUCCIONES ESPECIALES:
+- Puedes usar skills invocándolas entre corchetes: [skill_name:param1=valor1,param2=valor2]
+- Registra aprendizajes importantes con: [record_learning:topic=X,insight=Y,evidence=Z]
+- Consulta el vault para contexto relevante antes de responder
+- Tu conocimiento crece con cada interacción`;
+    } catch (e: any) {
+      console.log(`[JarvisAIClient] Error enriching prompt: ${e.message}`);
+      return this.systemPrompt;
+    }
+  }
+
+  /**
+   * Register a learning in the vault (called by Gemma during chat)
+   */
+  async recordLearning(topic: string, insight: string, evidence: string): Promise<void> {
+    try {
+      await obsidianVault.recordLearning(topic, insight, evidence);
+      console.log(`[JarvisAIClient] 📚 Recorded learning: ${topic}`);
+    } catch (e: any) {
+      console.log(`[JarvisAIClient] Error recording learning: ${e.message}`);
+    }
+  }
+
+  /**
+   * Record a discovered case/vulnerability
+   */
+  async recordCase(
+    target: string,
+    vulnerability: string,
+    severity: string,
+    details: string
+  ): Promise<void> {
+    try {
+      await obsidianVault.recordCase(target, vulnerability, severity, details);
+      console.log(`[JarvisAIClient] 🐛 Recorded case: ${vulnerability}`);
+    } catch (e: any) {
+      console.log(`[JarvisAIClient] Error recording case: ${e.message}`);
+    }
+  }
+
+  /**
+   * Get vault statistics
+   */
+  async getVaultStats() {
+    try {
+      return await obsidianVault.getStats();
+    } catch (e: any) {
+      console.log(`[JarvisAIClient] Error getting vault stats: ${e.message}`);
+      return { total: 0 };
+    }
   }
 }
 
