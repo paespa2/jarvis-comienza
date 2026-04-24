@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS - Automatización</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #0f1624 0%, #1a1f3a 100%);
+      color: #e2e8f0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .navbar {
+      background: rgba(15, 22, 40, 0.95);
+      border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+      padding: 1rem 2rem;
+      display: flex;
+      gap: 2rem;
+      backdrop-filter: blur(10px);
+    }
+    .navbar a {
+      color: #94a3b8;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      transition: all 0.3s;
+    }
+    .navbar a:hover {
+      color: #00d4ff;
+      background: rgba(0, 212, 255, 0.1);
+    }
+    .container {
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 { color: #00d4ff; margin-bottom: 2rem; }
+    .section {
+      background: rgba(30, 40, 60, 0.8);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 0.75rem;
+      background: rgba(15, 22, 40, 0.8);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.9rem;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: rgba(0, 212, 255, 0.6);
+      background: rgba(15, 22, 40, 1);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+    .btn {
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.3s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .output {
+      background: rgba(15, 22, 40, 0.8);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 6px;
+      padding: 1rem;
+      min-height: 200px;
+      overflow-y: auto;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.85rem;
+      color: #10b981;
+    }
+    .status-item {
+      padding: 0.75rem;
+      background: rgba(139, 92, 246, 0.1);
+      border-left: 3px solid #8b5cf6;
+      margin-bottom: 0.75rem;
+      border-radius: 4px;
+    }
+    .status-item.success {
+      border-left-color: #10b981;
+      background: rgba(16, 185, 129, 0.1);
+    }
+    .status-item.error {
+      border-left-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <a href="/">← Volver</a>
+    <a href="/chat.html">💬 Chat</a>
+    <a href="/dashboard.html">📊 Dashboard</a>
+    <a href="/automation.html">⚙️ Automatización</a>
+  </div>
+
+  <div class="container">
+    <h1>⚙️ Automatización y Scraping</h1>
+
+    <div class="section">
+      <h2 style="color: #00d4ff; margin-bottom: 1rem;">Scraping Web</h2>
+      <div class="form-group">
+        <label>URL a scrapear:</label>
+        <input type="url" id="scrapeUrl" placeholder="https://example.com">
+      </div>
+      <div class="form-group">
+        <label>Selector CSS (opcional):</label>
+        <input type="text" id="scrapeSelector" placeholder=".producto, #contenido, etc">
+      </div>
+      <div class="form-group">
+        <label>Tipo de extracción:</label>
+        <select id="scrapeType">
+          <option value="html">HTML completo</option>
+          <option value="text">Solo texto</option>
+          <option value="links">Enlaces</option>
+          <option value="images">Imágenes</option>
+          <option value="forms">Formularios</option>
+        </select>
+      </div>
+      <button class="btn" onclick="startScraping()">🕷️ Iniciar Scraping</button>
+    </div>
+
+    <div class="section">
+      <h2 style="color: #00d4ff; margin-bottom: 1rem;">Navegación Automática</h2>
+      <div class="form-group">
+        <label>Acciones (una por línea):</label>
+        <textarea id="automationScript" placeholder="click(.boton)
+type(.input, usuario@ejemplo.com)
+submit(.formulario)
+wait(2000)
+screenshot()"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Nombre de la tarea:</label>
+        <input type="text" id="taskName" placeholder="Mi tarea automatizada">
+      </div>
+      <button class="btn" onclick="startAutomation()">▶️ Ejecutar Automatización</button>
+    </div>
+
+    <div class="section">
+      <h2 style="color: #00d4ff; margin-bottom: 1rem;">Análisis de Trabajos</h2>
+      <div class="form-group">
+        <label>URL del trabajo o repositorio:</label>
+        <input type="url" id="jobUrl" placeholder="https://github.com/user/repo o URL de proyecto">
+      </div>
+      <div class="form-group">
+        <label>¿Qué deseas analizar?</label>
+        <textarea id="jobAnalysis" placeholder="Analiza el código, busca vulnerabilidades, verifica la estructura del proyecto, etc."></textarea>
+      </div>
+      <button class="btn" onclick="analyzeJob()">🔍 Analizar Proyecto</button>
+    </div>
+
+    <div class="section">
+      <h2 style="color: #00d4ff; margin-bottom: 1rem;">Resultados</h2>
+      <div id="output" class="output">
+        <div style="color: #94a3b8;">Los resultados aparecerán aquí...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function appendOutput(message, type = 'info') {
+      const output = document.getElementById('output');
+      const item = document.createElement('div');
+      item.className = `status-item ${type}`;
+      item.textContent = message;
+      output.appendChild(item);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    async function startScraping() {
+      const url = document.getElementById('scrapeUrl').value;
+      const selector = document.getElementById('scrapeSelector').value;
+      const type = document.getElementById('scrapeType').value;
+
+      if (!url) {
+        appendOutput('❌ Ingresa una URL', 'error');
+        return;
+      }
+
+      appendOutput(`🕷️ Scrapeando: ${url}...`, 'info');
+
+      try {
+        const response = await fetch('/api/automate/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, selector, type })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          appendOutput(`✓ Scraping completado (${data.itemsFound} elementos)`, 'success');
+          appendOutput(JSON.stringify(data.data, null, 2), 'success');
+        } else {
+          appendOutput(`❌ Error: ${data.error}`, 'error');
+        }
+      } catch (e) {
+        appendOutput(`❌ Error de red: ${e.message}`, 'error');
+      }
+    }
+
+    async function startAutomation() {
+      const script = document.getElementById('automationScript').value;
+      const taskName = document.getElementById('taskName').value;
+
+      if (!script || !taskName) {
+        appendOutput('❌ Completa todos los campos', 'error');
+        return;
+      }
+
+      appendOutput(`▶️ Ejecutando: ${taskName}...`, 'info');
+
+      try {
+        const response = await fetch('/api/automate/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskName, script, automate: true })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          appendOutput(`✓ Tarea completada: ${taskName}`, 'success');
+          if (data.result) appendOutput(data.result, 'success');
+        } else {
+          appendOutput(`❌ Error: ${data.error}`, 'error');
+        }
+      } catch (e) {
+        appendOutput(`❌ Error: ${e.message}`, 'error');
+      }
+    }
+
+    async function analyzeJob() {
+      const url = document.getElementById('jobUrl').value;
+      const analysis = document.getElementById('jobAnalysis').value;
+
+      if (!url || !analysis) {
+        appendOutput('❌ Completa URL y análisis', 'error');
+        return;
+      }
+
+      appendOutput(`🔍 Analizando proyecto...`, 'info');
+
+      try {
+        const response = await fetch('/api/automate/analyze-job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, analysis })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          appendOutput(`✓ Análisis completado`, 'success');
+          appendOutput(data.findings, 'success');
+        } else {
+          appendOutput(`❌ Error: ${data.error}`, 'error');
+        }
+      } catch (e) {
+        appendOutput(`❌ Error: ${e.message}`, 'error');
+      }
+    }
+  </script>
+</body>
+</html>
