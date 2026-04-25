@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -23,8 +23,11 @@
     "typeRoots": ["./node_modules/@types"]
   },
   "include": [
-    "src/server.ts",
-    "src/integrations/**/*.ts"
+    "jarvis.ts",
+    "src/services/JarvisAIClient.ts",
+    "src/services/ObsidianVault.ts",
+    "src/services/SkillEngine.ts",
+    "scripts/seed-vault.ts"
   ],
   "exclude": [
     "node_modules",
